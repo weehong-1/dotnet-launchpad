@@ -1,0 +1,39 @@
+---
+sidebar_label: About the Reference
+sidebar_position: 0
+---
+
+# Reference
+
+The Reference is the .NET 10 Clean Architecture template: the architecture specification and the Boilerplate code in one place. The [Setup Flow](../setup/index.mdx) walks through it in order; this is where the detail lives.
+
+| Item | Details |
+| --- | --- |
+| Boilerplate version | 1.0 |
+| Status | The Skeleton Solution builds with zero warnings and its tests pass (scaffold script, .NET SDK 10.0.401, Worker and Auditing both on and both off); the integration test needs a MassTransit license. Running on a VM is not yet verified. |
+| Applies to | Every backend project built on .NET 10 |
+| Architecture | Clean Architecture, Vertical Slice, DDD, CQRS |
+
+The template is only a technical skeleton. **It contains no business logic or business process**, so it fits any project. Aggregates, use cases, endpoints and background jobs are added in each project as its requirements dictate.
+
+## Structure
+
+- **Part 1: Architecture specification** (sections 1 to 10): layering, naming, layer responsibilities, optional components and design rules.
+- **Part 2: Boilerplate code** (sections 11 to 18): the files every project starts with. Each section ends with an AI coding agent prompt.
+- **Appendix A: Demo code**: a fictional `Sample` feature that shows how the pieces connect. It is not part of the template: never copy it into a project.
+- **Appendix B: Key decision record**: why the major technical choices were made, for when you want to change one.
+
+## Personalised code
+
+With an active project (see the bar at the top of each page), every code block uses its Project Name and Short Name, and the parts for Optional Components it leaves out are removed or collapsed. Without one, the code shows the `%%ProductName%%` and `%%productname%%` placeholders and every optional part.
+
+## Version 1.0 highlights
+
+- The validation pipeline builds failed results through the new `IResultFactory<TSelf>` static abstract factory instead of reflection ([13.11](./code/13-domain.mdx#13-11-result-cs-and-iresultfactory-cs), [14.9](./code/14-application.mdx#14-9-validationpipelinebehavior-cs)).
+- New tests guard it: an architecture test that every handler comes through the template's handler interfaces ([18.1](./code/18-tests.mdx#18-1-layertests-cs)), and a pipeline test that Commands are validated and Queries are not ([18.5](./code/18-tests.mdx#18-5-validationpipelinebehaviortests-cs-application-unittests)).
+- The AI common rules carry the full Project Settings, including the Short Name, SonarCloud and Qodana ([11.1](./code/11-file-overview.mdx#11-1-generating-with-an-ai-coding-agent)).
+- Verified by building a scaffolded solution, which found and fixed: the missing `Microsoft.Extensions.Configuration.Abstractions` package (12.2), `using` directives now supplied by one `GlobalUsings.cs` per project ([11.3](./code/11-file-overview.mdx#11-3-globalusings-cs-per-project)), `using MassTransit;` in the Worker (17.2), EF migrations failing the style rules ([12.4](./code/12-solution-level.mdx#12-4-editorconfig)), and a fresh skeleton running zero Domain tests (`ResultTests`, 18.2).
+- Tests run on Microsoft.Testing.Platform, selected in `global.json` ([12.3](./code/12-solution-level.mdx#12-3-global-json)), with `Microsoft.Testing.Extensions.CodeCoverage` for coverage.
+- The MassTransit v9 license is configured concretely through `MT_LICENSE` / `MT_LICENSE_PATH` locally, in CI and on the VMs ([8.8](./spec/08-design-rules/08-configuration-environments-and-secrets.mdx)).
+- Renaming or dropping a column takes three deployments, so every rollback stays compatible ([8.21](./spec/08-design-rules/21-deployment.mdx)).
+- The open decisions of v1.1 became either this change or per-project decisions in [Setup Flow step 0.2](../setup/project-decisions.mdx).

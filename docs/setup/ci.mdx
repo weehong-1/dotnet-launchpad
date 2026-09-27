@@ -1,0 +1,19 @@
+---
+sidebar_label: 4.1 Set up CI
+---
+
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 4.1 Set up CI
+
+The push in step 3.3 already triggered `.github/workflows/ci.yml` ([Reference 12.10](../reference/code/12-solution-level.mdx#12-10-github-workflows-ci-yml)). It builds, runs every test (including the Testcontainers integration tests), and publishes the deployment artifact only when the tests pass.
+
+```bash
+gh run watch                        # follow the latest run
+gh run list --workflow ci --limit 5
+gh run view <run-id>                # the artifact productname-<sha> is listed at the bottom
+```
+
+The `MT_LICENSE`, SonarCloud and Qodana secrets were set in [step 3.3](./commit.mdx) before the first push. If a run failed because one was missing, set it and re-run: `gh run rerun <run-id>`.
+
+<DoneConditions step="ci" />

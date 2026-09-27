@@ -1,0 +1,14 @@
+---
+sidebar_label: 4.7 Production 首次部署
+---
+
+import {Deploy} from '@site/src/components/Commands';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 4.7 Production：首次部署
+
+只把已通过 SIT 部署和测试的版本部署到 Production。步骤遵循 [Reference 8.21](../reference/spec/08-design-rules/21-deployment.mdx)。第 1 个代码块在你的电脑上执行；第 2 个代码块以 SSH 连线到 VM，第 3 至 7 个代码块都在这同一个 SSH 会话中执行，使 `$VERSION`、`$STAGE`、`$R`、`$MIGRATED` 等变量在各代码块之间保留。
+
+<Deploy env="Production" />
+
+<DoneConditions step="prod-deploy" />

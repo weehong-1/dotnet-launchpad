@@ -1,0 +1,629 @@
+---
+sidebar_label: "16. Api"
+---
+
+import Prompt16Api from '../_partials/prompt-16-api.mdx';
+
+# 16. Api \{#16-api\}
+
+## 16.1 IEndpoint.cs \{#16-1-iendpoint-cs\}
+
+```csharp
+namespace ProductName.Api.Endpoints;
+
+public interface IEndpoint
+{
+    void MapEndpoint(IEndpointRouteBuilder app);
+}
+```
+
+## 16.2 EndpointExtensions.cs \{#16-2-endpointextensions-cs\}
+
+```csharp
+using System.Reflection;
+
+namespace ProductName.Api.Endpoints;
+
+public static class EndpointExtensions
+{
+    public static IServiceCollection AddEndpoints(this IServiceCollection services)
+    {
+        var endpointTypes = Assembly.GetExecutingAssembly()
+            .DefinedTypes
+            .Where(t => t is { IsAbstract: false, IsInterface: false } && t.IsAssignableTo(typeof(IEndpoint)));
+
+        foreach (var type in endpointTypes)
+            services.AddTransient(typeof(IEndpoint), type);
+
+        return services;
+    }
+
+    public static WebApplication MapEndpoints(this WebApplication app)
+    {
+        foreach (var endpoint in app.Services.GetRequiredService<IEnumerable<IEndpoint>>())
+            endpoint.MapEndpoint(app);
+
+        return app;
+    }
+}
+```
+
+每个端点一个类，放在 `Endpoints/{功能}/{用例}.cs`，与 Application 的 `Features/{功能}/{用例}/` 一一对应（见 [8.15](../spec/08-design-rules/15-feature-slices-vertical-slice.mdx)）。新增端点不需要手动注册。英文 guide 使用 Controllers 加 Asp.Versioning，本模板不采用；是否加入 API 版本控制属于项目决策（[Setup Flow 步骤 0.2](../../setup/project-decisions.mdx)），模板没有提供对应代码。
+
+## 16.3 ResultExtensions.cs \{#16-3-resultextensions-cs\}
+
+```csharp
+namespace ProductName.Api.Extensions;
+
+public static class ResultExtensions
+{
+    public static TOut Match<TOut>(
+        this Result result,
+        Func<TOut> onSuccess,
+        Func<Result, TOut> onFailure) =>
+        result.IsSuccess ? onSuccess() : onFailure(result);
+
+    public static TOut Match<TIn, TOut>(
+        this Result<TIn> result,
+        Func<TIn, TOut> onSuccess,
+        Func<Result<TIn>, TOut> onFailure) =>
+        result.IsSuccess ? onSuccess(result.Value) : onFailure(result);
+}
+```
+
+## 16.4 MigrationExtensions.cs \{#16-4-migrationextensions-cs\}
+
+```csharp
+using Microsoft.EntityFrameworkCore;
+
+namespace ProductName.Api.Extensions;
+
+internal static class MigrationExtensions
+{
+    // 由设定 Migrations:ApplyOnStartup 控制，只在 Development 开启；SIT 与正式环境的迁移方式见 8.11
+    public static async Task ApplyMigrationsAsync(this WebApplication app)
+    {
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await db.Database.MigrateAsync();
+    }
+}
+```
+
+## 16.5 CustomResults.cs \{#16-5-customresults-cs\}
+
+```csharp
+namespace ProductName.Api.Infrastructure;
+
+public static class CustomResults
+{
+    public static IResult Problem(Result result)
+    {
+        if (result.IsSuccess)
+            throw new InvalidOperationException("Cannot create a problem from a successful result.");
+
+        return Results.Problem(
+            title: result.Error.Code,
+            detail: result.Error.Description,
+            statusCode: GetStatusCode(result.Error.Type),
+            extensions: GetErrors(result));
+    }
+
+    private static int GetStatusCode(ErrorType type) => type switch
+    {
+        ErrorType.Validation => StatusCodes.Status400BadRequest,
+        ErrorType.Unauthorized => StatusCodes.Status401Unauthorized,
+        ErrorType.Forbidden => StatusCodes.Status403Forbidden,
+        ErrorType.NotFound => StatusCodes.Status404NotFound,
+        ErrorType.Conflict => StatusCodes.Status409Conflict,
+        _ => StatusCodes.Status500InternalServerError
+    };
+
+    private static Dictionary<string, object?>? GetErrors(Result result) =>
+        result.Error is ValidationError validationError
+            ? new Dictionary<string, object?> { ["errors"] = validationError.Errors }
+            : null;
+}
+```
+
+所有错误响应统一为 ProblemDetails 格式，调用方只需处理一种结构。
+
+## 16.6 GlobalExceptionHandler.cs \{#16-6-globalexceptionhandler-cs\}
+
+```csharp
+using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+
+namespace ProductName.Api.Infrastructure;
+
+internal sealed class GlobalExceptionHandler(
+    ILogger<GlobalExceptionHandler> logger,
+    IProblemDetailsService problemDetailsService)
+    : IExceptionHandler
+{
+    public async ValueTask<bool> TryHandleAsync(
+        HttpContext httpContext,
+        Exception exception,
+        CancellationToken ct)
+    {
+        // 并发冲突：可预期的情况，返回 409 让前端提示重新载入（见 8.17）
+        if (exception is DbUpdateConcurrencyException)
+        {
+            logger.LogWarning(exception, "Concurrency conflict");
+
+            return await WriteProblemAsync(
+                httpContext,
+                exception,
+                StatusCodes.Status409Conflict,
+                "Concurrency.Conflict",
+                "The resource was modified by another request. Reload and try again.");
+        }
+
+        if (exception is DomainException domainException)
+            logger.LogError(exception, "Domain invariant violated: {ErrorCode}", domainException.Code);
+        else
+            logger.LogError(exception, "Unhandled exception occurred");
+
+        return await WriteProblemAsync(
+            httpContext,
+            exception,
+            StatusCodes.Status500InternalServerError,
+            "Server.Error",
+            "An unexpected error occurred.");
+    }
+
+    private ValueTask<bool> WriteProblemAsync(
+        HttpContext httpContext,
+        Exception exception,
+        int statusCode,
+        string title,
+        string detail)
+    {
+        httpContext.Response.StatusCode = statusCode;
+
+        return problemDetailsService.TryWriteAsync(new ProblemDetailsContext
+        {
+            HttpContext = httpContext,
+            Exception = exception,
+            ProblemDetails = new ProblemDetails
+            {
+                Title = title,
+                Detail = detail,
+                Status = statusCode
+            }
+        });
+    }
+}
+```
+
+- 并发冲突返回 409 并以 Warning 记录，因为这是多人同时操作时可预期的情况，不是程序错误。
+- 领域异常与其他未预期的异常一律返回 500，不对外透露内部细节；领域异常另在日志中记录错误代码。
+- 业务失败走 Result，不会进到这里。
+
+## 16.7 AuthExtensions.cs \{#16-7-authextensions-cs\}
+
+```csharp
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using ProductName.Api.Authorization;
+
+namespace ProductName.Api.Extensions;
+
+internal static class AuthExtensions
+{
+    public static IServiceCollection AddApiAuthentication(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services
+            .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            .AddJwtBearer(options =>
+            {
+                options.Authority = configuration["Authentication:Authority"];
+                options.Audience = configuration["Authentication:Audience"];
+            });
+
+        // 预设所有端点都须登入；公开端点须明确标记 AllowAnonymous（见 8.16）
+        services.AddAuthorizationBuilder()
+            .SetFallbackPolicy(new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .Build());
+
+        services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
+
+        return services;
+    }
+}
+```
+
+- 只使用标准的 JWT Bearer 验证，适用于任何 OpenID Connect 提供方；提供方的差异只在设定值。
+- `Authority` 必须是 HTTPS 网址；设定留空时所有需要登入的请求都会被拒绝，不会意外开放。
+
+## 16.8 PermissionRequirement.cs \{#16-8-permissionrequirement-cs\}
+
+```csharp
+using Microsoft.AspNetCore.Authorization;
+
+namespace ProductName.Api.Authorization;
+
+internal sealed class PermissionRequirement(string permission) : IAuthorizationRequirement
+{
+    public string Permission { get; } = permission;
+}
+```
+
+## 16.9 PermissionAuthorizationHandler.cs \{#16-9-permissionauthorizationhandler-cs\}
+
+```csharp
+using Microsoft.AspNetCore.Authorization;
+
+namespace ProductName.Api.Authorization;
+
+internal sealed class PermissionAuthorizationHandler(IPermissionProvider permissionProvider)
+    : AuthorizationHandler<PermissionRequirement>
+{
+    protected override async Task HandleRequirementAsync(
+        AuthorizationHandlerContext context,
+        PermissionRequirement requirement)
+    {
+        if (context.User.Identity?.IsAuthenticated != true)
+            return;
+
+        var permissions = await permissionProvider.GetPermissionsAsync(context.User);
+
+        if (permissions.Contains(requirement.Permission))
+            context.Succeed(requirement);
+    }
+}
+```
+
+## 16.10 PermissionEndpointExtensions.cs \{#16-10-permissionendpointextensions-cs\}
+
+```csharp
+using ProductName.Api.Authorization;
+
+namespace ProductName.Api.Extensions;
+
+public static class PermissionEndpointExtensions
+{
+    public static TBuilder RequirePermission<TBuilder>(this TBuilder builder, string permission)
+        where TBuilder : IEndpointConventionBuilder =>
+        builder.RequireAuthorization(policy => policy
+            .RequireAuthenticatedUser()
+            .AddRequirements(new PermissionRequirement(permission)));
+}
+```
+
+端点写法：`app.MapPost(...).RequirePermission(XxxPermissions.Create);`，不需要预先注册政策。
+
+## 16.11 RateLimitingExtensions.cs \{#16-11-ratelimitingextensions-cs\}
+
+```csharp
+using System.Security.Claims;
+using System.Threading.RateLimiting;
+
+namespace ProductName.Api.Extensions;
+
+internal static class RateLimitingExtensions
+{
+    public static IServiceCollection AddApiRateLimiting(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        var permitLimit = configuration.GetValue("RateLimiting:PermitLimit", 100);
+        var window = TimeSpan.FromSeconds(configuration.GetValue("RateLimiting:WindowSeconds", 60));
+
+        services.AddRateLimiter(options =>
+        {
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+            // 已登入的请求以 UserId 计数，未登入的请求以客户端 IP 计数（见 8.18）
+            options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier)
+                        ?? httpContext.Connection.RemoteIpAddress?.ToString()
+                        ?? "unknown",
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = permitLimit,
+                        Window = window
+                    }));
+        });
+
+        return services;
+    }
+}
+```
+
+- 以 IP 计数依赖转发标头设定（见 [16.13](#16-13-program-cs)），否则所有请求都会被视为来自 Nginx。
+- 个别端点需要不同的限制时，另外定义具名政策，并在端点加上 `.RequireRateLimiting("政策名称")`。
+
+## 16.12 appsettings 设定档（4 个） \{#16-12-appsettings-files-4\}
+
+分层方式与各环境差异见 [8.8](../spec/08-design-rules/08-configuration-environments-and-secrets.mdx)，日志设计见 [8.9](../spec/08-design-rules/09-logging-rules.mdx)。
+
+### appsettings.json（基础档） \{#appsettings-json-base-file\}
+
+```json
+{
+  "ConnectionStrings": {
+    "Database": "",
+    "MessageBroker": ""
+  },
+  "MediatR": {
+    "LicenseKey": ""
+  },
+  "Cors": {
+    "AllowedOrigins": []
+  },
+  "OpenApi": {
+    "Enabled": false
+  },
+  "Migrations": {
+    "ApplyOnStartup": false
+  },
+  "Authentication": {
+    "Authority": "",
+    "Audience": "",
+    "PermissionClaimType": "permissions"
+  },
+  "RateLimiting": {
+    "PermitLimit": 100,
+    "WindowSeconds": 60
+  },
+  "Serilog": {
+    "MinimumLevel": {
+      "Default": "Information",
+      "Override": {
+        "Microsoft": "Warning",
+        "Microsoft.Hosting.Lifetime": "Information",
+        "Microsoft.EntityFrameworkCore.Database.Command": "Warning",
+        "MassTransit": "Warning"
+      }
+    },
+    "Enrich": [ "FromLogContext", "WithMachineName", "WithEnvironmentName" ],
+    "Properties": {
+      "Application": "ProductName.Api"
+    }
+  },
+  "AllowedHosts": "*"
+}
+```
+
+- 所有功能预设关闭，连接字符串留空。任何环境漏设连接字符串，应用会在启动时直接失败，不会连错数据库。
+- `Authentication` 的 `Authority` 与 `Audience` 按环境以 User Secrets 或环境变量提供（见 [8.16](../spec/08-design-rules/16-authentication-and-authorization.mdx)）；`RateLimiting` 为限流预设值（见 [8.18](../spec/08-design-rules/18-rate-limiting.mdx)）。
+- 不定义 `Serilog:WriteTo`，由各环境档自行定义（原因见 [8.8](../spec/08-design-rules/08-configuration-environments-and-secrets.mdx)）。
+- `Enrich` 与 `Properties` 让每条日志都带上机器名称、环境名称与应用名称（见 [8.9](../spec/08-design-rules/09-logging-rules.mdx)）。
+
+### appsettings.Development.json \{#appsettings-development-json\}
+
+```json
+{
+  "ConnectionStrings": {
+    "Database": "Host=localhost;Port=5432;Database=productname;Username=postgres;Password=postgres",
+    "MessageBroker": "amqp://guest:guest@localhost:5672"
+  },
+  "Cors": {
+    "AllowedOrigins": []
+  },
+  "OpenApi": {
+    "Enabled": true
+  },
+  "Migrations": {
+    "ApplyOnStartup": true
+  },
+  "Serilog": {
+    "MinimumLevel": {
+      "Default": "Debug"
+    },
+    "WriteTo": {
+      "Console": {
+        "Name": "Console"
+      },
+      "Seq": {
+        "Name": "Seq",
+        "Args": { "serverUrl": "http://localhost:5341" }
+      }
+    }
+  }
+}
+```
+
+- 连接字符串与 Seq 网址对应 `docker-compose.yml` 的本地预设值，本地开发开箱即用。
+- 开发环境不写日志文件。
+- `Cors:AllowedOrigins` 填入本地前端网址；没有前端的项目保持空白。
+- MediatR 授权金钥不写在这里，以 User Secrets 提供。
+
+### appsettings.SIT.json \{#appsettings-sit-json\}
+
+```json
+{
+  "Cors": {
+    "AllowedOrigins": []
+  },
+  "OpenApi": {
+    "Enabled": true
+  },
+  "Serilog": {
+    "WriteTo": {
+      "Console": {
+        "Name": "Console",
+        "Args": { "restrictedToMinimumLevel": "Warning" }
+      },
+      "File": {
+        "Name": "Async",
+        "Args": {
+          "configure": [
+            {
+              "Name": "File",
+              "Args": {
+                "path": "/var/log/productname/api/log-.json",
+                "formatter": "Serilog.Formatting.Compact.RenderedCompactJsonFormatter, Serilog.Formatting.Compact",
+                "rollingInterval": "Day",
+                "rollOnFileSizeLimit": true,
+                "fileSizeLimitBytes": 104857600,
+                "retainedFileTimeLimit": "14.00:00:00",
+                "retainedFileCountLimit": 50
+              }
+            }
+          ]
+        }
+      },
+      "Seq": {
+        "Name": "Seq",
+        "Args": { "serverUrl": "", "apiKey": "" }
+      }
+    }
+  }
+}
+```
+
+- 连接字符串、授权金钥、Seq 网址与 API key 以环境变量或机密管理服务提供，不写在设定档。Seq 的环境变量为 `Serilog__WriteTo__Seq__Args__serverUrl` 与 `Serilog__WriteTo__Seq__Args__apiKey`。
+- 日志文件路径中的 `%%productname%%` 改为项目名称小写。
+- 文件保留 14 天，最多 50 个文件（磁盘上限约 5 GB）。
+- `Cors:AllowedOrigins` 填入 SIT 前端网址。
+- 开启 OpenAPI 供测试人员查阅与试用端点；其余设定与正式环境一致。
+
+### appsettings.Production.json \{#appsettings-production-json\}
+
+```json
+{
+  "Cors": {
+    "AllowedOrigins": []
+  },
+  "Serilog": {
+    "WriteTo": {
+      "Console": {
+        "Name": "Console",
+        "Args": { "restrictedToMinimumLevel": "Warning" }
+      },
+      "File": {
+        "Name": "Async",
+        "Args": {
+          "configure": [
+            {
+              "Name": "File",
+              "Args": {
+                "path": "/var/log/productname/api/log-.json",
+                "formatter": "Serilog.Formatting.Compact.RenderedCompactJsonFormatter, Serilog.Formatting.Compact",
+                "rollingInterval": "Day",
+                "rollOnFileSizeLimit": true,
+                "fileSizeLimitBytes": 104857600,
+                "retainedFileTimeLimit": "30.00:00:00",
+                "retainedFileCountLimit": 100
+              }
+            }
+          ]
+        }
+      },
+      "Seq": {
+        "Name": "Seq",
+        "Args": { "serverUrl": "", "apiKey": "" }
+      }
+    }
+  }
+}
+```
+
+- 连接字符串、授权金钥、Seq 网址与 API key 以环境变量或机密管理服务提供，不写在设定档。
+- 日志文件路径中的 `%%productname%%` 改为项目名称小写。
+- 文件保留 30 天，最多 100 个文件（磁盘上限约 10 GB）。
+- `Cors:AllowedOrigins` 填入正式前端网址。
+- OpenAPI 与启动时迁移沿用基础档的关闭设定，不需要重复写。
+- 建议把 `AllowedHosts` 改为正式网域，只接受指定主机名称的请求。
+
+## 16.13 Program.cs \{#16-13-program-cs\}
+
+```csharp
+using System.Security.Claims;
+using Microsoft.AspNetCore.HttpOverrides;
+using ProductName.Api.Endpoints;
+using ProductName.Api.Extensions;
+using ProductName.Api.Infrastructure;
+using ProductName.Application;
+using ProductName.Infrastructure;
+using Scalar.AspNetCore;
+using Serilog;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// 以 systemd 服务执行时，回报启动完成并正确处理停止信号（见 12.7）
+builder.Services.AddSystemd();
+
+builder.Services.AddSerilog((services, logger) => logger
+    .ReadFrom.Configuration(builder.Configuration)
+    .ReadFrom.Services(services));
+
+builder.Services
+    .AddApplication(builder.Configuration)
+    .AddInfrastructure(builder.Configuration)
+    .AddEndpoints();
+
+// 位于 Nginx 反向代理之后，取得真实的客户端 IP 与通讯协定
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto);
+
+builder.Services.AddOpenApi();
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+
+builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
+    .WithOrigins(builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [])
+    .AllowAnyHeader()
+    .AllowAnyMethod()));
+
+builder.Services
+    .AddApiAuthentication(builder.Configuration)
+    .AddApiRateLimiting(builder.Configuration);
+
+var app = builder.Build();
+
+if (app.Configuration.GetValue<bool>("OpenApi:Enabled"))
+{
+    app.MapOpenApi().AllowAnonymous();
+    app.MapScalarApiReference().AllowAnonymous();
+}
+
+if (app.Configuration.GetValue<bool>("Migrations:ApplyOnStartup"))
+    await app.ApplyMigrationsAsync();
+
+app.UseForwardedHeaders();
+
+// 放在异常处理之外：请求日志只记录最终状态码，异常本身由 GlobalExceptionHandler 记录一次
+app.UseSerilogRequestLogging(options =>
+    options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
+    {
+        diagnosticContext.Set("UserId", httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier));
+        diagnosticContext.Set("ClientIp", httpContext.Connection.RemoteIpAddress?.ToString());
+    });
+
+app.UseExceptionHandler();
+app.UseCors();
+app.UseAuthentication();
+app.UseRateLimiter();
+app.UseAuthorization();
+
+app.MapHealthChecks("/health")
+    .AllowAnonymous()
+    .DisableRateLimiting();
+app.MapEndpoints();
+
+await app.RunAsync();
+
+// 供整合测试的 WebApplicationFactory 使用
+public partial class Program { }
+```
+
+- OpenAPI 文档与 Scalar 界面由设定 `OpenApi:Enabled` 控制（Development 与 SIT 开启），界面位于 `/scalar`。
+- 启动时迁移由设定 `Migrations:ApplyOnStartup` 控制，只在 Development 开启。
+- 健康检查位于 `/health`，供负载平衡器或监控服务探测。
+- 请求日志每个请求记录一条，包含路径、状态码、耗时、`UserId` 与 `ClientIp`（见 [8.9](../spec/08-design-rules/09-logging-rules.mdx)）。
+- 转发标头预设只信任本机的代理。Nginx 与 Api 在同一台 VM 时不需额外设定；Nginx 在其他主机时，须把它的 IP 加入 `KnownProxies`，否则取得的 IP 会是 Nginx 的。
+- 身份认证与授权见 [16.7](#16-7-authextensions-cs) 至 [16.10](#16-10-permissionendpointextensions-cs)：预设所有端点都须登入，健康检查与 OpenAPI 明确标记为公开。
+- 限流放在认证之后，才能以使用者计数；健康检查不受限流影响（见 [8.18](../spec/08-design-rules/18-rate-limiting.mdx)）。
+- `AddSystemd()` 在非 systemd 环境（例如本机开发）自动不起作用。
+
+## 16.14 AI Coding Agent 提示词 \{#16-14-ai-coding-agent-prompt\}
+
+<Prompt16Api />

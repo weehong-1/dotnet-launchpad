@@ -1,0 +1,10 @@
+```text
+执行文档第 14 节（Application）。前置条件：第 13 节已完成。
+
+1. 按第 11 节列出的路径建立 14.1 至 14.19 的文件，内容照文档。
+2. 14.16 至 14.19 只在选择审计时建立，未选择审计时一并删除 14.15 中 OperationAuditPipelineBehavior 的注册。
+3. 所有 Pipeline Behavior 维持 internal sealed，注册顺序照 14.15：日志、操作审计、验证。Application 只使用 ILogger，不得引用 Serilog。
+4. 不要建立任何 Command、Query、Handler、Validator 或 DTO 范例。
+
+完成条件：dotnet build 成功；ProductName.Application 只引用 ProductName.Domain，没有引用 MassTransit。
+```

@@ -1,0 +1,55 @@
+---
+sidebar_label: "8.21 Deployment"
+---
+
+# 8.21 Deployment \{#8-21-deployment\}
+
+**Publishing**
+
+Publish self contained for linux-x64. The executable includes the .NET runtime, so the VM needs no .NET installed and each application pins its own runtime version. See [12.10](../../code/12-solution-level.mdx#12-10-github-workflows-ci-yml) for CI.
+
+**VM directory layout**
+
+```
+/opt/productname/
+    releases/<version>/api/          One new directory per deployment
+    releases/<version>/worker/  # @@worker
+    api      -> releases/<version>/api    Symbolic link to the current version
+    worker   -> releases/<version>/worker  # @@worker
+/etc/productname/
+    api.env                          Environment variables and secrets, owner root, mode 600
+    worker.env  # @@worker
+/var/log/productname/
+    api/                             Log files (see 8.9)
+    worker/  # @@worker
+```
+
+**First time VM setup**
+
+1. Create the system account that runs the services (same as the lowercase project name, no login).
+2. Create the directories above; `/opt/productname` and `/var/log/productname` are owned by that account.
+3. Create `/etc/productname/api.env` and `worker.env` from the [12.9](../../code/12-solution-level.mdx#12-9-deploy-env-environment-variable-templates) templates with that environment's settings and secrets, owner root, mode 600.
+4. Put the [12.7](../../code/12-solution-level.mdx#12-7-deploy-systemd-service-files) systemd service files in `/etc/systemd/system/` and run `systemctl enable`.
+5. Install Nginx and certbot, add the [12.8](../../code/12-solution-level.mdx#12-8-deploy-nginx-productname-api-conf) site configuration and obtain the HTTPS certificate.
+6. Set journald's `SystemMaxUse` (see [8.9](./09-logging-rules.mdx)) and the system time zone to UTC; the firewall opens only 80, 443 and SSH.
+7. Create the owner account and the application account in the database (see [8.11](./11-database-migrations.mdx)).
+
+**Each deployment**
+
+1. Get the CI artifacts: api, worker, migration bundle.
+2. Extract them to `/opt/productname/releases/<version>/`.
+3. Run the migration bundle with the database owner account, passing the connection string through the environment so it never appears in shell history or process arguments: `read -rs OWNER_CONNECTION`, then `ConnectionStrings__Database="$OWNER_CONNECTION" ./efbundle; unset OWNER_CONNECTION`. Do not use `--connection`.
+4. Switch the `api` and `worker` symbolic links to the new version and restart both services.
+5. Confirm `/health` returns Healthy and Seq shows no new errors.
+
+**Rollback**
+
+Point the symbolic links back to the previous version and restart the services. Migrations are not rolled back automatically, so **every migration must be backward compatible**: a new version's migration must not break the old version. Deleting or renaming a column takes three deployments, so that every rollback lands on code that matches the schema: (1) add the new column and write to both; (2) switch reads and writes to the new column and stop touching the old one; (3) once (2) is stable, drop the old column. Rolling back (3) returns to (2), which no longer uses the dropped column.
+
+**Backups**
+
+Back up the database automatically every day, keep backups as the project requires, and rehearse restores regularly; with a managed cloud database, enable its automatic backup and point in time restore.
+
+**Getting artifacts to the VM**
+
+The team decides (script or CD tool); the template does not preset it. One option from the English guide: GitHub Actions joins a private network through Tailscale OAuth, then copies artifacts to the VM with SCP and runs the deployment steps above over SSH, so the VM's SSH never needs to face the internet. Whether to adopt it is a Project Decision ([Setup Flow step 0.2](../../../setup/project-decisions.mdx)); the template provides no code for it.

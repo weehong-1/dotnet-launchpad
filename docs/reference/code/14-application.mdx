@@ -1,0 +1,415 @@
+---
+sidebar_label: "14. Application"
+---
+
+import Prompt14Application from '../_partials/prompt-14-application.mdx';
+
+# 14. Application \{#14-application\}
+
+## 14.1 IBaseCommand.cs \{#14-1-ibasecommand-cs\}
+
+```csharp
+namespace ProductName.Application.Abstractions.Messaging;
+
+public interface IBaseCommand { }
+```
+
+A marker interface so the validation pipeline applies only to Commands, not Queries.
+
+## 14.2 ICommand.cs \{#14-2-icommand-cs\}
+
+```csharp
+using MediatR;
+
+namespace ProductName.Application.Abstractions.Messaging;
+
+public interface ICommand : IRequest<Result>, IBaseCommand { }
+
+public interface ICommand<TResponse> : IRequest<Result<TResponse>>, IBaseCommand { }
+```
+
+## 14.3 IQuery.cs \{#14-3-iquery-cs\}
+
+```csharp
+using MediatR;
+
+namespace ProductName.Application.Abstractions.Messaging;
+
+public interface IQuery<TResponse> : IRequest<Result<TResponse>> { }
+```
+
+## 14.4 ICommandHandler.cs \{#14-4-icommandhandler-cs\}
+
+```csharp
+using MediatR;
+
+namespace ProductName.Application.Abstractions.Messaging;
+
+public interface ICommandHandler<in TCommand> : IRequestHandler<TCommand, Result>
+    where TCommand : ICommand { }
+
+public interface ICommandHandler<in TCommand, TResponse> : IRequestHandler<TCommand, Result<TResponse>>
+    where TCommand : ICommand<TResponse> { }
+```
+
+## 14.5 IQueryHandler.cs \{#14-5-iqueryhandler-cs\}
+
+```csharp
+using MediatR;
+
+namespace ProductName.Application.Abstractions.Messaging;
+
+public interface IQueryHandler<in TQuery, TResponse> : IRequestHandler<TQuery, Result<TResponse>>
+    where TQuery : IQuery<TResponse> { }
+```
+
+Wrapping MediatR in our own interfaces means every Command and Query must return Result, and replacing MediatR later touches only these few interfaces.
+
+## 14.6 IDomainEventHandler.cs \{#14-6-idomaineventhandler-cs\}
+
+```csharp
+using MediatR;
+
+namespace ProductName.Application.Abstractions.Messaging;
+
+public interface IDomainEventHandler<in TDomainEvent> : INotificationHandler<TDomainEvent>
+    where TDomainEvent : IDomainEvent { }
+```
+
+## 14.7 IEventBus.cs \{#14-7-ieventbus-cs\}
+
+```csharp
+namespace ProductName.Application.Abstractions.Messaging;
+
+public interface IEventBus
+{
+    Task PublishAsync<T>(T message, CancellationToken ct = default)
+        where T : class;
+}
+```
+
+Application publishes integration events through this interface and never references MassTransit directly. The implementation is in [15.5](./15-infrastructure.mdx#15-5-eventbus-cs).
+
+## 14.8 LoggingPipelineBehavior.cs \{#14-8-loggingpipelinebehavior-cs\}
+
+```csharp
+using System.Diagnostics;
+using MediatR;
+using Microsoft.Extensions.Logging;
+
+namespace ProductName.Application.Abstractions.Behaviors;
+
+internal sealed class LoggingPipelineBehavior<TRequest, TResponse>(
+    ILogger<LoggingPipelineBehavior<TRequest, TResponse>> logger)
+    : IPipelineBehavior<TRequest, TResponse>
+    where TRequest : notnull
+    where TResponse : Result
+{
+    public async Task<TResponse> Handle(
+        TRequest request,
+        RequestHandlerDelegate<TResponse> next,
+        CancellationToken ct)
+    {
+        var requestName = typeof(TRequest).Name;
+
+        // Every log entry in this scope (including those inside the handler) carries RequestName
+        using var scope = logger.BeginScope(new Dictionary<string, object> { ["RequestName"] = requestName });
+
+        var startTimestamp = Stopwatch.GetTimestamp();
+
+        logger.LogDebug("Processing {RequestName}", requestName);
+
+        var result = await next();
+
+        var elapsedMs = Stopwatch.GetElapsedTime(startTimestamp).TotalMilliseconds;
+
+        if (result.IsSuccess)
+            logger.LogInformation("Completed {RequestName} in {ElapsedMs:0.0} ms", requestName, elapsedMs);
+        else
+            logger.LogWarning(
+                "Completed {RequestName} with error {ErrorCode} in {ElapsedMs:0.0} ms",
+                requestName, result.Error.Code, elapsedMs);
+
+        return result;
+    }
+}
+```
+
+- Each Command and Query writes one completion entry with its duration; failures are logged as Warning with the error code.
+- The start entry is Debug, output only in development, so production log volume does not double.
+- Exceptions are not logged here; the global exception handler logs each one once (see the writing rules in [8.9](../spec/08-design-rules/09-logging-rules.mdx)).
+- Only .NET's built in `ILogger` is used; Application does not reference Serilog.
+
+## 14.9 ValidationPipelineBehavior.cs \{#14-9-validationpipelinebehavior-cs\}
+
+```csharp
+using FluentValidation;
+using MediatR;
+
+namespace ProductName.Application.Abstractions.Behaviors;
+
+internal sealed class ValidationPipelineBehavior<TRequest, TResponse>(
+    IEnumerable<IValidator<TRequest>> validators)
+    : IPipelineBehavior<TRequest, TResponse>
+    where TRequest : IBaseCommand
+    where TResponse : Result, IResultFactory<TResponse>
+{
+    public async Task<TResponse> Handle(
+        TRequest request,
+        RequestHandlerDelegate<TResponse> next,
+        CancellationToken ct)
+    {
+        var errors = await ValidateAsync(request, ct);
+
+        if (errors.Length == 0)
+            return await next();
+
+        // TResponse is Result or Result<T>; its own static factory builds the failure (13.11)
+        return TResponse.CreateFailure(new ValidationError(errors));
+    }
+
+    private async Task<Error[]> ValidateAsync(TRequest request, CancellationToken ct)
+    {
+        var errors = new List<Error>();
+
+        // One context per validator, run one at a time: a ValidationContext holds mutable state,
+        // and validators may share scoped dependencies such as the DbContext
+        foreach (var validator in validators)
+        {
+            var result = await validator.ValidateAsync(new ValidationContext<TRequest>(request), ct);
+            errors.AddRange(result.Errors.Select(f => Error.Validation(f.PropertyName, f.ErrorMessage)));
+        }
+
+        return [.. errors];
+    }
+}
+```
+
+When validation fails, a failed Result is returned directly: the handler is never entered and nothing is thrown.
+
+- `TResponse.CreateFailure` calls the static factory of the exact response type ([13.11](./13-domain.mdx#13-11-result-cs-and-iresultfactory-cs)), so the pipeline uses no reflection: a wrong signature fails the build instead of the first failed validation in production.
+- The constraints also decide where this pipeline applies. A request that is not a Command (`IBaseCommand`), or whose response does not implement `IResultFactory`, fails the generic constraint and dependency injection **silently skips** the behavior. That is how Queries skip validation. Because a skip raises no error, [18.1](./18-tests.mdx#18-1-layertests-cs) checks that every handler goes through our own handler interfaces, and [18.5](./18-tests.mdx#18-5-validationpipelinebehaviortests-cs-application-unittests) checks that Commands are validated and Queries are not.
+
+## 14.10 IApplicationDbContext.cs \{#14-10-iapplicationdbcontext-cs\}
+
+```csharp
+using Microsoft.EntityFrameworkCore;
+
+namespace ProductName.Application.Abstractions.Data;
+
+public interface IApplicationDbContext
+{
+    DbSet<TEntity> Set<TEntity>() where TEntity : class;
+}
+```
+
+Lets Queries read directly with `AsNoTracking`. Because it uses the generic `Set<TEntity>()`, new entities never require changes to this interface.
+
+## 14.11 IUnitOfWork.cs \{#14-11-iunitofwork-cs\}
+
+```csharp
+namespace ProductName.Application.Abstractions.Data;
+
+public interface IUnitOfWork
+{
+    Task<int> SaveChangesAsync(CancellationToken ct = default);
+}
+```
+
+## 14.12 ICurrentUser.cs \{#14-12-icurrentuser-cs\}
+
+```csharp
+namespace ProductName.Application.Abstractions.Authentication;
+
+public interface ICurrentUser
+{
+    bool IsAuthenticated { get; }
+    string UserId { get; }
+}
+```
+
+## 14.13 IPermissionProvider.cs \{#14-13-ipermissionprovider-cs\}
+
+```csharp
+using System.Security.Claims;
+
+namespace ProductName.Application.Abstractions.Authentication;
+
+public interface IPermissionProvider
+{
+    Task<IReadOnlySet<string>> GetPermissionsAsync(ClaimsPrincipal user, CancellationToken ct = default);
+}
+```
+
+Supplies the user's permissions (see [8.16](../spec/08-design-rules/16-authentication-and-authorization.mdx)). By default the template reads them from token claims ([15.7](./15-infrastructure.mdx#15-7-claimspermissionprovider-cs)); when the system manages permissions itself, replace the implementation and callers stay unchanged.
+
+## 14.14 PagedList.cs \{#14-14-pagedlist-cs\}
+
+```csharp
+namespace ProductName.Application.Abstractions;
+
+public sealed record PagedList<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount)
+{
+    public int TotalPages => (int)Math.Ceiling(TotalCount / (double)PageSize);
+    public bool HasNextPage => Page < TotalPages;
+    public bool HasPreviousPage => Page > 1;
+}
+```
+
+## 14.15 DependencyInjection.cs \{#14-15-dependencyinjection-cs\}
+
+```csharp
+using FluentValidation;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace ProductName.Application;
+
+public static class DependencyInjection
+{
+    public static IServiceCollection AddApplication(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.AddMediatR(config =>
+        {
+            config.LicenseKey = configuration["MediatR:LicenseKey"];
+            config.RegisterServicesFromAssembly(typeof(DependencyInjection).Assembly);
+            config.AddOpenBehavior(typeof(LoggingPipelineBehavior<,>));
+            config.AddOpenBehavior(typeof(OperationAuditPipelineBehavior<,>));   // @@auditing
+            config.AddOpenBehavior(typeof(ValidationPipelineBehavior<,>));
+        });
+
+        services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly, includeInternalTypes: true);
+
+        return services;
+    }
+}
+```
+
+Pipelines run in registration order: logging first, then operation audit, then validation, then the handler. Operation audit sits before validation, so failed validation attempts are recorded too. The MediatR license key is read from configuration, never hardcoded. New handlers and validators need no manual registration.
+
+<Optional when="auditing">
+
+## 14.16 IAuditContext.cs (optional: auditing) \{#14-16-iauditcontext-cs-optional-auditing\}
+
+```csharp
+namespace ProductName.Application.Abstractions.Auditing;
+
+public interface IAuditContext
+{
+    string? UserId { get; }
+    string? SessionId { get; }
+    string? ClientIp { get; }
+    string? UserAgent { get; }
+    string? TraceId { get; }
+}
+```
+
+Supplies the information shared by audit records (see [7.3](../spec/07-optional-components.mdx#7-3-audit-records)). Every property may be null: where there is no HTTP request, such as the Worker, null means the system performed the action.
+
+</Optional>
+
+<Optional when="auditing">
+
+## 14.17 IAuditableRequest.cs (optional: auditing) \{#14-17-iauditablerequest-cs-optional-auditing\}
+
+```csharp
+namespace ProductName.Application.Abstractions.Auditing;
+
+// Marker interface: every run of an implementing Command or Query is written to the operation audit
+public interface IAuditableRequest { }
+```
+
+</Optional>
+
+<Optional when="auditing">
+
+## 14.18 IOperationAuditWriter.cs (optional: auditing) \{#14-18-ioperationauditwriter-cs-optional-auditing\}
+
+```csharp
+namespace ProductName.Application.Abstractions.Auditing;
+
+public enum AuditOutcome
+{
+    Succeeded,
+    Failed,
+    Exception
+}
+
+public interface IOperationAuditWriter
+{
+    Task WriteAsync(string requestName, AuditOutcome outcome, string? errorCode, CancellationToken ct = default);
+}
+```
+
+`Failed` means a business failure returned as Result (including validation failures); `Exception` means an unhandled exception.
+
+</Optional>
+
+<Optional when="auditing">
+
+## 14.19 OperationAuditPipelineBehavior.cs (optional: auditing) \{#14-19-operationauditpipelinebehavior-cs-optional-auditing\}
+
+```csharp
+using MediatR;
+using Microsoft.Extensions.Logging;
+
+namespace ProductName.Application.Abstractions.Behaviors;
+
+internal sealed class OperationAuditPipelineBehavior<TRequest, TResponse>(
+    IOperationAuditWriter auditWriter,
+    ILogger<OperationAuditPipelineBehavior<TRequest, TResponse>> logger)
+    : IPipelineBehavior<TRequest, TResponse>
+    where TRequest : IAuditableRequest
+    where TResponse : Result
+{
+    public async Task<TResponse> Handle(
+        TRequest request,
+        RequestHandlerDelegate<TResponse> next,
+        CancellationToken ct)
+    {
+        TResponse result;
+
+        try
+        {
+            result = await next();
+        }
+        catch (Exception exception)
+        {
+            await WriteAsync(AuditOutcome.Exception, exception.GetType().Name);
+            throw;
+        }
+
+        await WriteAsync(
+            result.IsSuccess ? AuditOutcome.Succeeded : AuditOutcome.Failed,
+            result.IsFailure ? result.Error.Code : null);
+
+        return result;
+    }
+
+    private async Task WriteAsync(AuditOutcome outcome, string? errorCode)
+    {
+        var requestName = typeof(TRequest).Name;
+
+        try
+        {
+            // Do not use the request's CancellationToken: the audit must be written even if the request is cancelled
+            await auditWriter.WriteAsync(requestName, outcome, errorCode, CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "Failed to write operation audit for {RequestName}", requestName);
+        }
+    }
+}
+```
+
+- Applies only to requests implementing `IAuditableRequest`; other requests skip this pipeline.
+- If writing the audit fails, only an Error log is written and the request result is unaffected (see [7.3](../spec/07-optional-components.mdx#7-3-audit-records) for why).
+
+</Optional>
+
+## 14.20 AI coding agent prompt \{#14-20-ai-coding-agent-prompt\}
+
+<Prompt14Application />

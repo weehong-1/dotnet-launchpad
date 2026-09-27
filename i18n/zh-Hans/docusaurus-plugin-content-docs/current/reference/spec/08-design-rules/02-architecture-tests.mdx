@@ -1,0 +1,11 @@
+---
+sidebar_label: "8.2 架构测试"
+---
+
+# 8.2 架构测试 \{#8-2-architecture-tests\}
+
+使用 NetArchTest 在 `ProductName.Architecture.Tests` 中自动检查各层依赖关系，防止无意中破坏分层。所有项目必须保留此测试项目。
+
+**原因**：单人或小团队开发时没有人做代码审查，分层很容易在赶进度时被悄悄破坏（例如 Domain 引用了 EF Core）。架构测试把依赖规则变成会失败的测试，问题在测试阶段就会被发现。
+
+架构测试同时检查功能切片之间没有互相引用（见 [8.15](./15-feature-slices-vertical-slice.mdx)）。

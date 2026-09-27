@@ -1,0 +1,124 @@
+.page {
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: var(--space-6);
+}
+
+.title {
+  margin: 0 0 var(--space-3);
+  padding-bottom: var(--space-4);
+  border-bottom: 2px solid var(--color-divider);
+  font-size: 40px;
+  letter-spacing: -0.025em;
+}
+
+.intro {
+  max-width: 70ch;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  margin: var(--space-4) 0;
+}
+
+.newButton {
+  min-width: 160px;
+}
+
+.message {
+  font-size: 13px;
+}
+
+.tableWrap {
+  overflow-x: auto;
+  border-top: 2px solid var(--color-divider);
+}
+
+.table {
+  min-width: 760px;
+}
+
+.table td {
+  vertical-align: middle;
+}
+
+.progressCol {
+  width: 240px;
+}
+
+.projectCell {
+  padding-block: var(--space-3) !important;
+}
+
+.name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.name strong {
+  font-weight: 800;
+}
+
+.meta {
+  margin-top: 2px;
+  font-size: 12px;
+}
+
+.meta code {
+  padding: 0;
+  background: none;
+  font-size: 12px;
+}
+
+.progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.progressTrack {
+  flex: 1;
+  height: 8px;
+  border: 1px solid var(--color-divider);
+  background: var(--color-surface);
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--color-accent);
+}
+
+.progressCount {
+  min-width: 48px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.activeRow {
+  background: var(--color-accent-100);
+}
+
+.table tbody tr.activeRow:hover {
+  background: var(--color-accent-100);
+}
+
+.actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.actions > * + * {
+  margin-left: var(--space-2);
+}
+
+.warning {
+  padding: var(--space-2) var(--space-3);
+  border-top: 2px solid var(--color-accent);
+  background: var(--color-accent-100);
+  color: var(--color-accent-800);
+}

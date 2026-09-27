@@ -1,0 +1,12 @@
+---
+sidebar_label: "10. Turning it into a template"
+---
+
+# 10. Turning it into a template \{#10-turning-it-into-a-template\}
+
+To copy it quickly every time, make the skeleton solution built by this specification into a custom `dotnet new` template:
+
+- Add `.template.config/template.json` at the skeleton solution's root, with `%%ProductName%%` as the replacement name.
+- Make the optional components switch parameters, chosen when a project is created.
+- Once installed, a new project needs a single `dotnet new` command with the project name to generate the full structure.
+- Before building the `dotnet new` template, you can create the skeleton with the [11.2](../code/11-file-overview.mdx#11-2-scaffolding-the-solution-with-the-cli) CLI commands. The gist's `scaffold.sh` and `scaffold.ps1` serve the same purpose but currently follow the English guide's structure and must first be updated to this edition's project structure.

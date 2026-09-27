@@ -1,0 +1,38 @@
+---
+sidebar_label: 2.2 Application
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import Prompt14Application from '../reference/_partials/prompt-14-application.mdx';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 2.2 Application
+
+Application holds the CQRS messaging interfaces, the pipeline behaviors (logging, operation audit, validation) and the abstractions Infrastructure implements. The code is in [Reference 14](../reference/code/14-application.mdx).
+
+<Tabs groupId="route" queryString>
+<TabItem value="script" label="Script" default>
+
+Done by the scaffold script in [step 1.2](./empty-solution.mdx). Check the result against the Done Conditions below.
+
+</TabItem>
+<TabItem value="ai" label="AI Agent">
+
+<Prompt14Application />
+
+</TabItem>
+<TabItem value="manual" label="Manual">
+
+Create each file of [Reference 14.1 to 14.19](../reference/code/14-application.mdx) at the paths listed in [Reference 11](../reference/code/11-file-overview.mdx). Create 14.16 to 14.19 only with Auditing; without it, the `OperationAuditPipelineBehavior` registration in 14.15 is already gone from the code shown for your project.
+
+Finish by creating this project's `GlobalUsings.cs` from [Reference 11.3](../reference/code/11-file-overview.mdx#11-3-globalusings-cs-per-project), then build:
+
+```bash
+dotnet build
+```
+
+</TabItem>
+</Tabs>
+
+<DoneConditions step="application" />

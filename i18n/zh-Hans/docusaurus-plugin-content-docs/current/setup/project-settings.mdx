@@ -1,0 +1,21 @@
+---
+sidebar_label: 0.1 填写 Project Settings
+---
+
+import ProjectSettingsForm from '@site/src/components/ProjectSettingsForm';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 0.1 填写 Project Settings（项目设定）
+
+每个新后端都从这里开始。你保存的内容会成为**当前项目**：整个站点的代码块会换成你的名称，你不需要的组件内容会被折叠。
+
+- **项目名称**替换 `%%ProductName%%`：solution、项目、namespace 和文件夹。
+- **简短名称**替换 `%%productname%%`：Linux 服务帐号、`/opt`、`/etc` 和 `/var/log` 下的路径、systemd 服务，以及数据库名称。默认取项目名称的最后一段并转为小写。
+- **Worker** 运行后台工作：consumer、定时任务和 Outbox 投递。大多数项目会启用它。见 [Reference 7.1](../reference/spec/07-optional-components.mdx#7-1-worker)。
+- **审计**从第一天起记录数据变更和操作。从未记录的历史之后无法恢复，因此建议默认开启。见 [Reference 7.3](../reference/spec/07-optional-components.mdx#7-3-audit-records)。
+
+<ProjectSettingsForm />
+
+之后可以随时回来修改；站点上的所有内容都会跟随保存的值。
+
+<DoneConditions step="project-settings" />

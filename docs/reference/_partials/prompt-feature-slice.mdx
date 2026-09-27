@@ -1,0 +1,25 @@
+```text
+Following section 8.15 of the document, create a new feature slice for this use case.
+
+Feature: <feature name, plural noun>
+Use case: <use case name, starting with a verb>
+Type: <Command / Query>
+Input: <fields and validation rules>
+Output: <data returned; write "none" if nothing>
+Business rules: <description>
+HTTP endpoint: <method and route; write "none" if none>
+Operation audit: <whether it implements IAuditableRequest>
+Permission: <permission name the endpoint requires; write "public" for public endpoints>
+
+Requirements:
+1. In Application/Features/<Feature>/<UseCase>/ create the Command or Query, Validator (Commands only), Handler and Response (when there is output), one type per file, namespace matching the folder.
+2. If there is an HTTP endpoint, create it in Api/Endpoints/<Feature>/<UseCase>.cs following 16.1 to 16.3 and Appendix A.6: only bind parameters, send with ISender, convert the result with Match and CustomResults. When a permission is required add .RequirePermission(...), with permission constants in Application/Features/<Feature>/<Feature>Permissions.cs named <feature>.<action> (see 8.16); public endpoints add .AllowAnonymous().
+3. Write use cases go through aggregates and repositories; query use cases project with IApplicationDbContext and AsNoTracking (see 8.1).
+4. Business rules go in Domain aggregates; the handler only orchestrates. When a new aggregate, strongly typed ID, error or domain event is needed, create it per section 13.16; add the entity configuration (key ValueGeneratedNever) and repository in Infrastructure's Database/Configurations and Database/Repositories, and register the repository in DependencyInjection.
+5. Do not reference other feature slices or create shared folders; if sharing is truly needed, stop and explain why, and I will decide between Domain and Abstractions.
+6. In Application.UnitTests/Features/<Feature>/<UseCase>/ test the handler's success and each failure case; if there is an endpoint, test success and validation failure in Api.IntegrationTests/Features/<Feature>/. New aggregates must have their business rules and domain events tested in Domain.UnitTests.
+7. If tables change, create a migration per 8.11, named after the use case.
+8. When done, list the files added and changed.
+
+Done when: dotnet build has zero warnings and zero errors; dotnet test passes (including architecture tests).
+```

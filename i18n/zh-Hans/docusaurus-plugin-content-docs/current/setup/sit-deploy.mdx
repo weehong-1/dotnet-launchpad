@@ -1,0 +1,14 @@
+---
+sidebar_label: 4.4 SIT 首次部署
+---
+
+import {Deploy} from '@site/src/components/Commands';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 4.4 SIT：首次部署
+
+之后的每次部署都会重复这些步骤，所以在 SIT 上演练。步骤遵循 [Reference 8.21](../reference/spec/08-design-rules/21-deployment.mdx)。第 1 个代码块在你的电脑上执行；第 2 个代码块以 SSH 连线到 VM，第 3 至 7 个代码块都在这同一个 SSH 会话中执行，使 `$VERSION`、`$STAGE`、`$R`、`$MIGRATED` 等变量在各代码块之间保留。
+
+<Deploy env="SIT" />
+
+<DoneConditions step="sit-deploy" />

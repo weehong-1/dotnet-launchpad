@@ -1,0 +1,38 @@
+---
+sidebar_label: 2.1 Domain
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import Prompt13Domain from '../reference/_partials/prompt-13-domain.mdx';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 2.1 Domain
+
+Domain 包含共享的基础类型：entity、aggregate root、domain event、`Result` 和错误。它不依赖任何东西。代码见 [Reference 13](../reference/code/13-domain.mdx)。
+
+<Tabs groupId="route" queryString>
+<TabItem value="script" label="脚本" default>
+
+已由[步骤 1.2](./empty-solution.mdx) 的 scaffold 脚本完成。请对照下方的完成条件检查结果。
+
+</TabItem>
+<TabItem value="ai" label="AI Agent">
+
+<Prompt13Domain />
+
+</TabItem>
+<TabItem value="manual" label="手动">
+
+按 [Reference 11](../reference/code/11-file-overview.mdx) 列出的路径，在 `src/ProductName.Domain/Abstractions/` 中创建 [Reference 13.1 至 13.15](../reference/code/13-domain.mdx) 中的每个文件。13.11 包含两个文件：`Result.cs` 和 `IResultFactory.cs`。13.14 和 13.15 仅在启用审计时创建。13.16 是一组约定，不创建文件。
+
+最后按 [Reference 11.3](../reference/code/11-file-overview.mdx#11-3-globalusings-cs-per-project) 建立此项目的 `GlobalUsings.cs`，然后编译：
+
+```bash
+dotnet build
+```
+
+</TabItem>
+</Tabs>
+
+<DoneConditions step="domain" />

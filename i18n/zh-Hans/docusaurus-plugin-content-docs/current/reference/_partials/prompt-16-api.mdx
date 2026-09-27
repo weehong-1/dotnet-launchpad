@@ -1,0 +1,16 @@
+```text
+执行文档第 16 节（Api）。前置条件：第 15 节已完成。
+
+1. 按第 11 节列出的路径建立 16.1 至 16.6 与 16.7 至 16.11 的文件，内容照文档。
+2. 建立 16.12 的四个设定档（appsettings.json、appsettings.Development.json、appsettings.SIT.json、appsettings.Production.json），内容照文档；连接字符串中的数据库名称改为项目名称的小写，与 docker-compose.yml 一致；SIT 与 Production 的日志文件路径改为 /var/log/<项目名称小写>/api/log-.json。
+3. 以 16.13 的内容完全取代 Program.cs。
+4. 确认 Properties/launchSettings.json 的 ASPNETCORE_ENVIRONMENT 为 Development。
+5. 以本地工具安装 dotnet-ef（dotnet new tool-manifest，再 dotnet tool install dotnet-ef），并按 8.11 的指令建立第一个迁移，名称为 InitialCreate。此迁移应只包含 MassTransit 的 Outbox 与 Inbox 数据表，以及选择审计时的 AuditTrails 与 OperationAudits 数据表；若出现其他数据表，停下来说明原因。
+6. 不要建立任何端点范例；身份认证只使用 16.7 的通用 JWT Bearer 设定，不加入任何特定提供方的套件或设定。
+
+完成条件：
+(a) dotnet build 成功。
+(b) 执行 docker compose up -d 后，以 Development 启动 Api：数据库迁移自动执行，/health 返回 Healthy，/scalar 可以开启。
+(c) 以 SIT 环境名称启动且未提供连接字符串时，Api 在启动时失败，而不是连到本地数据库。
+(d) 不带令牌时，/health 返回 200，Development 下 /openapi/v1.json 与 /scalar 可以打开（设计上即为公开）；其他任何路径返回 401。
+```

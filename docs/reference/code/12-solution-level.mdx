@@ -1,0 +1,513 @@
+---
+sidebar_label: "12. Solution level"
+---
+
+import Prompt12Solution from '../_partials/prompt-12-solution.mdx';
+
+# 12. Solution level \{#12-solution-level\}
+
+## 12.1 Directory.Build.props \{#12-1-directory-build-props\}
+
+```xml
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <AnalysisLevel>latest</AnalysisLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.txt" />
+  </ItemGroup>
+</Project>
+```
+
+`EnforceCodeStyleInBuild` makes `.editorconfig` style rules apply at build time too; with `TreatWarningsAsErrors`, a style violation fails the build.
+
+## 12.2 Directory.Packages.props \{#12-2-directory-packages-props\}
+
+Fill in the latest stable versions when creating the template.
+
+```xml
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- CQRS and validation -->
+    <PackageVersion Include="MediatR" Version="" />
+    <PackageVersion Include="MediatR.Contracts" Version="" />
+    <PackageVersion Include="FluentValidation" Version="" />
+    <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="" />
+
+    <!-- Database -->
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="" />
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="" />
+
+    <!-- Analyzers shared by all projects -->
+    <GlobalPackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="" />
+
+    <!-- Messaging -->
+    <PackageVersion Include="MassTransit" Version="" />
+    <PackageVersion Include="MassTransit.EntityFrameworkCore" Version="" />
+    <PackageVersion Include="MassTransit.RabbitMQ" Version="" />
+
+    <!-- Api -->
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="" />
+    <PackageVersion Include="Scalar.AspNetCore" Version="" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="" />
+
+    <!-- Hosting and resilience -->
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Systemd" Version="" />
+    <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="" />
+
+    <!-- Logging -->
+    <PackageVersion Include="Serilog.AspNetCore" Version="" />
+    <PackageVersion Include="Serilog.Extensions.Hosting" Version="" />
+    <PackageVersion Include="Serilog.Settings.Configuration" Version="" />
+    <PackageVersion Include="Serilog.Sinks.Console" Version="" />
+    <PackageVersion Include="Serilog.Sinks.Seq" Version="" />
+    <PackageVersion Include="Serilog.Formatting.Compact" Version="" />
+    <PackageVersion Include="Serilog.Sinks.File" Version="" />
+    <PackageVersion Include="Serilog.Sinks.Async" Version="" />
+    <PackageVersion Include="Serilog.Enrichers.Environment" Version="" />
+
+    <!-- Testing -->
+    <PackageVersion Include="xunit.v3" Version="" />
+    <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="" />
+    <PackageVersion Include="NSubstitute" Version="" />
+    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="" />
+    <PackageVersion Include="NetArchTest.Rules" Version="" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="" />
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="" />
+    <PackageVersion Include="Testcontainers.RabbitMq" Version="" />
+  </ItemGroup>
+</Project>
+```
+
+**Project references**
+
+| Project | Project references | NuGet packages |
+| --- | --- | --- |
+| Domain | None | `MediatR.Contracts` |
+| Application | Domain | `MediatR`, `FluentValidation`, `FluentValidation.DependencyInjectionExtensions`, `Microsoft.EntityFrameworkCore`, `Microsoft.Extensions.Configuration.Abstractions` |
+| Infrastructure | Application | `Npgsql.EntityFrameworkCore.PostgreSQL`, `Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore`, `MassTransit`, `MassTransit.EntityFrameworkCore`, `MassTransit.RabbitMQ`, `Microsoft.Extensions.Http.Resilience`; plus the `Microsoft.AspNetCore.App` framework reference |
+| Api | Application, Infrastructure | `Microsoft.AspNetCore.OpenApi`, `Scalar.AspNetCore`, `Microsoft.AspNetCore.Authentication.JwtBearer`, `Microsoft.Extensions.Hosting.Systemd`, `Serilog.AspNetCore`, `Serilog.Sinks.Seq`, `Serilog.Sinks.File`, `Serilog.Sinks.Async`, `Serilog.Enrichers.Environment`, `Microsoft.EntityFrameworkCore.Design` |
+| Worker | Application, Infrastructure | `Microsoft.Extensions.Hosting.Systemd`, `Serilog.Extensions.Hosting`, `Serilog.Settings.Configuration`, `Serilog.Sinks.Console`, `Serilog.Sinks.Seq`, `Serilog.Formatting.Compact`, `Serilog.Sinks.File`, `Serilog.Sinks.Async`, `Serilog.Enrichers.Environment` |
+| Domain.UnitTests | Domain | `xunit` set |
+| Application.UnitTests | Application | `xunit` set, `NSubstitute`, `Microsoft.Extensions.TimeProvider.Testing` |
+| Architecture.Tests | All src projects | `xunit` set, `NetArchTest.Rules` |
+| Api.IntegrationTests | Api, Infrastructure | `xunit` set, `Microsoft.AspNetCore.Mvc.Testing`, `Testcontainers.PostgreSql`, `Testcontainers.RabbitMq` |
+
+The `xunit` set means `xunit.v3` and `Microsoft.Testing.Extensions.CodeCoverage`. Tests run on Microsoft.Testing.Platform (selected in `global.json`, see [12.3](#12-3-global-json)), so the VSTest packages `Microsoft.NET.Test.Sdk`, `xunit.runner.visualstudio` and `coverlet.collector` are not used. xUnit v3 test projects must set `<OutputType>Exe</OutputType>` in the `.csproj`. Application references `Microsoft.Extensions.Configuration.Abstractions` because `AddApplication` reads `IConfiguration` (14.15). `Microsoft.CodeAnalysis.BannedApiAnalyzers` applies to every project through `GlobalPackageReference`, so no project references it individually. The Api and the Worker both need `<UserSecretsId>` in their `.csproj` to use User Secrets (see [8.8](../spec/08-design-rules/08-configuration-environments-and-secrets.mdx)).
+
+**Version reference**
+
+Versions the English guide actually used, listed only for packages this template shares. Use the latest stable versions when creating a project.
+
+| Package | Version |
+| --- | --- |
+| `MediatR` | 14.1.0 |
+| `FluentValidation`, `FluentValidation.DependencyInjectionExtensions` | 12.1.1 |
+| `Microsoft.EntityFrameworkCore`, `Microsoft.EntityFrameworkCore.Design` | 10.0.5 |
+| `Npgsql.EntityFrameworkCore.PostgreSQL` | 10.0.1 |
+| `Microsoft.AspNetCore.OpenApi` | 10.0.5 |
+| `Microsoft.AspNetCore.Mvc.Testing` | 10.0.5 |
+| `Serilog.AspNetCore` | 10.0.0 |
+| `Serilog.Enrichers.Environment` | 3.0.1 |
+
+## 12.3 global.json \{#12-3-global-json\}
+
+```json
+{
+  "sdk": {
+    "version": "10.0.100",
+    "rollForward": "latestFeature"
+  },
+  "test": {
+    "runner": "Microsoft.Testing.Platform"
+  }
+}
+```
+
+Adjust the version to the SDK installed when creating the template (the English guide uses 10.0.103). `latestFeature` rolls forward to the newest installed SDK of the same major and minor version (10.0), including newer feature bands such as 10.0.2xx. The `test` section makes `dotnet test` use Microsoft.Testing.Platform, which xUnit v3 needs; its options differ from VSTest (see [8.10](../spec/08-design-rules/10-local-development.mdx), [8.12](../spec/08-design-rules/12-testing-strategy.mdx)).
+
+## 12.4 .editorconfig \{#12-4-editorconfig\}
+
+```ini
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{json,yml,yaml,xml,csproj,props,slnx}]
+indent_size = 2
+
+[*.cs]
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_prefer_braces = when_multiline:suggestion
+dotnet_sort_system_directives_first = true
+dotnet_style_readonly_field = true:warning
+
+[**/Migrations/*.cs]
+generated_code = true
+```
+
+Only the basics are listed here; add or remove rules to suit the team. The last section marks EF Core migrations as generated code: they use block-scoped namespaces, and without it the first migration fails the build under "warnings as errors".
+
+## 12.5 docker-compose.yml \{#12-5-docker-compose-yml\}
+
+```yaml
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: productname
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+
+  seq:
+    image: datalust/seq:latest
+    environment:
+      ACCEPT_EULA: "Y"
+      SEQ_FIRSTRUN_NOAUTHENTICATION: "true"
+    ports:
+      - "127.0.0.1:5341:80"
+
+volumes:
+  postgres-data:
+```
+
+**For local development only**; all credentials are defaults, so every port is published on `127.0.0.1` only and never reachable from the network. Once started, the RabbitMQ management UI is at `http://localhost:15672` (user and password guest) and Seq is at `http://localhost:5341`.
+
+## 12.6 BannedSymbols.txt \{#12-6-bannedsymbols-txt\}
+
+```text
+P:System.DateTime.Now;Use TimeProvider.GetUtcNow(); the database always stores UTC (see 8.20)
+P:System.DateTime.Today;Use TimeProvider.GetUtcNow() and specify the time zone explicitly (see 8.20)
+P:System.DateTimeOffset.Now;Use TimeProvider.GetUtcNow() (see 8.20)
+```
+
+Read by `Microsoft.CodeAnalysis.BannedApiAnalyzers`: using a listed API raises a warning, which fails the build under "warnings as errors". Add any other API that should be banned to this list.
+
+## 12.7 deploy/systemd service files \{#12-7-deploy-systemd-service-files\}
+
+`deploy/systemd/productname-api.service`:
+
+```ini
+[Unit]
+Description=ProductName Api
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+User=productname
+Group=productname
+WorkingDirectory=/opt/productname/api
+ExecStart=/opt/productname/api/ProductName.Api
+EnvironmentFile=/etc/productname/api.env
+Environment=ASPNETCORE_URLS=http://127.0.0.1:5000
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+SyslogIdentifier=productname-api
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/var/log/productname
+
+[Install]
+WantedBy=multi-user.target
+```
+
+<Optional when="worker">
+
+`deploy/systemd/productname-worker.service` (optional: Worker):
+
+```ini
+[Unit]
+Description=ProductName Worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+User=productname
+Group=productname
+WorkingDirectory=/opt/productname/worker
+ExecStart=/opt/productname/worker/ProductName.Worker
+EnvironmentFile=/etc/productname/worker.env
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+SyslogIdentifier=productname-worker
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/var/log/productname
+
+[Install]
+WantedBy=multi-user.target
+```
+
+</Optional>
+
+- `Type=notify` works with `AddSystemd()` in the program (see [16.13](./16-api.mdx#16-13-program-cs), [17.2](./17-worker-optional.mdx#17-2-program-cs)): the app reports to systemd only once startup finishes, and shuts down cleanly, finishing work in progress.
+- The Api listens only on local port 5000; all external requests go through Nginx.
+- The environment name and secrets live in the `EnvironmentFile`, so the service files are identical in every environment.
+- `Restart=always` restarts the service after an abnormal exit; `ProtectSystem` and similar settings limit where the service can write.
+
+## 12.8 deploy/nginx/productname-api.conf \{#12-8-deploy-nginx-productname-api-conf\}
+
+```nginx
+server {
+    listen 80;
+    server_name api.example.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name api.example.com;
+
+    ssl_certificate     /etc/letsencrypt/live/api.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/api.example.com/privkey.pem;
+
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "no-referrer" always;
+
+    client_max_body_size 10m;
+
+    location / {
+        proxy_pass         http://127.0.0.1:5000;
+        proxy_http_version 1.1;
+        proxy_set_header   Host $host;
+        proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
+    }
+}
+```
+
+- Replace `api.example.com` with the real domain; certbot issues and renews the certificate.
+- HTTP always redirects to HTTPS; Nginx adds the security headers, so the application does not have to.
+- `X-Forwarded-For` and `X-Forwarded-Proto` give the Api the real client IP and scheme (see the forwarded headers setup in [16.13](./16-api.mdx#16-13-program-cs)).
+- `client_max_body_size` is the upload size limit; adjust per project.
+
+## 12.9 deploy/env environment variable templates \{#12-9-deploy-env-environment-variable-templates\}
+
+`deploy/env/api.env.example`:
+
+```ini
+# Copy to /etc/productname/api.env and fill in this environment's values; owner root, mode 600
+ASPNETCORE_ENVIRONMENT=Production
+ConnectionStrings__Database=Host=<host>;Port=5432;Database=productname;Username=<app account>;Password=<password>
+ConnectionStrings__MessageBroker=amqps://<user>:<password>@<host>:5671
+MediatR__LicenseKey=
+Authentication__Authority=
+Authentication__Audience=
+Cors__AllowedOrigins__0=
+Serilog__WriteTo__Seq__Args__serverUrl=
+Serilog__WriteTo__Seq__Args__apiKey=
+# MassTransit v9 license text; MT_LICENSE_PATH=<file> works too
+MT_LICENSE=
+```
+
+<Optional when="worker">
+
+`deploy/env/worker.env.example` (optional: Worker):
+
+```ini
+# Copy to /etc/productname/worker.env and fill in this environment's values; owner root, mode 600
+DOTNET_ENVIRONMENT=Production
+ConnectionStrings__Database=Host=<host>;Port=5432;Database=productname;Username=<app account>;Password=<password>
+ConnectionStrings__MessageBroker=amqps://<user>:<password>@<host>:5671
+MediatR__LicenseKey=
+Serilog__WriteTo__Seq__Args__serverUrl=
+Serilog__WriteTo__Seq__Args__apiKey=
+# MassTransit v9 license text; MT_LICENSE_PATH=<file> works too
+MT_LICENSE=
+```
+
+</Optional>
+
+- The templates list only settings that vary by environment and hold no real values, so they can be committed; filled in `.env` files are **never** committed.
+- On the SIT VM, set the environment name to `SIT` (case must match, see [8.8](../spec/08-design-rules/08-configuration-environments-and-secrets.mdx)).
+- Connection strings use the application account, never the database owner account (see [8.11](../spec/08-design-rules/11-database-migrations.mdx)).
+
+## 12.10 .github/workflows/ci.yml \{#12-10-github-workflows-ci-yml\}
+
+```yaml
+name: ci
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      MT_LICENSE: ${{ secrets.MT_LICENSE }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - run: dotnet restore
+      - run: dotnet build --no-restore -c Release
+      - run: dotnet test --no-build -c Release
+
+      - run: dotnet publish src/ProductName.Api -c Release -r linux-x64 --self-contained -o artifacts/api
+      - run: dotnet publish src/ProductName.Worker -c Release -r linux-x64 --self-contained -o artifacts/worker  # @@worker
+
+      - run: dotnet tool restore
+      - run: >
+          dotnet ef migrations bundle
+          --project src/ProductName.Infrastructure
+          --startup-project src/ProductName.Api
+          -r linux-x64 --self-contained
+          -o artifacts/migrations/efbundle
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: productname-${{ github.sha }}
+          path: artifacts/
+```
+
+- GitHub Actions is the example; on another CI platform, rewrite the same steps.
+- Every push and pull request builds and runs all tests (including Testcontainers integration tests); deployment artifacts are produced only when tests pass.
+- Artifacts include the Api, the Worker and the migration bundle; see [8.21](../spec/08-design-rules/21-deployment.mdx) for deployment steps.
+- Projects without a Worker delete the step that publishes the Worker.
+- Set the `MT_LICENSE` secret before the first push: the integration tests start MassTransit, which refuses to run without a license (`gh secret set MT_LICENSE < license.txt`).
+
+<Optional when="sonar,qodana">
+
+**Optional: code quality checks (SonarCloud and Qodana)**
+
+From the English guide. When you want static analysis and coverage reports, add these two jobs under `jobs:` in `ci.yml`; they run in parallel after `build` passes. Integration tests start their own database through Testcontainers, so CI `services` are not needed.
+
+```yaml
+  # @@sonar-begin
+  sonar:
+    name: SonarCloud
+    runs-on: ubuntu-latest
+    needs: build
+    env:
+      MT_LICENSE: ${{ secrets.MT_LICENSE }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      # SonarScanner needs Java
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - run: dotnet tool install --global dotnet-sonarscanner
+
+      - run: >
+          dotnet sonarscanner begin
+          /k:"${{ vars.SONAR_PROJECT_KEY }}"
+          /o:"${{ vars.SONAR_ORGANIZATION_KEY }}"
+          /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+          /d:sonar.host.url="https://sonarcloud.io"
+          /d:sonar.cs.vscoveragexml.reportsPaths="TestResults/*.xml"
+          /d:sonar.exclusions="**/obj/**,**/bin/**"
+          /d:sonar.coverage.exclusions="**/obj/**,**/bin/**,**/Migrations/**"
+
+      - run: dotnet build -c Release
+
+      - run: >
+          dotnet test --no-build -c Release
+          --coverage --coverage-output-format xml
+          --results-directory TestResults
+
+      - run: dotnet sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+
+  # @@sonar-end
+  # @@qodana-begin
+  qodana:
+    name: Qodana
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: write
+      pull-requests: write
+      checks: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: JetBrains/qodana-action@v2025.1
+        env:
+          QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
+  # @@qodana-end
+```
+
+<Optional when="qodana">
+
+When Qodana is enabled, add `qodana.yaml` at the root:
+
+```yaml
+# Do not store sensitive data in this file; its content appears in the Qodana report
+version: "1.0"
+ide: QDNET
+dotnet:
+  solution: ProductName.slnx
+profile:
+  name: qodana.starter
+```
+
+</Optional>
+
+Secrets and variables to set in GitHub:
+
+| Type | Name | Description |
+| --- | --- | --- |
+| Secret | `SONAR_TOKEN` | SonarCloud authentication token |
+| Secret | `QODANA_TOKEN` | Qodana Cloud authentication token |
+| Secret | `MT_LICENSE` | MassTransit v9 license text; the tests start the bus, so every job that runs tests needs it |
+| Variable | `SONAR_PROJECT_KEY` | SonarCloud project key |
+| Variable | `SONAR_ORGANIZATION_KEY` | SonarCloud organization key |
+
+</Optional>
+
+## 12.11 AI coding agent prompt \{#12-11-ai-coding-agent-prompt\}
+
+<Prompt12Solution />

@@ -1,0 +1,43 @@
+---
+sidebar_label: 0.5 准备身份提供者
+---
+
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 0.5 准备身份提供者
+
+Api 接受任何 OpenID Connect 提供者签发的 JWT access token，除公开端点外，所有端点都要求登入（[Reference 8.16](../reference/spec/08-design-rules/16-authentication-and-authorization.mdx)）。模板不附带身份提供者，所以现在就准备好：步骤 3.1、3.2、4.4、4.7 都需要它。
+
+每个环境（Development、SIT、Production）都有自己的值：
+
+| 设定 | 说明 | 放在哪里 |
+| --- | --- | --- |
+| `Authentication:Authority` | 提供者的 issuer URL；`<Authority>/.well-known/openid-configuration` 必须可以打开 | Development：User Secrets（步骤 3.1）。SIT 与 Production：环境变量文件（步骤 4.3、4.6） |
+| `Authentication:Audience` | Api 在提供者中注册的识别码；发给 Api 的 token 会在 `aud` 中带着它 | 同上 |
+| `Authentication:PermissionClaimType` | 存放权限的 claim；预设 `permissions` | 只有提供者使用其他 claim 时，才修改 `appsettings.json` |
+
+在你的提供者中（例如 Microsoft Entra ID、Auth0、Keycloak 或 Okta），为每个环境：
+
+1. 把 Api 注册为 API 或资源服务器，其识别码就是 **Audience**。
+2. 注册一个能取得该 audience access token 的测试客户端。最简单的是使用 client credentials 授权的机器对机器客户端；使用 authorization code 流程的测试用户也可以。
+3. 如果端点会要求权限，让提供者把权限放在 `permissions` claim 中（或修改 `PermissionClaimType`）。
+
+先检查 Authority，再取得 Development 的测试 token。下面的请求是标准的 OAuth 2.0 client credentials 授权。有些提供者用 `scope=<audience>/.default` 取代 `audience=<audience>`，请查阅提供者的文件。每个字段都经过 URL 编码，secret 以不回显方式读入并经由标准输入传送，因此 `+`、`&` 等特殊字符都能原样送达，secret 也不会出现在历史纪录或程序参数中。
+
+```bash
+AUTHORITY=https://<your issuer>
+TOKEN_ENDPOINT=$(curl -fsS "$AUTHORITY/.well-known/openid-configuration" | jq -er .token_endpoint)
+echo "$TOKEN_ENDPOINT"
+
+IFS= read -rs CLIENT_SECRET   # 粘贴 client secret 后按 Enter（不会显示）
+TOKEN=$(printf '%s' "$CLIENT_SECRET" | curl -fsS -X POST "$TOKEN_ENDPOINT" \
+  --data-urlencode grant_type=client_credentials \
+  --data-urlencode "client_id=<client id>" \
+  --data-urlencode "audience=<audience>" \
+  --data-urlencode client_secret@- | jq -er .access_token); unset CLIENT_SECRET
+echo "${TOKEN:0:20}..."   # JWT 以 eyJ 开头
+```
+
+client secret 和其他机密一样，不要放进 repo。步骤 3.2 会用这样的 token 证明 Api 接受它。
+
+<DoneConditions step="identity-provider" />

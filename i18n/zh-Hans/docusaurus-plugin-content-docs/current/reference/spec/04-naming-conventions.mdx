@@ -1,0 +1,10 @@
+---
+sidebar_label: "4. 命名约定"
+---
+
+# 4. 命名约定 \{#4-naming-conventions\}
+
+- 项目名称格式：`ProductName.层名`，例如 `ProductName.Domain`。
+- “Presentation”是概念层名称，项目本身按宿主类型命名（`Api`、`Worker`），与业界主流做法一致。表现层可能有多个入口，统一叫 Presentation 无法区分。
+- 不另建 `Presentation` 类库存放端点，以免增加不必要的项目。
+- 测试文件按 `{被测类别}Tests.cs` 命名，例如 `ResultTests.cs` 测试 `Result.cs`。

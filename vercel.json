@@ -1,0 +1,9 @@
+{
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "redirects": [
+    {"source": "/TEMPLATE.zh-Hans.md", "destination": "/TEMPLATE.zh.md", "permanent": true},
+    {"source": "/zh-Hans", "destination": "/zh", "permanent": true},
+    {"source": "/zh-Hans/:path*", "destination": "/zh/:path*", "permanent": true}
+  ]
+}

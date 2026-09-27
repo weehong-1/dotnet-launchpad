@@ -1,0 +1,47 @@
+---
+sidebar_label: "6. Layer responsibilities"
+---
+
+# 6. Layer responsibilities \{#6-layer-responsibilities\}
+
+## 6.1 Domain \{#6-1-domain\}
+
+- Aggregate roots, entities, value objects
+- Domain events
+- Domain exception (`DomainException`)
+- Repository interfaces
+- Common base types and interfaces: `Entity`, `AggregateRoot`, `IDomainEvent`, `IStronglyTypedId`, `IHasTimestamps`; auditing adds `IAuditable` and `[AuditIgnore]`
+- Value objects use `record` directly, with no base class
+
+## 6.2 Application \{#6-2-application\}
+
+- Organised as feature slices: `Features/{Feature}/{UseCase}/`, with each use case's Command or Query, Validator, Handler and Response in one folder (see [8.15](./08-design-rules/15-feature-slices-vertical-slice.mdx))
+- Integration events (outbound message contracts) live in `IntegrationEvents/` and belong to no slice
+- Input validation
+- Pipeline behaviors: logging, operation audit (optional), validation
+- DTOs
+- Abstractions implemented by Infrastructure, such as current user, message publishing, external service clients
+
+**No transaction pipeline**: each Command calls `SaveChangesAsync` once, and EF Core puts every change of that save (including Outbox messages produced by domain events) in one transaction. Only when a Command must save several times and all saves must succeed or roll back together does that handler open its own transaction.
+
+## 6.3 Infrastructure \{#6-3-infrastructure\}
+
+- EF Core DbContext, entity configuration, migrations
+- Repository implementations
+- Authentication related implementations (current user, permission source)
+- Writing audit records (optional)
+- Message publishing (MassTransit)
+- External service clients (third party APIs, email, file storage and so on, as the project needs), all with the resilience handler
+- Health check registration
+
+## 6.4 Api \{#6-4-api\}
+
+- HTTP endpoints, with folders matching Application's feature slices
+- Middleware
+- Authentication and permission based authorization
+- Rate limiting
+- Unified error handling (ProblemDetails)
+- OpenAPI documentation
+- Health check endpoint
+- CORS
+- Automatic migrations in development

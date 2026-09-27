@@ -1,0 +1,38 @@
+---
+sidebar_label: 2.2 Application
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import Prompt14Application from '../reference/_partials/prompt-14-application.mdx';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 2.2 Application
+
+Application 包含 CQRS 消息接口、pipeline behavior（日志、操作审计、验证）以及由 Infrastructure 实现的抽象。代码见 [Reference 14](../reference/code/14-application.mdx)。
+
+<Tabs groupId="route" queryString>
+<TabItem value="script" label="脚本" default>
+
+已由[步骤 1.2](./empty-solution.mdx) 的 scaffold 脚本完成。请对照下方的完成条件检查结果。
+
+</TabItem>
+<TabItem value="ai" label="AI Agent">
+
+<Prompt14Application />
+
+</TabItem>
+<TabItem value="manual" label="手动">
+
+按 [Reference 11](../reference/code/11-file-overview.mdx) 列出的路径，创建 [Reference 14.1 至 14.19](../reference/code/14-application.mdx) 中的每个文件。14.16 至 14.19 仅在启用审计时创建；未启用时，为你的项目显示的 14.15 代码中已没有 `OperationAuditPipelineBehavior` 的注册。
+
+最后按 [Reference 11.3](../reference/code/11-file-overview.mdx#11-3-globalusings-cs-per-project) 建立此项目的 `GlobalUsings.cs`，然后编译：
+
+```bash
+dotnet build
+```
+
+</TabItem>
+</Tabs>
+
+<DoneConditions step="application" />

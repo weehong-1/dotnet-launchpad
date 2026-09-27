@@ -1,0 +1,47 @@
+---
+sidebar_label: "6. 各层职责"
+---
+
+# 6. 各层职责 \{#6-layer-responsibilities\}
+
+## 6.1 Domain \{#6-1-domain\}
+
+- 聚合根、实体、值对象
+- 领域事件
+- 领域异常（`DomainException`）
+- 仓储接口
+- 通用基类与接口：`Entity`、`AggregateRoot`、`IDomainEvent`、`IStronglyTypedId`、`IHasTimestamps`；审计另加 `IAuditable`、`[AuditIgnore]`
+- 值对象直接用 `record`，不另建基类
+
+## 6.2 Application \{#6-2-application\}
+
+- 以功能切片组织：`Features/{功能}/{用例}/`，每个用例的 Command 或 Query、Validator、Handler、Response 放在同一个资料夹（见 [8.15](./08-design-rules/15-feature-slices-vertical-slice.mdx)）
+- 整合事件（对外消息契约）放在 `IntegrationEvents/`，不属于任何切片
+- 输入验证
+- Pipeline Behaviors：日志、操作审计（可选）、验证
+- DTO
+- 抽象接口：由 Infrastructure 实现，例如当前用户、消息发布、外部服务客户端
+
+**不需要事务管线**：每个 Command 只调用一次 `SaveChangesAsync`，EF Core 会把这次保存的所有变更（包括领域事件产生的 Outbox 消息）放在同一个事务中。只有当一个 Command 需要多次保存且必须全部成功或全部回滚时，才在该 Handler 内自行开启事务。
+
+## 6.3 Infrastructure \{#6-3-infrastructure\}
+
+- EF Core DbContext、实体配置、数据库迁移
+- 仓储实现
+- 身份认证相关实现（当前用户、权限来源）
+- 审计纪录的写入（可选）
+- 消息发布（MassTransit）
+- 外部服务客户端（第三方 API、邮件、文件存储等，按项目需要），统一套用韧性处理
+- 健康检查注册
+
+## 6.4 Api \{#6-4-api\}
+
+- HTTP 端点，资料夹与 Application 的功能切片一一对应
+- 中间件
+- 认证与以权限为单位的授权
+- 限流
+- 统一错误处理（ProblemDetails）
+- OpenAPI 文档
+- 健康检查端点
+- CORS
+- 开发环境下自动执行数据库迁移

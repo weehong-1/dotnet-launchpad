@@ -1,0 +1,39 @@
+---
+sidebar_label: 0.3 Confirm licenses
+---
+
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 0.3 Confirm licenses
+
+## Before the first command
+
+Commands on this site are written for bash and carry `# comments`. Run them in bash, or in zsh after turning on interactive comments; otherwise zsh treats a comment as more arguments:
+
+```bash
+setopt interactive_comments 2>/dev/null; grep -q interactive_comments ~/.zshrc 2>/dev/null || [ "${SHELL##*/}" != zsh ] || echo 'setopt interactive_comments' >> ~/.zshrc
+```
+
+## Confirm the licenses
+
+MediatR (from version 13) and MassTransit (from v9) have commercial licenses. Confirm them **before** writing code, for the organisation that will actually own and use the system. See [Reference 8.5](../reference/spec/08-design-rules/05-third-party-licensing.mdx).
+
+- **MediatR**: free Community license for organisations under USD 5 million annual revenue and no more than USD 10 million outside funding. Get the license key.
+- **MassTransit v9**: organisations under USD 1 million annual revenue *may* get a full discount. Apply and get the answer in writing. If the system is later handed to another organisation, that organisation needs its own license.
+- **Seq**: free for a single user, paid for more. Check the current terms ([Reference 8.9](../reference/spec/08-design-rules/09-logging-rules.mdx)).
+
+Keep the keys out of the repository. They go into User Secrets locally (step 3.1) and into the VM's env files on SIT and Production (steps 4.3 and 4.6).
+
+## Make the MassTransit license available locally
+
+MassTransit v9 reads its license from the environment: without it the Api, the Worker and the integration tests fail at startup ([Reference 8.8](../reference/spec/08-design-rules/08-configuration-environments-and-secrets.mdx)). Keep the file outside any repository:
+
+```bash
+mkdir -p ~/.config/masstransit
+cp <downloaded license file> ~/.config/masstransit/license.txt
+PROFILE="$HOME/.${SHELL##*/}rc"
+echo 'export MT_LICENSE_PATH="$HOME/.config/masstransit/license.txt"' >> "$PROFILE"
+export MT_LICENSE_PATH="$HOME/.config/masstransit/license.txt"
+```
+
+<DoneConditions step="licenses" />

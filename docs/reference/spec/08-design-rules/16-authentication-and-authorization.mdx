@@ -1,0 +1,21 @@
+---
+sidebar_label: "8.16 Authentication and authorization"
+---
+
+# 8.16 Authentication and authorization \{#8-16-authentication-and-authorization\}
+
+**Authentication**
+
+- JWT Bearer against any OpenID Connect provider; there are only two settings, `Authentication:Authority` and `Authentication:Audience` (see [16.7](../../code/16-api.mdx#16-7-authextensions-cs)).
+- **Every endpoint requires sign in by default**: unmarked endpoints require an authenticated user. Public endpoints must explicitly add `.AllowAnonymous()`; the health check and OpenAPI are already marked. An endpoint where authorization was forgotten is therefore "denied", not "open".
+
+**Authorization by permission**
+
+- Endpoints declare the permission they need with `.RequirePermission("permission name")` (see [16.10](../../code/16-api.mdx#16-10-permissionendpointextensions-cs)) instead of checking roles directly. A role is just a set of permissions, managed by the identity provider or the project, so role changes need no code change.
+- Permission names follow `{feature}.{action}`, all lowercase. Each feature's permission constants live in `Application/Features/{Feature}/{Feature}Permissions.cs`.
+- Permissions come from `IPermissionProvider` (see [14.13](../../code/14-application.mdx#14-13-ipermissionprovider-cs)). The default `ClaimsPermissionProvider` reads them from token claims, with the claim name set by `Authentication:PermissionClaimType` (default `permissions`). If the system manages permissions itself in the database, replace this implementation and add caching.
+- **Resource level authorization** (for example editing only records you created) is a business rule: check it in the handler with `ICurrentUser` and return `Error.Forbidden` when it fails.
+
+**Testing**
+
+For endpoints that require sign in, add a test authentication handler to the integration tests' `IntegrationTestWebAppFactory` that runs as a chosen user with chosen permissions.

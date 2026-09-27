@@ -1,0 +1,28 @@
+---
+sidebar_label: "5. Solution structure"
+---
+
+# 5. Solution structure \{#5-solution-structure\}
+
+```
+src/
+    ProductName.Domain
+    ProductName.Application
+    ProductName.Infrastructure
+    ProductName.Api
+    ProductName.Worker                      (optional)  # @@worker
+tests/
+    ProductName.Domain.UnitTests
+    ProductName.Application.UnitTests
+    ProductName.Architecture.Tests
+    ProductName.Api.IntegrationTests
+.editorconfig
+.gitignore
+docker-compose.yml
+global.json
+Directory.Build.props
+Directory.Packages.props
+ProductName.slnx
+```
+
+See [8.6](./08-design-rules/06-solution-infrastructure.mdx) for what the root files do.

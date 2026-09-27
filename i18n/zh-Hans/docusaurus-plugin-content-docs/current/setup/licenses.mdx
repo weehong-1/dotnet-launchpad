@@ -1,0 +1,39 @@
+---
+sidebar_label: 0.3 确认许可证
+---
+
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 0.3 确认许可证
+
+## 执行第一个指令之前
+
+本站的指令以 bash 为准，并带有 `# 注释`。请在 bash 中执行；若使用 zsh，先开启 interactive comments，否则 zsh 会把注释当成额外的参数：
+
+```bash
+setopt interactive_comments 2>/dev/null; grep -q interactive_comments ~/.zshrc 2>/dev/null || [ "${SHELL##*/}" != zsh ] || echo 'setopt interactive_comments' >> ~/.zshrc
+```
+
+## 确认授权
+
+MediatR（从版本 13 起）和 MassTransit（从 v9 起）采用商业许可证。请在编写代码**之前**，为实际拥有和使用该系统的组织确认许可证。见 [Reference 8.5](../reference/spec/08-design-rules/05-third-party-licensing.mdx)。
+
+- **MediatR**：年收入低于 500 万美元且外部融资不超过 1000 万美元的组织可免费使用 Community 许可证。获取 license key。
+- **MassTransit v9**：年收入低于 100 万美元的组织*可能*获得全额折扣。提出申请并取得书面答复。如果系统之后移交给另一个组织，该组织需要自己的许可证。
+- **Seq**：单用户免费，多用户收费。查看当前条款（[Reference 8.9](../reference/spec/08-design-rules/09-logging-rules.mdx)）。
+
+key 不要放进 repo。本地放在 User Secrets 中（步骤 3.1），SIT 和 Production 上放在 VM 的环境变量文件中（步骤 4.3 和 4.6）。
+
+## 让本机可以使用 MassTransit 授权
+
+MassTransit v9 从环境变量读取授权：没有授权，Api、Worker 与整合测试都会在启动时失败（[Reference 8.8](../reference/spec/08-design-rules/08-configuration-environments-and-secrets.mdx)）。授权文件放在任何 repo 之外：
+
+```bash
+mkdir -p ~/.config/masstransit
+cp <下载的授权文件> ~/.config/masstransit/license.txt
+PROFILE="$HOME/.${SHELL##*/}rc"
+echo 'export MT_LICENSE_PATH="$HOME/.config/masstransit/license.txt"' >> "$PROFILE"
+export MT_LICENSE_PATH="$HOME/.config/masstransit/license.txt"
+```
+
+<DoneConditions step="licenses" />

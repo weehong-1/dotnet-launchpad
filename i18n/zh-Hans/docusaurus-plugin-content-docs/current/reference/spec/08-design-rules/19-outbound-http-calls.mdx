@@ -1,0 +1,16 @@
+---
+sidebar_label: "8.19 对外 HTTP 呼叫"
+---
+
+# 8.19 对外 HTTP 呼叫 \{#8-19-outbound-http-calls\}
+
+- 一律使用 `IHttpClientFactory` 注册的型别化客户端，不直接 `new HttpClient()`。
+- 所有 HttpClient 自动套用 .NET 官方的标准韧性处理：逾时、重试（指数退避）与熔断，已在 [15.8](../../code/15-infrastructure.mdx#15-8-dependencyinjection-cs) 统一设定，个别客户端不需重复设定。
+- POST、PATCH 等非幂等方法**不自动重试**，以免外部系统收到重复的请求。确实需要重试时，须确认对方支援幂等键。
+- 外部服务客户端的介面定义在 Application，实现在 Infrastructure；网址设定放设定档，金钥放机密（见 [8.8](./08-configuration-environments-and-secrets.mdx)）。
+- 注册写法，`Xxx` 替换为外部服务名称：
+
+```csharp
+services.AddHttpClient<IXxxClient, XxxClient>(client =>
+    client.BaseAddress = new Uri(configuration["Xxx:BaseUrl"]!));
+```

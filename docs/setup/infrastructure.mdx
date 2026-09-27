@@ -1,0 +1,47 @@
+---
+sidebar_label: 2.3 Infrastructure
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import Prompt15Infrastructure from '../reference/_partials/prompt-15-infrastructure.mdx';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 2.3 Infrastructure
+
+Infrastructure implements Application's abstractions: EF Core, MassTransit with the Outbox, current user, permissions, resilience and, optionally, auditing. The code is in [Reference 15](../reference/code/15-infrastructure.mdx).
+
+<Tabs groupId="route" queryString>
+<TabItem value="script" label="Script" default>
+
+Done by the scaffold script in [step 1.2](./empty-solution.mdx). Check the result against the Done Conditions below.
+
+</TabItem>
+<TabItem value="ai" label="AI Agent">
+
+<Prompt15Infrastructure />
+
+</TabItem>
+<TabItem value="manual" label="Manual">
+
+Create each file of [Reference 15.1 to 15.14](../reference/code/15-infrastructure.mdx) at the paths listed in [Reference 11](../reference/code/11-file-overview.mdx), then add the framework reference:
+
+```xml
+<!-- src/ProductName.Infrastructure/ProductName.Infrastructure.csproj -->
+<ItemGroup>
+  <FrameworkReference Include="Microsoft.AspNetCore.App" />
+</ItemGroup>
+```
+
+The 15.8 code shown for your project already has the right Outbox delivery check and audit registrations. Using another broker or database? Change `UseNpgsql`, `UsePostgres` and `UsingRabbitMq` together with the packages.
+
+Finish by creating this project's `GlobalUsings.cs` from [Reference 11.3](../reference/code/11-file-overview.mdx#11-3-globalusings-cs-per-project), then build:
+
+```bash
+dotnet build
+```
+
+</TabItem>
+</Tabs>
+
+<DoneConditions step="infrastructure" />

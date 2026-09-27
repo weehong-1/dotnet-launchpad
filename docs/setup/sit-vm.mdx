@@ -1,0 +1,16 @@
+---
+sidebar_label: 4.3 SIT VM setup
+---
+
+import {VmSetup} from '@site/src/components/Commands';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 4.3 SIT: first-time VM setup
+
+Prepare the SIT Ubuntu VM once, following [Reference 8.21](../reference/spec/08-design-rules/21-deployment.mdx). SIT gets its **own** database, broker, Seq API key and secrets; nothing is shared with Production ([Reference 8.8](../reference/spec/08-design-rules/08-configuration-environments-and-secrets.mdx)).
+
+Before you start, have these ready: an x86-64 VM running Ubuntu 24.04 LTS (CI publishes linux-x64 artifacts, and these commands are written for 24.04) with SSH access, a DNS name for the Api pointing at it, and the backing services from [step 4.2](./sit-services.mdx).
+
+<VmSetup env="SIT" />
+
+<DoneConditions step="sit-vm" />

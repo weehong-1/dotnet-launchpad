@@ -1,0 +1,21 @@
+---
+sidebar_label: 0.1 Fill in Project Settings
+---
+
+import ProjectSettingsForm from '@site/src/components/ProjectSettingsForm';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 0.1 Fill in Project Settings
+
+Every new backend starts here. What you save becomes the **active project**: code blocks across the site switch to your names, and content for components you leave out is collapsed.
+
+- **Project Name** replaces `%%ProductName%%`: solution, projects, namespaces and folders.
+- **Short Name** replaces `%%productname%%`: Linux service account, paths under `/opt`, `/etc` and `/var/log`, systemd services, and the database name. It defaults to the last segment of the Project Name, lowercased.
+- **Worker** runs background work: consumers, scheduled jobs and Outbox delivery. Most projects enable it. See [Reference 7.1](../reference/spec/07-optional-components.mdx#7-1-worker).
+- **Auditing** records data changes and operations from day one. History that was never recorded cannot be recovered later, so it is recommended on by default. See [Reference 7.3](../reference/spec/07-optional-components.mdx#7-3-audit-records).
+
+<ProjectSettingsForm />
+
+You can come back and change these later; everything on the site follows the saved values.
+
+<DoneConditions step="project-settings" />

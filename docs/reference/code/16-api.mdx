@@ -1,0 +1,629 @@
+---
+sidebar_label: "16. Api"
+---
+
+import Prompt16Api from '../_partials/prompt-16-api.mdx';
+
+# 16. Api \{#16-api\}
+
+## 16.1 IEndpoint.cs \{#16-1-iendpoint-cs\}
+
+```csharp
+namespace ProductName.Api.Endpoints;
+
+public interface IEndpoint
+{
+    void MapEndpoint(IEndpointRouteBuilder app);
+}
+```
+
+## 16.2 EndpointExtensions.cs \{#16-2-endpointextensions-cs\}
+
+```csharp
+using System.Reflection;
+
+namespace ProductName.Api.Endpoints;
+
+public static class EndpointExtensions
+{
+    public static IServiceCollection AddEndpoints(this IServiceCollection services)
+    {
+        var endpointTypes = Assembly.GetExecutingAssembly()
+            .DefinedTypes
+            .Where(t => t is { IsAbstract: false, IsInterface: false } && t.IsAssignableTo(typeof(IEndpoint)));
+
+        foreach (var type in endpointTypes)
+            services.AddTransient(typeof(IEndpoint), type);
+
+        return services;
+    }
+
+    public static WebApplication MapEndpoints(this WebApplication app)
+    {
+        foreach (var endpoint in app.Services.GetRequiredService<IEnumerable<IEndpoint>>())
+            endpoint.MapEndpoint(app);
+
+        return app;
+    }
+}
+```
+
+One class per endpoint, in `Endpoints/{Feature}/{UseCase}.cs`, one to one with Application's `Features/{Feature}/{UseCase}/` (see [8.15](../spec/08-design-rules/15-feature-slices-vertical-slice.mdx)). New endpoints need no manual registration. The English guide uses Controllers with Asp.Versioning; this template does not, and whether to add API versioning is a Project Decision ([Setup Flow step 0.2](../../setup/project-decisions.mdx)); the template provides no code for it.
+
+## 16.3 ResultExtensions.cs \{#16-3-resultextensions-cs\}
+
+```csharp
+namespace ProductName.Api.Extensions;
+
+public static class ResultExtensions
+{
+    public static TOut Match<TOut>(
+        this Result result,
+        Func<TOut> onSuccess,
+        Func<Result, TOut> onFailure) =>
+        result.IsSuccess ? onSuccess() : onFailure(result);
+
+    public static TOut Match<TIn, TOut>(
+        this Result<TIn> result,
+        Func<TIn, TOut> onSuccess,
+        Func<Result<TIn>, TOut> onFailure) =>
+        result.IsSuccess ? onSuccess(result.Value) : onFailure(result);
+}
+```
+
+## 16.4 MigrationExtensions.cs \{#16-4-migrationextensions-cs\}
+
+```csharp
+using Microsoft.EntityFrameworkCore;
+
+namespace ProductName.Api.Extensions;
+
+internal static class MigrationExtensions
+{
+    // Controlled by Migrations:ApplyOnStartup, on only in Development; for SIT and production see 8.11
+    public static async Task ApplyMigrationsAsync(this WebApplication app)
+    {
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await db.Database.MigrateAsync();
+    }
+}
+```
+
+## 16.5 CustomResults.cs \{#16-5-customresults-cs\}
+
+```csharp
+namespace ProductName.Api.Infrastructure;
+
+public static class CustomResults
+{
+    public static IResult Problem(Result result)
+    {
+        if (result.IsSuccess)
+            throw new InvalidOperationException("Cannot create a problem from a successful result.");
+
+        return Results.Problem(
+            title: result.Error.Code,
+            detail: result.Error.Description,
+            statusCode: GetStatusCode(result.Error.Type),
+            extensions: GetErrors(result));
+    }
+
+    private static int GetStatusCode(ErrorType type) => type switch
+    {
+        ErrorType.Validation => StatusCodes.Status400BadRequest,
+        ErrorType.Unauthorized => StatusCodes.Status401Unauthorized,
+        ErrorType.Forbidden => StatusCodes.Status403Forbidden,
+        ErrorType.NotFound => StatusCodes.Status404NotFound,
+        ErrorType.Conflict => StatusCodes.Status409Conflict,
+        _ => StatusCodes.Status500InternalServerError
+    };
+
+    private static Dictionary<string, object?>? GetErrors(Result result) =>
+        result.Error is ValidationError validationError
+            ? new Dictionary<string, object?> { ["errors"] = validationError.Errors }
+            : null;
+}
+```
+
+Every error response uses the ProblemDetails format, so callers handle one shape only.
+
+## 16.6 GlobalExceptionHandler.cs \{#16-6-globalexceptionhandler-cs\}
+
+```csharp
+using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+
+namespace ProductName.Api.Infrastructure;
+
+internal sealed class GlobalExceptionHandler(
+    ILogger<GlobalExceptionHandler> logger,
+    IProblemDetailsService problemDetailsService)
+    : IExceptionHandler
+{
+    public async ValueTask<bool> TryHandleAsync(
+        HttpContext httpContext,
+        Exception exception,
+        CancellationToken ct)
+    {
+        // Concurrency conflict: expected, return 409 so the frontend prompts a reload (see 8.17)
+        if (exception is DbUpdateConcurrencyException)
+        {
+            logger.LogWarning(exception, "Concurrency conflict");
+
+            return await WriteProblemAsync(
+                httpContext,
+                exception,
+                StatusCodes.Status409Conflict,
+                "Concurrency.Conflict",
+                "The resource was modified by another request. Reload and try again.");
+        }
+
+        if (exception is DomainException domainException)
+            logger.LogError(exception, "Domain invariant violated: {ErrorCode}", domainException.Code);
+        else
+            logger.LogError(exception, "Unhandled exception occurred");
+
+        return await WriteProblemAsync(
+            httpContext,
+            exception,
+            StatusCodes.Status500InternalServerError,
+            "Server.Error",
+            "An unexpected error occurred.");
+    }
+
+    private ValueTask<bool> WriteProblemAsync(
+        HttpContext httpContext,
+        Exception exception,
+        int statusCode,
+        string title,
+        string detail)
+    {
+        httpContext.Response.StatusCode = statusCode;
+
+        return problemDetailsService.TryWriteAsync(new ProblemDetailsContext
+        {
+            HttpContext = httpContext,
+            Exception = exception,
+            ProblemDetails = new ProblemDetails
+            {
+                Title = title,
+                Detail = detail,
+                Status = statusCode
+            }
+        });
+    }
+}
+```
+
+- Concurrency conflicts return 409 and are logged as Warning, because they are expected when several people work at once, not a bug.
+- Domain exceptions and other unexpected exceptions return 500 without revealing internals; domain exceptions also log their error code.
+- Business failures travel as Result and never reach this handler.
+
+## 16.7 AuthExtensions.cs \{#16-7-authextensions-cs\}
+
+```csharp
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using ProductName.Api.Authorization;
+
+namespace ProductName.Api.Extensions;
+
+internal static class AuthExtensions
+{
+    public static IServiceCollection AddApiAuthentication(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services
+            .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            .AddJwtBearer(options =>
+            {
+                options.Authority = configuration["Authentication:Authority"];
+                options.Audience = configuration["Authentication:Audience"];
+            });
+
+        // Every endpoint requires sign in by default; public endpoints must be marked AllowAnonymous (see 8.16)
+        services.AddAuthorizationBuilder()
+            .SetFallbackPolicy(new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .Build());
+
+        services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
+
+        return services;
+    }
+}
+```
+
+- Only standard JWT Bearer validation is used, which fits any OpenID Connect provider; providers differ only in settings.
+- `Authority` must be an HTTPS URL; when it is left empty, every request that requires sign in is rejected, so nothing is opened by accident.
+
+## 16.8 PermissionRequirement.cs \{#16-8-permissionrequirement-cs\}
+
+```csharp
+using Microsoft.AspNetCore.Authorization;
+
+namespace ProductName.Api.Authorization;
+
+internal sealed class PermissionRequirement(string permission) : IAuthorizationRequirement
+{
+    public string Permission { get; } = permission;
+}
+```
+
+## 16.9 PermissionAuthorizationHandler.cs \{#16-9-permissionauthorizationhandler-cs\}
+
+```csharp
+using Microsoft.AspNetCore.Authorization;
+
+namespace ProductName.Api.Authorization;
+
+internal sealed class PermissionAuthorizationHandler(IPermissionProvider permissionProvider)
+    : AuthorizationHandler<PermissionRequirement>
+{
+    protected override async Task HandleRequirementAsync(
+        AuthorizationHandlerContext context,
+        PermissionRequirement requirement)
+    {
+        if (context.User.Identity?.IsAuthenticated != true)
+            return;
+
+        var permissions = await permissionProvider.GetPermissionsAsync(context.User);
+
+        if (permissions.Contains(requirement.Permission))
+            context.Succeed(requirement);
+    }
+}
+```
+
+## 16.10 PermissionEndpointExtensions.cs \{#16-10-permissionendpointextensions-cs\}
+
+```csharp
+using ProductName.Api.Authorization;
+
+namespace ProductName.Api.Extensions;
+
+public static class PermissionEndpointExtensions
+{
+    public static TBuilder RequirePermission<TBuilder>(this TBuilder builder, string permission)
+        where TBuilder : IEndpointConventionBuilder =>
+        builder.RequireAuthorization(policy => policy
+            .RequireAuthenticatedUser()
+            .AddRequirements(new PermissionRequirement(permission)));
+}
+```
+
+Endpoint usage: `app.MapPost(...).RequirePermission(XxxPermissions.Create);` with no policy registered in advance.
+
+## 16.11 RateLimitingExtensions.cs \{#16-11-ratelimitingextensions-cs\}
+
+```csharp
+using System.Security.Claims;
+using System.Threading.RateLimiting;
+
+namespace ProductName.Api.Extensions;
+
+internal static class RateLimitingExtensions
+{
+    public static IServiceCollection AddApiRateLimiting(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        var permitLimit = configuration.GetValue("RateLimiting:PermitLimit", 100);
+        var window = TimeSpan.FromSeconds(configuration.GetValue("RateLimiting:WindowSeconds", 60));
+
+        services.AddRateLimiter(options =>
+        {
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+            // Signed in requests count per UserId, anonymous requests per client IP (see 8.18)
+            options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier)
+                        ?? httpContext.Connection.RemoteIpAddress?.ToString()
+                        ?? "unknown",
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = permitLimit,
+                        Window = window
+                    }));
+        });
+
+        return services;
+    }
+}
+```
+
+- Counting by IP depends on the forwarded headers setup (see [16.13](#16-13-program-cs)); otherwise every request appears to come from Nginx.
+- When an endpoint needs a different limit, define a named policy and add `.RequireRateLimiting("policy name")` to the endpoint.
+
+## 16.12 appsettings files (4) \{#16-12-appsettings-files-4\}
+
+See [8.8](../spec/08-design-rules/08-configuration-environments-and-secrets.mdx) for layering and environment differences, and [8.9](../spec/08-design-rules/09-logging-rules.mdx) for logging design.
+
+### appsettings.json (base file) \{#appsettings-json-base-file\}
+
+```json
+{
+  "ConnectionStrings": {
+    "Database": "",
+    "MessageBroker": ""
+  },
+  "MediatR": {
+    "LicenseKey": ""
+  },
+  "Cors": {
+    "AllowedOrigins": []
+  },
+  "OpenApi": {
+    "Enabled": false
+  },
+  "Migrations": {
+    "ApplyOnStartup": false
+  },
+  "Authentication": {
+    "Authority": "",
+    "Audience": "",
+    "PermissionClaimType": "permissions"
+  },
+  "RateLimiting": {
+    "PermitLimit": 100,
+    "WindowSeconds": 60
+  },
+  "Serilog": {
+    "MinimumLevel": {
+      "Default": "Information",
+      "Override": {
+        "Microsoft": "Warning",
+        "Microsoft.Hosting.Lifetime": "Information",
+        "Microsoft.EntityFrameworkCore.Database.Command": "Warning",
+        "MassTransit": "Warning"
+      }
+    },
+    "Enrich": [ "FromLogContext", "WithMachineName", "WithEnvironmentName" ],
+    "Properties": {
+      "Application": "ProductName.Api"
+    }
+  },
+  "AllowedHosts": "*"
+}
+```
+
+- Every feature is off by default and connection strings are empty. If any environment misses a connection string, the app fails at startup instead of connecting to the wrong database.
+- `Authentication` `Authority` and `Audience` come from User Secrets or environment variables per environment (see [8.16](../spec/08-design-rules/16-authentication-and-authorization.mdx)); `RateLimiting` holds the rate limit defaults (see [8.18](../spec/08-design-rules/18-rate-limiting.mdx)).
+- `Serilog:WriteTo` is not defined here; each environment file defines it (see [8.8](../spec/08-design-rules/08-configuration-environments-and-secrets.mdx) for why).
+- `Enrich` and `Properties` add the machine name, environment name and application name to every log entry (see [8.9](../spec/08-design-rules/09-logging-rules.mdx)).
+
+### appsettings.Development.json \{#appsettings-development-json\}
+
+```json
+{
+  "ConnectionStrings": {
+    "Database": "Host=localhost;Port=5432;Database=productname;Username=postgres;Password=postgres",
+    "MessageBroker": "amqp://guest:guest@localhost:5672"
+  },
+  "Cors": {
+    "AllowedOrigins": []
+  },
+  "OpenApi": {
+    "Enabled": true
+  },
+  "Migrations": {
+    "ApplyOnStartup": true
+  },
+  "Serilog": {
+    "MinimumLevel": {
+      "Default": "Debug"
+    },
+    "WriteTo": {
+      "Console": {
+        "Name": "Console"
+      },
+      "Seq": {
+        "Name": "Seq",
+        "Args": { "serverUrl": "http://localhost:5341" }
+      }
+    }
+  }
+}
+```
+
+- Connection strings and the Seq URL match the local defaults in `docker-compose.yml`, so local development works out of the box.
+- Development writes no log files.
+- Put the local frontend URL in `Cors:AllowedOrigins`; projects without a frontend leave it empty.
+- The MediatR license key is not here; it comes from User Secrets.
+
+### appsettings.SIT.json \{#appsettings-sit-json\}
+
+```json
+{
+  "Cors": {
+    "AllowedOrigins": []
+  },
+  "OpenApi": {
+    "Enabled": true
+  },
+  "Serilog": {
+    "WriteTo": {
+      "Console": {
+        "Name": "Console",
+        "Args": { "restrictedToMinimumLevel": "Warning" }
+      },
+      "File": {
+        "Name": "Async",
+        "Args": {
+          "configure": [
+            {
+              "Name": "File",
+              "Args": {
+                "path": "/var/log/productname/api/log-.json",
+                "formatter": "Serilog.Formatting.Compact.RenderedCompactJsonFormatter, Serilog.Formatting.Compact",
+                "rollingInterval": "Day",
+                "rollOnFileSizeLimit": true,
+                "fileSizeLimitBytes": 104857600,
+                "retainedFileTimeLimit": "14.00:00:00",
+                "retainedFileCountLimit": 50
+              }
+            }
+          ]
+        }
+      },
+      "Seq": {
+        "Name": "Seq",
+        "Args": { "serverUrl": "", "apiKey": "" }
+      }
+    }
+  }
+}
+```
+
+- Connection strings, license keys, the Seq URL and API key come from environment variables or a secrets manager, never settings files. The Seq variables are `Serilog__WriteTo__Seq__Args__serverUrl` and `Serilog__WriteTo__Seq__Args__apiKey`.
+- Replace `%%productname%%` in the log path with the lowercase project name.
+- Files are kept 14 days, at most 50 files (about 5 GB of disk).
+- Put the SIT frontend URL in `Cors:AllowedOrigins`.
+- OpenAPI is on so testers can browse and try endpoints; everything else matches production.
+
+### appsettings.Production.json \{#appsettings-production-json\}
+
+```json
+{
+  "Cors": {
+    "AllowedOrigins": []
+  },
+  "Serilog": {
+    "WriteTo": {
+      "Console": {
+        "Name": "Console",
+        "Args": { "restrictedToMinimumLevel": "Warning" }
+      },
+      "File": {
+        "Name": "Async",
+        "Args": {
+          "configure": [
+            {
+              "Name": "File",
+              "Args": {
+                "path": "/var/log/productname/api/log-.json",
+                "formatter": "Serilog.Formatting.Compact.RenderedCompactJsonFormatter, Serilog.Formatting.Compact",
+                "rollingInterval": "Day",
+                "rollOnFileSizeLimit": true,
+                "fileSizeLimitBytes": 104857600,
+                "retainedFileTimeLimit": "30.00:00:00",
+                "retainedFileCountLimit": 100
+              }
+            }
+          ]
+        }
+      },
+      "Seq": {
+        "Name": "Seq",
+        "Args": { "serverUrl": "", "apiKey": "" }
+      }
+    }
+  }
+}
+```
+
+- Connection strings, license keys, the Seq URL and API key come from environment variables or a secrets manager, never settings files.
+- Replace `%%productname%%` in the log path with the lowercase project name.
+- Files are kept 30 days, at most 100 files (about 10 GB of disk).
+- Put the production frontend URL in `Cors:AllowedOrigins`.
+- OpenAPI and startup migrations keep the base file's off setting and need not be repeated.
+- Consider setting `AllowedHosts` to the production domain so only that host name is accepted.
+
+## 16.13 Program.cs \{#16-13-program-cs\}
+
+```csharp
+using System.Security.Claims;
+using Microsoft.AspNetCore.HttpOverrides;
+using ProductName.Api.Endpoints;
+using ProductName.Api.Extensions;
+using ProductName.Api.Infrastructure;
+using ProductName.Application;
+using ProductName.Infrastructure;
+using Scalar.AspNetCore;
+using Serilog;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// When running as a systemd service, report startup completion and handle stop signals correctly (see 12.7)
+builder.Services.AddSystemd();
+
+builder.Services.AddSerilog((services, logger) => logger
+    .ReadFrom.Configuration(builder.Configuration)
+    .ReadFrom.Services(services));
+
+builder.Services
+    .AddApplication(builder.Configuration)
+    .AddInfrastructure(builder.Configuration)
+    .AddEndpoints();
+
+// Behind the Nginx reverse proxy: get the real client IP and scheme
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto);
+
+builder.Services.AddOpenApi();
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+
+builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
+    .WithOrigins(builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [])
+    .AllowAnyHeader()
+    .AllowAnyMethod()));
+
+builder.Services
+    .AddApiAuthentication(builder.Configuration)
+    .AddApiRateLimiting(builder.Configuration);
+
+var app = builder.Build();
+
+if (app.Configuration.GetValue<bool>("OpenApi:Enabled"))
+{
+    app.MapOpenApi().AllowAnonymous();
+    app.MapScalarApiReference().AllowAnonymous();
+}
+
+if (app.Configuration.GetValue<bool>("Migrations:ApplyOnStartup"))
+    await app.ApplyMigrationsAsync();
+
+app.UseForwardedHeaders();
+
+// Outside exception handling: the request log records only the final status code, and GlobalExceptionHandler logs the exception once
+app.UseSerilogRequestLogging(options =>
+    options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
+    {
+        diagnosticContext.Set("UserId", httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier));
+        diagnosticContext.Set("ClientIp", httpContext.Connection.RemoteIpAddress?.ToString());
+    });
+
+app.UseExceptionHandler();
+app.UseCors();
+app.UseAuthentication();
+app.UseRateLimiter();
+app.UseAuthorization();
+
+app.MapHealthChecks("/health")
+    .AllowAnonymous()
+    .DisableRateLimiting();
+app.MapEndpoints();
+
+await app.RunAsync();
+
+// Used by the integration tests' WebApplicationFactory
+public partial class Program { }
+```
+
+- The OpenAPI document and Scalar UI are controlled by `OpenApi:Enabled` (on in Development and SIT); the UI is at `/scalar`.
+- Startup migrations are controlled by `Migrations:ApplyOnStartup`, on only in Development.
+- The health check is at `/health` for load balancers and monitoring.
+- The request log writes one entry per request with path, status code, duration, `UserId` and `ClientIp` (see [8.9](../spec/08-design-rules/09-logging-rules.mdx)).
+- Forwarded headers trust only a local proxy by default. With Nginx on the same VM as the Api nothing more is needed; with Nginx on another host, add its IP to `KnownProxies`, or the IP you get will be Nginx's.
+- See [16.7](#16-7-authextensions-cs) to [16.10](#16-10-permissionendpointextensions-cs) for authentication and authorization: every endpoint requires sign in by default, and the health check and OpenAPI are explicitly public.
+- Rate limiting comes after authentication so it can count per user; the health check is exempt (see [8.18](../spec/08-design-rules/18-rate-limiting.mdx)).
+- `AddSystemd()` does nothing outside systemd (for example local development).
+
+## 16.14 AI coding agent prompt \{#16-14-ai-coding-agent-prompt\}
+
+<Prompt16Api />

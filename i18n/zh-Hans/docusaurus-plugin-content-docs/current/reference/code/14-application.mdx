@@ -1,0 +1,415 @@
+---
+sidebar_label: "14. Application"
+---
+
+import Prompt14Application from '../_partials/prompt-14-application.mdx';
+
+# 14. Application \{#14-application\}
+
+## 14.1 IBaseCommand.cs \{#14-1-ibasecommand-cs\}
+
+```csharp
+namespace ProductName.Application.Abstractions.Messaging;
+
+public interface IBaseCommand { }
+```
+
+标记接口，让验证管线只作用于 Command，不作用于 Query。
+
+## 14.2 ICommand.cs \{#14-2-icommand-cs\}
+
+```csharp
+using MediatR;
+
+namespace ProductName.Application.Abstractions.Messaging;
+
+public interface ICommand : IRequest<Result>, IBaseCommand { }
+
+public interface ICommand<TResponse> : IRequest<Result<TResponse>>, IBaseCommand { }
+```
+
+## 14.3 IQuery.cs \{#14-3-iquery-cs\}
+
+```csharp
+using MediatR;
+
+namespace ProductName.Application.Abstractions.Messaging;
+
+public interface IQuery<TResponse> : IRequest<Result<TResponse>> { }
+```
+
+## 14.4 ICommandHandler.cs \{#14-4-icommandhandler-cs\}
+
+```csharp
+using MediatR;
+
+namespace ProductName.Application.Abstractions.Messaging;
+
+public interface ICommandHandler<in TCommand> : IRequestHandler<TCommand, Result>
+    where TCommand : ICommand { }
+
+public interface ICommandHandler<in TCommand, TResponse> : IRequestHandler<TCommand, Result<TResponse>>
+    where TCommand : ICommand<TResponse> { }
+```
+
+## 14.5 IQueryHandler.cs \{#14-5-iqueryhandler-cs\}
+
+```csharp
+using MediatR;
+
+namespace ProductName.Application.Abstractions.Messaging;
+
+public interface IQueryHandler<in TQuery, TResponse> : IRequestHandler<TQuery, Result<TResponse>>
+    where TQuery : IQuery<TResponse> { }
+```
+
+在 MediatR 之上包一层自己的接口，好处是：所有 Command 与 Query 强制返回 Result；日后若要换掉 MediatR，只需修改这几个接口。
+
+## 14.6 IDomainEventHandler.cs \{#14-6-idomaineventhandler-cs\}
+
+```csharp
+using MediatR;
+
+namespace ProductName.Application.Abstractions.Messaging;
+
+public interface IDomainEventHandler<in TDomainEvent> : INotificationHandler<TDomainEvent>
+    where TDomainEvent : IDomainEvent { }
+```
+
+## 14.7 IEventBus.cs \{#14-7-ieventbus-cs\}
+
+```csharp
+namespace ProductName.Application.Abstractions.Messaging;
+
+public interface IEventBus
+{
+    Task PublishAsync<T>(T message, CancellationToken ct = default)
+        where T : class;
+}
+```
+
+Application 通过这个接口发布整合事件，不直接引用 MassTransit。实现见 [15.5](./15-infrastructure.mdx#15-5-eventbus-cs)。
+
+## 14.8 LoggingPipelineBehavior.cs \{#14-8-loggingpipelinebehavior-cs\}
+
+```csharp
+using System.Diagnostics;
+using MediatR;
+using Microsoft.Extensions.Logging;
+
+namespace ProductName.Application.Abstractions.Behaviors;
+
+internal sealed class LoggingPipelineBehavior<TRequest, TResponse>(
+    ILogger<LoggingPipelineBehavior<TRequest, TResponse>> logger)
+    : IPipelineBehavior<TRequest, TResponse>
+    where TRequest : notnull
+    where TResponse : Result
+{
+    public async Task<TResponse> Handle(
+        TRequest request,
+        RequestHandlerDelegate<TResponse> next,
+        CancellationToken ct)
+    {
+        var requestName = typeof(TRequest).Name;
+
+        // 此范围内产生的所有日志（包括 Handler 内的日志）都会带上 RequestName
+        using var scope = logger.BeginScope(new Dictionary<string, object> { ["RequestName"] = requestName });
+
+        var startTimestamp = Stopwatch.GetTimestamp();
+
+        logger.LogDebug("Processing {RequestName}", requestName);
+
+        var result = await next();
+
+        var elapsedMs = Stopwatch.GetElapsedTime(startTimestamp).TotalMilliseconds;
+
+        if (result.IsSuccess)
+            logger.LogInformation("Completed {RequestName} in {ElapsedMs:0.0} ms", requestName, elapsedMs);
+        else
+            logger.LogWarning(
+                "Completed {RequestName} with error {ErrorCode} in {ElapsedMs:0.0} ms",
+                requestName, result.Error.Code, elapsedMs);
+
+        return result;
+    }
+}
+```
+
+- 每个 Command 与 Query 记录一条完成日志，包含耗时；失败时以 Warning 记录错误代码。
+- 开始处理的日志为 Debug，只在开发环境输出，避免正式环境日志量加倍。
+- 异常不在这里记录，由全局异常处理统一记录一次（见 [8.9](../spec/08-design-rules/09-logging-rules.mdx) 撰写规则）。
+- 只使用 .NET 内建的 `ILogger`，Application 不引用 Serilog。
+
+## 14.9 ValidationPipelineBehavior.cs \{#14-9-validationpipelinebehavior-cs\}
+
+```csharp
+using FluentValidation;
+using MediatR;
+
+namespace ProductName.Application.Abstractions.Behaviors;
+
+internal sealed class ValidationPipelineBehavior<TRequest, TResponse>(
+    IEnumerable<IValidator<TRequest>> validators)
+    : IPipelineBehavior<TRequest, TResponse>
+    where TRequest : IBaseCommand
+    where TResponse : Result, IResultFactory<TResponse>
+{
+    public async Task<TResponse> Handle(
+        TRequest request,
+        RequestHandlerDelegate<TResponse> next,
+        CancellationToken ct)
+    {
+        var errors = await ValidateAsync(request, ct);
+
+        if (errors.Length == 0)
+            return await next();
+
+        // TResponse 是 Result 或 Result<T>，由它自己的静态工厂建立失败结果（13.11）
+        return TResponse.CreateFailure(new ValidationError(errors));
+    }
+
+    private async Task<Error[]> ValidateAsync(TRequest request, CancellationToken ct)
+    {
+        var errors = new List<Error>();
+
+        // 每个 Validator 各用一个 context，并逐一执行：ValidationContext 带有可变状态，
+        // 而且多个 Validator 可能共用 DbContext 等 scoped 依赖
+        foreach (var validator in validators)
+        {
+            var result = await validator.ValidateAsync(new ValidationContext<TRequest>(request), ct);
+            errors.AddRange(result.Errors.Select(f => Error.Validation(f.PropertyName, f.ErrorMessage)));
+        }
+
+        return [.. errors];
+    }
+}
+```
+
+验证失败时直接返回失败的 Result，不进入 Handler，也不抛异常。
+
+- `TResponse.CreateFailure` 调用的是回应类型自己的静态工厂（[13.11](./13-domain.mdx#13-11-result-cs-and-iresultfactory-cs)），管线完全不用反射：签名写错会在编译时失败，而不是等到正式环境第一次验证失败时才出错。
+- 泛型约束同时决定这个管线套用在哪些请求上。不是 Command（`IBaseCommand`）的请求，或回应类型没有实现 `IResultFactory` 的请求，不满足泛型约束，依赖注入会**默默略过**这个行为；Query 就是这样略过验证的。由于略过时不会报错，[18.1](./18-tests.mdx#18-1-layertests-cs) 检查所有 Handler 都经由我们自己的 Handler 接口，[18.5](./18-tests.mdx#18-5-validationpipelinebehaviortests-cs-application-unittests) 检查 Command 会被验证、Query 不会。
+
+## 14.10 IApplicationDbContext.cs \{#14-10-iapplicationdbcontext-cs\}
+
+```csharp
+using Microsoft.EntityFrameworkCore;
+
+namespace ProductName.Application.Abstractions.Data;
+
+public interface IApplicationDbContext
+{
+    DbSet<TEntity> Set<TEntity>() where TEntity : class;
+}
+```
+
+供 Query 直接以 `AsNoTracking` 读取。使用泛型 `Set<TEntity>()`，新增实体时不需要修改这个接口。
+
+## 14.11 IUnitOfWork.cs \{#14-11-iunitofwork-cs\}
+
+```csharp
+namespace ProductName.Application.Abstractions.Data;
+
+public interface IUnitOfWork
+{
+    Task<int> SaveChangesAsync(CancellationToken ct = default);
+}
+```
+
+## 14.12 ICurrentUser.cs \{#14-12-icurrentuser-cs\}
+
+```csharp
+namespace ProductName.Application.Abstractions.Authentication;
+
+public interface ICurrentUser
+{
+    bool IsAuthenticated { get; }
+    string UserId { get; }
+}
+```
+
+## 14.13 IPermissionProvider.cs \{#14-13-ipermissionprovider-cs\}
+
+```csharp
+using System.Security.Claims;
+
+namespace ProductName.Application.Abstractions.Authentication;
+
+public interface IPermissionProvider
+{
+    Task<IReadOnlySet<string>> GetPermissionsAsync(ClaimsPrincipal user, CancellationToken ct = default);
+}
+```
+
+提供使用者拥有的权限（见 [8.16](../spec/08-design-rules/16-authentication-and-authorization.mdx)）。模板预设从令牌声明读取（[15.7](./15-infrastructure.mdx#15-7-claimspermissionprovider-cs)）；权限由系统自行管理时，替换实现即可，呼叫端不需修改。
+
+## 14.14 PagedList.cs \{#14-14-pagedlist-cs\}
+
+```csharp
+namespace ProductName.Application.Abstractions;
+
+public sealed record PagedList<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount)
+{
+    public int TotalPages => (int)Math.Ceiling(TotalCount / (double)PageSize);
+    public bool HasNextPage => Page < TotalPages;
+    public bool HasPreviousPage => Page > 1;
+}
+```
+
+## 14.15 DependencyInjection.cs \{#14-15-dependencyinjection-cs\}
+
+```csharp
+using FluentValidation;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace ProductName.Application;
+
+public static class DependencyInjection
+{
+    public static IServiceCollection AddApplication(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.AddMediatR(config =>
+        {
+            config.LicenseKey = configuration["MediatR:LicenseKey"];
+            config.RegisterServicesFromAssembly(typeof(DependencyInjection).Assembly);
+            config.AddOpenBehavior(typeof(LoggingPipelineBehavior<,>));
+            config.AddOpenBehavior(typeof(OperationAuditPipelineBehavior<,>));   // @@auditing
+            config.AddOpenBehavior(typeof(ValidationPipelineBehavior<,>));
+        });
+
+        services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly, includeInternalTypes: true);
+
+        return services;
+    }
+}
+```
+
+管线执行顺序与注册顺序相同：先记录日志，再记录操作审计，再验证，最后进入 Handler。操作审计放在验证之前，验证失败的尝试也会被记录。MediatR 授权金钥从设定读取，不写死在代码中。新增 Handler 或 Validator 不需要手动注册。
+
+<Optional when="auditing">
+
+## 14.16 IAuditContext.cs（可选：审计） \{#14-16-iauditcontext-cs-optional-auditing\}
+
+```csharp
+namespace ProductName.Application.Abstractions.Auditing;
+
+public interface IAuditContext
+{
+    string? UserId { get; }
+    string? SessionId { get; }
+    string? ClientIp { get; }
+    string? UserAgent { get; }
+    string? TraceId { get; }
+}
+```
+
+提供审计纪录共通的资讯（见 [7.3](../spec/07-optional-components.mdx#7-3-audit-records)）。所有属性都可以为空：在 Worker 等没有 HTTP 请求的场景，代表由系统执行。
+
+</Optional>
+
+<Optional when="auditing">
+
+## 14.17 IAuditableRequest.cs（可选：审计） \{#14-17-iauditablerequest-cs-optional-auditing\}
+
+```csharp
+namespace ProductName.Application.Abstractions.Auditing;
+
+// 标记接口：实现此接口的 Command 或 Query，每次执行都会写入操作审计
+public interface IAuditableRequest { }
+```
+
+</Optional>
+
+<Optional when="auditing">
+
+## 14.18 IOperationAuditWriter.cs（可选：审计） \{#14-18-ioperationauditwriter-cs-optional-auditing\}
+
+```csharp
+namespace ProductName.Application.Abstractions.Auditing;
+
+public enum AuditOutcome
+{
+    Succeeded,
+    Failed,
+    Exception
+}
+
+public interface IOperationAuditWriter
+{
+    Task WriteAsync(string requestName, AuditOutcome outcome, string? errorCode, CancellationToken ct = default);
+}
+```
+
+`Failed` 代表以 Result 返回的业务失败（包括验证失败）；`Exception` 代表未处理的异常。
+
+</Optional>
+
+<Optional when="auditing">
+
+## 14.19 OperationAuditPipelineBehavior.cs（可选：审计） \{#14-19-operationauditpipelinebehavior-cs-optional-auditing\}
+
+```csharp
+using MediatR;
+using Microsoft.Extensions.Logging;
+
+namespace ProductName.Application.Abstractions.Behaviors;
+
+internal sealed class OperationAuditPipelineBehavior<TRequest, TResponse>(
+    IOperationAuditWriter auditWriter,
+    ILogger<OperationAuditPipelineBehavior<TRequest, TResponse>> logger)
+    : IPipelineBehavior<TRequest, TResponse>
+    where TRequest : IAuditableRequest
+    where TResponse : Result
+{
+    public async Task<TResponse> Handle(
+        TRequest request,
+        RequestHandlerDelegate<TResponse> next,
+        CancellationToken ct)
+    {
+        TResponse result;
+
+        try
+        {
+            result = await next();
+        }
+        catch (Exception exception)
+        {
+            await WriteAsync(AuditOutcome.Exception, exception.GetType().Name);
+            throw;
+        }
+
+        await WriteAsync(
+            result.IsSuccess ? AuditOutcome.Succeeded : AuditOutcome.Failed,
+            result.IsFailure ? result.Error.Code : null);
+
+        return result;
+    }
+
+    private async Task WriteAsync(AuditOutcome outcome, string? errorCode)
+    {
+        var requestName = typeof(TRequest).Name;
+
+        try
+        {
+            // 不使用请求的 CancellationToken：请求被取消时，审计仍须写入
+            await auditWriter.WriteAsync(requestName, outcome, errorCode, CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "Failed to write operation audit for {RequestName}", requestName);
+        }
+    }
+}
+```
+
+- 只对实现 `IAuditableRequest` 的请求生效，其他请求不经过此管线。
+- 审计写入失败时只记录 Error 日志，不影响请求结果（原因见 [7.3](../spec/07-optional-components.mdx#7-3-audit-records)）。
+
+</Optional>
+
+## 14.20 AI Coding Agent 提示词 \{#14-20-ai-coding-agent-prompt\}
+
+<Prompt14Application />

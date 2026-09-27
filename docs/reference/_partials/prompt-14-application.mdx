@@ -1,0 +1,10 @@
+```text
+Run section 14 of the document (Application). Prerequisite: section 13 is done.
+
+1. Create the files of 14.1 to 14.19 at the paths listed in section 11, with the document's content.
+2. Create 14.16 to 14.19 only when auditing is chosen; without auditing, also remove the OperationAuditPipelineBehavior registration from 14.15.
+3. Keep every pipeline behavior internal sealed, registered in the 14.15 order: logging, operation audit, validation. Application uses only ILogger and must not reference Serilog.
+4. Do not create any sample Command, Query, Handler, Validator or DTO.
+
+Done when: dotnet build succeeds; ProductName.Application references only ProductName.Domain and does not reference MassTransit.
+```

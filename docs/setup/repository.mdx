@@ -1,0 +1,45 @@
+---
+sidebar_label: 1.1 Create the repository
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import PromptCommonRules from '../reference/_partials/prompt-common-rules.mdx';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 1.1 Create the repository
+
+```bash
+mkdir productname && cd productname
+git init -b main
+mkdir docs
+curl -fsSL https://dotnet-launchpad.vercel.app/TEMPLATE.md -o docs/TEMPLATE.md
+```
+
+Download it directly: [TEMPLATE.md (English)](pathname:///TEMPLATE.md) · [TEMPLATE.zh.md (中文)](pathname:///TEMPLATE.zh.md). Save it as `docs/TEMPLATE.md` in the repository.
+
+`TEMPLATE.md` is the whole Reference in one Markdown file, rebuilt every time this site is published. The AI agent reads it; on the manual route it is a handy offline copy.
+
+<Tabs groupId="route" queryString>
+<TabItem value="script" label="Script" default>
+
+Nothing more to do here: step 1.2 runs the scaffold script.
+
+</TabItem>
+<TabItem value="ai" label="AI Agent">
+
+Save the **common rules** below in the agent's project instruction file: `CLAUDE.md` for Claude Code, `AGENTS.md`, or `.github/copilot-instructions.md` for GitHub Copilot. The project settings at the top are already filled in from step 0.1.
+
+<PromptCommonRules />
+
+It helps to add, below the rules: build and run commands ([Reference 8.10](../reference/spec/08-design-rules/10-local-development.mdx), [8.11](../reference/spec/08-design-rules/11-database-migrations.mdx)), the layering rules ([Reference 3](../reference/spec/03-layers-and-dependency-direction.mdx)), and the testing conventions ([Reference 8.12](../reference/spec/08-design-rules/12-testing-strategy.mdx)).
+
+</TabItem>
+<TabItem value="manual" label="Manual">
+
+Nothing more to do here. Steps 1.2 to 2.6 link to the Reference section that holds each file's code.
+
+</TabItem>
+</Tabs>
+
+<DoneConditions step="repository" />

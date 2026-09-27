@@ -1,0 +1,9 @@
+---
+sidebar_label: "8.13 强类型 ID"
+---
+
+# 8.13 强类型 ID \{#8-13-strongly-typed-ids\}
+
+- 每个聚合定义自己的 ID，实现 `IStronglyTypedId`，写法见 [13.13](../../code/13-domain.mdx#13-13-istronglytypedid-cs)。
+- DbContext 以约定自动为所有强类型 ID 加上数据库值转换，新增 ID 时**不需要**逐一设定。
+- 强类型 ID 由领域在建立聚合时产生（`Guid.CreateVersion7()`），实体配置中主键须设定 `ValueGeneratedNever()`。

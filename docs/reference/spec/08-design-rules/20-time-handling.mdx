@@ -1,0 +1,11 @@
+---
+sidebar_label: "8.20 Time handling"
+---
+
+# 8.20 Time handling \{#8-20-time-handling\}
+
+- **The database always stores UTC**: points in time use `DateTimeOffset`, mapped to PostgreSQL `timestamptz`. Npgsql accepts only zero offset values and fails on non UTC writes.
+- **Always get the current time from `TimeProvider`** (`GetUtcNow()`), replaceable with `FakeTimeProvider` in tests. `DateTime.Now`, `DateTime.Today` and `DateTimeOffset.Now` are banned by `BannedSymbols.txt` (see [12.6](../../code/12-solution-level.mdx#12-6-bannedsymbols-txt)) and fail the build.
+- Dates without time (such as due dates) use `DateOnly`; times without dates use `TimeOnly`.
+- The API returns UTC times in ISO 8601 with offset, and the frontend displays them in the user's time zone. When a calculation depends on a specific time zone (such as "today in some place"), pass the time zone explicitly instead of relying on the server's.
+- Every server's system time zone is UTC.

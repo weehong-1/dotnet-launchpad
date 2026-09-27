@@ -1,0 +1,42 @@
+---
+sidebar_label: "2. 技术基线"
+---
+
+# 2. 技术基线 \{#2-technical-baseline\}
+
+- 框架：.NET 10
+- 架构：Clean Architecture（CA）+ Vertical Slice（功能切片）+ DDD + CQRS
+- 进程内请求管线：MediatR
+- 异步消息：MassTransit v9（含 EF Core Transactional Outbox）
+- 验证：FluentValidation
+- 数据库：EF Core，代码以 PostgreSQL 为例，按项目替换
+- 消息中间件：代码以 RabbitMQ 为例，按项目替换
+- 日志：Serilog；Development 输出到控制台与本地 Seq，SIT 与 Production 输出到本机 JSON 文件与集中的 Seq（见 [8.9](./08-design-rules/09-logging-rules.mdx)）
+- 部署：SIT 与 Production 部署在 Ubuntu VM，以 systemd 服务执行，前面由 Nginx 反向代理
+- API 文档：.NET 10 内建 OpenAPI，界面使用 Scalar
+- 本地开发环境：Docker Compose
+- 部署环境：Development、SIT、Production 三个，各有独立设定档（见 [8.8](./08-design-rules/08-configuration-environments-and-secrets.mdx)）
+- 测试：xUnit v3、NSubstitute、Testcontainers、NetArchTest；覆盖率以 coverlet 收集（见 [8.12](./08-design-rules/12-testing-strategy.mdx)）
+- 解决方案格式：`.slnx`
+- 包管理：中央包管理（`Directory.Packages.props`）
+- 身份认证：JWT Bearer，可对接任一 OpenID Connect 提供方；授权以权限为单位（见 [8.16](./08-design-rules/16-authentication-and-authorization.mdx)）
+- 对外 HTTP 呼叫：`IHttpClientFactory` 加官方标准韧性处理（见 [8.19](./08-design-rules/19-outbound-http-calls.mdx)）
+- 发布方式：self-contained（linux-x64），VM 不需安装 .NET 执行环境（见 [8.21](./08-design-rules/21-deployment.mdx)）
+
+**外部服务清单**
+
+| 服务 | 是否使用 | 用途 | Development | SIT 与 Production |
+| --- | --- | --- | --- | --- |
+| PostgreSQL | 使用（必需） | 主数据库，包括 Outbox、Inbox 与审计数据表 | Docker Compose | 独立的数据库服务器或云端托管数据库 |
+| RabbitMQ | 使用（必需） | MassTransit 的消息中间件，传递整合事件 | Docker Compose | 独立的 RabbitMQ 服务器或云端托管服务 |
+| Seq | 使用 | 集中日志（见 [8.9](./08-design-rules/09-logging-rules.mdx)） | Docker Compose | 独立的 VM |
+| Nginx | 使用 | 反向代理与 HTTPS（见 [8.21](./08-design-rules/21-deployment.mdx)） | 不需要 | 与 Api 同一台 VM |
+| Redis | **不使用** | 不适用 | 不适用 | 不适用 |
+
+- **RabbitMQ**：只要使用 MassTransit 就需要消息中间件。项目规模很小、想少维护一个服务时，可改用 MassTransit 的 PostgreSQL 传输（SQL Transport），直接以现有数据库传递消息；改用时在 [15.8](../code/15-infrastructure.mdx#15-8-dependencyinjection-cs) 替换 `UsingRabbitMq`，并从 Docker Compose 移除 RabbitMQ。
+- **Redis**：模板目前没有任何功能需要 Redis。快取没有启用；限流在每个 Api 实例的内存中计数；没有分布式锁，也没有 SignalR。遇到以下情况时才加入，并同步更新本清单与 Docker Compose：
+  1. Api 部署多个实例，且需要共用限流计数或快取。
+  2. 使用 HybridCache 的第二层分布式快取。
+  3. 使用 SignalR 且有多个实例，需要背板。
+  4. 需要跨实例的分布式锁。
+- 新增任何外部服务（例如 Redis、档案储存、邮件服务），都必须先更新本清单，写明用途与各环境的提供方式。

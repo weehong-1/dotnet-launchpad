@@ -1,0 +1,10 @@
+```text
+执行文档第 18 节（Tests）。前置条件：第 16 节已完成（选择 Worker 时，第 17 节也须完成）。
+
+1. 按第 11 节列出的路径建立 18.1 至 18.5 的文件，内容照文档。测试项目使用 xUnit v3。
+2. 未选择 Worker 时，LayerTests 移除 Worker 常数，并从 HaveDependencyOnAny 中移除。
+3. 按 11.3 建立四个测试项目的 GlobalUsings.cs。
+4. 除了 18.1 至 18.5 的测试，不要建立其他测试。
+
+完成条件：dotnet test 全部通过（Docker 必须在运行，供 Testcontainers 使用；并须设定 MT_LICENSE 或 MT_LICENSE_PATH，供 MassTransit 使用）。
+```

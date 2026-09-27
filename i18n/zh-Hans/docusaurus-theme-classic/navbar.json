@@ -1,0 +1,22 @@
+{
+  "title": {
+    "message": ".NET Launchpad",
+    "description": "The title in the navbar"
+  },
+  "logo.alt": {
+    "message": ".NET Launchpad",
+    "description": "The alt text of navbar logo"
+  },
+  "item.label.Setup Flow": {
+    "message": "Setup Flow",
+    "description": "Navbar item with label Setup Flow"
+  },
+  "item.label.Reference": {
+    "message": "Reference",
+    "description": "Navbar item with label Reference"
+  },
+  "item.label.Projects": {
+    "message": "项目",
+    "description": "Navbar item with label Projects"
+  }
+}

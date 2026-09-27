@@ -1,0 +1,11 @@
+---
+sidebar_label: "8.18 限流"
+---
+
+# 8.18 限流 \{#8-18-rate-limiting\}
+
+- 使用 .NET 内建的 Rate Limiting，套用于所有端点：已登入的请求以 `UserId` 分别计数，未登入的请求以客户端 IP 计数。
+- 预设每个使用者或 IP 每分钟 100 次，以设定 `RateLimiting:PermitLimit` 与 `RateLimiting:WindowSeconds` 调整。超过时返回 HTTP 429。
+- 健康检查不受限流影响。
+- 计数存在每个 Api 实例的内存中，只部署一个实例时完全准确；部署多个实例时每台各自计数，需要共用计数时才引入 Redis（见第 [2](../02-technical-baseline.mdx) 节外部服务清单）。
+- 应用层限流以使用者为单位，防止滥用与暴力尝试；大量流量攻击应在 Nginx 或云端防火墙层级处理。

@@ -1,0 +1,12 @@
+---
+sidebar_label: "10. 模板化方式"
+---
+
+# 10. 模板化方式 \{#10-turning-it-into-a-template\}
+
+为了每次都能快速复制，建议将按本规范建好的骨架解决方案做成 `dotnet new` 自定义模板：
+
+- 在骨架解决方案根目录加入 `.template.config/template.json`，将 `%%ProductName%%` 设为替换名称。
+- 可选组件在模板中设为开关参数，建立项目时选择是否包含。
+- 安装模板后，新项目只需一条 `dotnet new` 指令并指定项目名称即可生成完整结构。
+- 在做成 `dotnet new` 模板之前，可先用 [11.2](../code/11-file-overview.mdx#11-2-scaffolding-the-solution-with-the-cli) 的 CLI 指令建立骨架。gist 中的 `scaffold.sh` 与 `scaffold.ps1` 是同一用途的脚本，但目前按英文 guide 的结构编写，需要先更新为本版的项目结构。

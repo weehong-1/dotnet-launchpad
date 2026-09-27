@@ -1,0 +1,27 @@
+---
+sidebar_label: 5.1 准备开始功能开发
+---
+
+import PromptFeatureSlice from '../reference/_partials/prompt-feature-slice.mdx';
+import Optional from '@site/src/components/Optional';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 5.1 准备开始功能开发
+
+Setup Flow 到此结束：Skeleton Solution 已部署，还没有任何业务功能。从现在起，每个用例都是一个 feature slice（[Reference 8.15](../reference/spec/08-design-rules/15-feature-slices-vertical-slice.mdx)）。这一步只做交接准备；开发功能是日常的项目工作，不属于 setup。
+
+写第一个用例时，填写尖括号中的内容，然后把这段提示词交给 agent，每个用例一次：
+
+<PromptFeatureSlice />
+
+把它放在找得到的地方：加到 AI 项目指示档（步骤 1.1）的共通规则下方，或把本页加入书签。
+
+想看各部分如何串起来，请阅读[附录 A 的演示](../reference/appendix/a-demo-code.mdx)。它只供阅读，不要复制进项目。
+
+<Optional when="auditing">
+
+在功能出现之前先决定审计规则（[Reference 7.3](../reference/spec/07-optional-components.mdx#7-3-audit-records)）：哪些类型的实体实现 `IAuditable`、哪些属性加上 `[AuditIgnore]`、哪些类型的 Command 或 Query 实现 `IAuditableRequest`。把规则写进项目指示档，让每个 feature slice 都遵守。
+
+</Optional>
+
+<DoneConditions step="first-feature" />

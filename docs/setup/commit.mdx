@@ -1,0 +1,64 @@
+---
+sidebar_label: 3.3 Commit and push
+---
+
+import Optional from '@site/src/components/Optional';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 3.3 Commit and push the Skeleton Solution
+
+The Skeleton Solution is complete. Commit it as the project's first commit, check it from a clean clone, set the CI secrets, and push, so CI runs in step 4.1.
+
+Stage everything, then check that nothing secret is about to be committed:
+
+```bash
+git add -A
+git status --short                                                     # no filled-in .env files, no license files
+git grep --cached -n -i -E "licensekey|mt_license" -- ':!docs/TEMPLATE.md'
+# Every hit must be code or configuration with an empty value, such as "LicenseKey": "" or MT_LICENSE=
+```
+
+Commit, then run the tests from a clean clone so nothing depends on files that were never committed:
+
+```bash
+git commit -m "Create the Skeleton Solution from Boilerplate v1.0"
+rm -rf /tmp/productname-clone && git clone -q "$PWD" /tmp/productname-clone
+(cd /tmp/productname-clone && dotnet test)
+```
+
+Create the private GitHub repository and set the secrets CI needs **before** the first push, so the first run can pass:
+
+```bash
+gh repo create productname --private --source .
+gh secret set MT_LICENSE < ~/.config/masstransit/license.txt   # the tests start MassTransit (Reference 12.10)
+```
+
+<Optional when="sonar">
+
+**SonarCloud.** Create the project in SonarCloud, then:
+
+```bash
+gh secret set SONAR_TOKEN
+gh variable set SONAR_PROJECT_KEY --body "<project key>"
+gh variable set SONAR_ORGANIZATION_KEY --body "<organization key>"
+```
+
+</Optional>
+
+<Optional when="qodana">
+
+**Qodana.** Create the project in Qodana Cloud, then:
+
+```bash
+gh secret set QODANA_TOKEN
+```
+
+</Optional>
+
+Push:
+
+```bash
+git push -u origin main
+```
+
+<DoneConditions step="commit" />

@@ -1,0 +1,14 @@
+---
+sidebar_label: 4.7 Production first deployment
+---
+
+import {Deploy} from '@site/src/components/Commands';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 4.7 Production: first deployment
+
+Deploy to Production only a version that has already passed its SIT deployment and testing. The steps follow [Reference 8.21](../reference/spec/08-design-rules/21-deployment.mdx). Block 1 runs on your machine; block 2 opens an SSH session on the VM, and blocks 3 to 7 run in that one session, so variables such as `$VERSION`, `$STAGE`, `$R` and `$MIGRATED` carry over between them.
+
+<Deploy env="Production" />
+
+<DoneConditions step="prod-deploy" />

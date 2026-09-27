@@ -1,0 +1,25 @@
+```text
+依据文档第 8.15 节，为以下用例建立一个新的功能切片。
+
+功能：<功能名称，复数名词>
+用例：<用例名称，以动词开头>
+类型：<Command / Query>
+输入：<栏位与验证规则>
+输出：<返回的资料；没有则写"无">
+业务规则：<说明>
+HTTP 端点：<方法与路由；没有则写"无">
+操作审计：<是否实现 IAuditableRequest>
+权限：<端点需要的权限名称；公开端点写"公开">
+
+要求：
+1. 在 Application/Features/<功能>/<用例>/ 建立 Command 或 Query、Validator（仅 Command）、Handler、Response（有输出时），一个类型一个文件，命名空间与资料夹相同。
+2. 有 HTTP 端点时，在 Api/Endpoints/<功能>/<用例>.cs 建立端点，照 16.1 至 16.3 与附录 A.6 的写法：只接收参数、以 ISender 发送、以 Match 与 CustomResults 转换结果。需要权限时加上 .RequirePermission(...)，权限常数放在 Application/Features/<功能>/<功能>Permissions.cs，名称格式为 <功能>.<动作>（见 8.16）；公开端点加上 .AllowAnonymous()。
+3. 写入用例通过聚合与仓储；查询用例以 IApplicationDbContext 与 AsNoTracking 投影（见 8.1）。
+4. 业务规则写在 Domain 的聚合中，Handler 只负责流程。需要新的聚合、强类型 ID、错误或领域事件时，按第 13.16 节的约定建立；并在 Infrastructure 的 Database/Configurations 与 Database/Repositories 加入实体设定（主键 ValueGeneratedNever）与仓储，在 DependencyInjection 注册仓储。
+5. 不得引用其他功能切片，也不得建立共用资料夹；若确实需要共用，停下来说明理由，由我决定放在 Domain 或 Abstractions。
+6. 在 Application.UnitTests/Features/<功能>/<用例>/ 测试 Handler 的成功与各失败情境；有端点时，在 Api.IntegrationTests/Features/<功能>/ 测试成功与验证失败情境。新的聚合须在 Domain.UnitTests 测试其业务规则与领域事件。
+7. 有资料表变更时，按 8.11 建立迁移，名称以用例命名。
+8. 完成时列出新增与修改的文件。
+
+完成条件：dotnet build 零警告零错误；dotnet test 全部通过（包括架构测试）。
+```

@@ -1,0 +1,10 @@
+---
+sidebar_label: "8.17 Concurrency control"
+---
+
+# 8.17 Concurrency control \{#8-17-concurrency-control\}
+
+- Every aggregate root gets **optimistic concurrency** automatically (see [15.1](../../code/15-infrastructure.mdx#15-1-applicationdbcontext-cs)). PostgreSQL uses each row's built in system column `xmin` as the version, so no column is added and Domain is unaffected.
+- When two requests modify the same aggregate at once, the later save gets a conflict instead of silently overwriting the earlier change. `GlobalExceptionHandler` turns the conflict into HTTP 409 with error code `Concurrency.Conflict`, and the frontend should prompt the user to reload.
+- Scope: conflicts during "read then modify" within one request. To detect "someone else changed the data while the user had the form open", return the version with the Response and have the Command carry the expected version back for comparison; that is a feature specific need, added when a project requires it.
+- Other databases need adjusting: SQL Server uses a `rowversion` column.

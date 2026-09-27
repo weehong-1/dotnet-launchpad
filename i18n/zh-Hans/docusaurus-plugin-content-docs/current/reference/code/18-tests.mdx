@@ -1,0 +1,428 @@
+---
+sidebar_label: "18. Tests"
+---
+
+import Prompt18Tests from '../_partials/prompt-18-tests.mdx';
+
+# 18. Tests \{#18-tests\}
+
+## 18.1 LayerTests.cs \{#18-1-layertests-cs\}
+
+```csharp
+using System.Reflection;
+using System.Text.RegularExpressions;
+using MediatR;
+using NetArchTest.Rules;
+using ProductName.Application.Abstractions.Messaging;
+
+namespace ProductName.Architecture.Tests;
+
+public class LayerTests
+{
+    private const string Application = "ProductName.Application";
+    private const string Infrastructure = "ProductName.Infrastructure";
+    private const string Api = "ProductName.Api";
+    private const string Worker = "ProductName.Worker"; // @@worker
+
+    private static readonly Assembly DomainAssembly =
+        typeof(ProductName.Domain.Abstractions.Result).Assembly;
+
+    private static readonly Assembly ApplicationAssembly =
+        typeof(ProductName.Application.DependencyInjection).Assembly;
+
+    [Fact]
+    public void Domain_Should_NotDependOn_OtherLayersOrEfCore()
+    {
+        var result = Types.InAssembly(DomainAssembly)
+            .ShouldNot()
+            .HaveDependencyOnAny(Application, Infrastructure, Api, Worker, "Microsoft.EntityFrameworkCore") // @@worker
+            .HaveDependencyOnAny(Application, Infrastructure, Api, "Microsoft.EntityFrameworkCore") // @@!worker
+            .GetResult();
+
+        Assert.True(result.IsSuccessful);
+    }
+
+    [Fact]
+    public void Application_Should_NotDependOn_InfrastructureOrPresentation()
+    {
+        var result = Types.InAssembly(ApplicationAssembly)
+            .ShouldNot()
+            .HaveDependencyOnAny(Infrastructure, Api, Worker, "MassTransit", "Serilog") // @@worker
+            .HaveDependencyOnAny(Infrastructure, Api, "MassTransit", "Serilog") // @@!worker
+            .GetResult();
+
+        Assert.True(result.IsSuccessful);
+    }
+
+    [Fact]
+    public void Handlers_Should_BeSealedAndInternal()
+    {
+        var result = Types.InAssembly(ApplicationAssembly)
+            .That()
+            .AreClasses()
+            .And()
+            .HaveNameEndingWith("Handler")
+            .Should()
+            .BeSealed()
+            .And()
+            .NotBePublic()
+            .GetResult();
+
+        Assert.True(result.IsSuccessful);
+    }
+
+    [Fact]
+    public void Features_Should_NotDependOn_OtherFeatures()
+    {
+        var featuresNamespace = $"{Application}.Features";
+
+        var features = ApplicationAssembly.GetTypes()
+            .Select(t => t.Namespace)
+            .Where(ns => ns is not null && ns.StartsWith($"{featuresNamespace}."))
+            .Select(ns => ns![(featuresNamespace.Length + 1)..].Split('.')[0])
+            .Distinct()
+            .ToList();
+
+        foreach (var feature in features)
+        {
+            var otherFeatures = features
+                .Where(f => f != feature)
+                .Select(f => $"{featuresNamespace}.{f}")
+                .ToArray();
+
+            if (otherFeatures.Length == 0)
+                continue;
+
+            var result = Types.InAssembly(ApplicationAssembly)
+                .That()
+                .ResideInNamespaceMatching($@"^{Regex.Escape($"{featuresNamespace}.{feature}")}(\.|$)")
+                .ShouldNot()
+                .HaveDependencyOnAny(otherFeatures)
+                .GetResult();
+
+            Assert.True(result.IsSuccessful, $"Feature '{feature}' depends on another feature.");
+        }
+    }
+
+    [Fact]
+    public void RequestHandlers_Should_ImplementOwnHandlerInterfaces()
+    {
+        Type[] ownInterfaces = [typeof(ICommandHandler<>), typeof(ICommandHandler<,>), typeof(IQueryHandler<,>)];
+
+        var offenders = ApplicationAssembly.GetTypes()
+            .Where(t => t is { IsClass: true, IsAbstract: false })
+            .Where(t => ImplementsOpenGeneric(t, typeof(IRequestHandler<>)) || ImplementsOpenGeneric(t, typeof(IRequestHandler<,>)))
+            .Where(t => !ownInterfaces.Any(i => ImplementsOpenGeneric(t, i)))
+            .Select(t => t.FullName)
+            .ToList();
+
+        Assert.Empty(offenders);
+    }
+
+    private static bool ImplementsOpenGeneric(Type type, Type openGeneric) =>
+        type.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == openGeneric);
+}
+```
+
+- 第一个测试也检查 Domain 没有引用 EF Core，确保领域层不受数据库技术影响。
+- 第二个测试也检查 Application 没有直接引用 MassTransit 与 Serilog，确保消息发布一律经过 `IEventBus`，日志一律经过 .NET 内建的 `ILogger`。
+- 最后一个测试找出 `Features` 下的所有功能，逐一检查每个功能没有引用其他功能（见 [8.15](../spec/08-design-rules/15-feature-slices-vertical-slice.mdx)）。选取条件的正则表达式在命名空间边界停止，而 NetArchTest 以完整的命名空间段落比对依赖目标，因此名称互为前缀的功能（例如 `Foo` 与 `FooBar`）既不会误判，也不会漏判。不要在目标后面加上点：v1.1 这样做，结果让检查悄悄失效（v1.0 已用两个这样的功能，从两个方向验证）。模板刚建立时没有任何功能，测试直接通过。
+- `RequestHandlers_Should_ImplementOwnHandlerInterfaces` 确保所有 MediatR Handler 都经由 `ICommandHandler` 或 `IQueryHandler`，因此回应一定是 `Result` 或 `Result<T>`，验证管线的约束一定成立（见 [14.9](./14-application.mdx#14-9-validationpipelinebehavior-cs)）。直接实现 `IRequestHandler` 的 Handler 会默默略过验证。
+
+## 18.2 BaseTest.cs 与 ResultTests.cs（Domain.UnitTests） \{#18-2-basetest-cs-domain-unittests\}
+
+```csharp
+using ProductName.Domain.Abstractions;
+
+namespace ProductName.Domain.UnitTests.Abstractions;
+
+public abstract class BaseTest
+{
+    protected static T AssertDomainEventWasPublished<T>(IAggregateRoot aggregate)
+        where T : IDomainEvent
+    {
+        var domainEvent = aggregate.DomainEvents.OfType<T>().SingleOrDefault();
+
+        Assert.NotNull(domainEvent);
+
+        return domainEvent;
+    }
+}
+```
+
+领域测试类别继承它，用来确认聚合方法有触发预期的领域事件。
+
+`ResultTests.cs`：
+
+```csharp
+namespace ProductName.Domain.UnitTests.Abstractions;
+
+public sealed class ResultTests
+{
+    private static readonly Error SomeError = Error.Failure("Test.Failure", "Something failed.");
+
+    [Fact]
+    public void Success_HasNoError()
+    {
+        var result = Result.Success();
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(Error.None, result.Error);
+    }
+
+    [Fact]
+    public void Error_ConvertsToFailedResult()
+    {
+        Result result = SomeError;
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(SomeError, result.Error);
+    }
+
+    [Fact]
+    public void Value_ConvertsToSuccessfulResult()
+    {
+        Result<int> result = 42;
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(42, result.Value);
+    }
+
+    [Fact]
+    public void Value_OfFailedResult_Throws()
+    {
+        Result<int> result = SomeError;
+
+        Assert.Throws<InvalidOperationException>(() => result.Value);
+    }
+
+    [Fact]
+    public void CreateFailure_BuildsTheExactResultType()
+    {
+        var result = CreateFailure<Result<int>>(SomeError);
+
+        Assert.IsType<Result<int>>(result);
+        Assert.Equal(SomeError, result.Error);
+    }
+
+    private static T CreateFailure<T>(Error error)
+        where T : Result, IResultFactory<T> => T.CreateFailure(error);
+}
+```
+
+- 涵盖所有 Handler 依赖的 `Result` 规则，包括 `IResultFactory`（13.11）。
+- 它也是模板中第一个 Domain 测试：Microsoft.Testing.Platform 会让执行零个测试的测试项目失败，少了它，新建的骨架执行 `dotnet test` 就会失败。
+
+## 18.3 IntegrationTestWebAppFactory.cs（Api.IntegrationTests） \{#18-3-integrationtestwebappfactory-cs-api-integrationtests\}
+
+```csharp
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using ProductName.Infrastructure.Database;
+using Testcontainers.PostgreSql;
+using Testcontainers.RabbitMq;
+
+namespace ProductName.Api.IntegrationTests.Abstractions;
+
+public sealed class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsyncLifetime
+{
+    private readonly PostgreSqlContainer _database = new PostgreSqlBuilder("postgres:17").Build();
+
+    private readonly RabbitMqContainer _messageBroker = new RabbitMqBuilder("rabbitmq:4-management").Build();
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        builder.UseEnvironment("Testing");
+        builder.UseSetting("ConnectionStrings:Database", _database.GetConnectionString());
+        builder.UseSetting("ConnectionStrings:MessageBroker", _messageBroker.GetConnectionString());
+    }
+
+    public async ValueTask InitializeAsync()
+    {
+        await Task.WhenAll(_database.StartAsync(), _messageBroker.StartAsync());
+
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await db.Database.MigrateAsync();
+    }
+
+    public override async ValueTask DisposeAsync()
+    {
+        await _database.DisposeAsync();
+        await _messageBroker.DisposeAsync();
+        await base.DisposeAsync();
+    }
+}
+```
+
+- 测试开始时启动 PostgreSQL 与 RabbitMQ 容器，并执行迁移；测试结束后释放容器。
+- 使用 xUnit v3：`IAsyncLifetime` 的方法回传 `ValueTask`，并继承 `IAsyncDisposable`，因此以覆写 `DisposeAsync` 释放容器。
+- Testcontainers 的建构函数直接传入映像名称；不带参数的旧写法已标记为过时，在“警告视为错误”下会导致建置失败。
+- 使用 `Testing` 环境，只载入基础档，OpenAPI 与启动时迁移都是关闭的；迁移改由此处自行执行。
+- 需要认证的端点，按项目的认证方案在此加入测试用的认证处理器。
+- 整合测试自行启动容器，CI 不需要另外提供数据库服务（英文 guide 在 CI 的 `services` 启动 PostgreSQL，本模板不需要）。
+
+## 18.4 BaseIntegrationTest.cs 与 HealthCheckTests.cs（Api.IntegrationTests） \{#18-4-baseintegrationtest-cs-api-integrationtests\}
+
+```csharp
+using MediatR;
+using Microsoft.Extensions.DependencyInjection;
+using ProductName.Infrastructure.Database;
+
+namespace ProductName.Api.IntegrationTests.Abstractions;
+
+public abstract class BaseIntegrationTest : IClassFixture<IntegrationTestWebAppFactory>, IDisposable
+{
+    private readonly IServiceScope _scope;
+
+    protected BaseIntegrationTest(IntegrationTestWebAppFactory factory)
+    {
+        _scope = factory.Services.CreateScope();
+        Sender = _scope.ServiceProvider.GetRequiredService<ISender>();
+        DbContext = _scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        HttpClient = factory.CreateClient();
+    }
+
+    protected ISender Sender { get; }
+    protected ApplicationDbContext DbContext { get; }
+    protected HttpClient HttpClient { get; }
+
+    public void Dispose()
+    {
+        HttpClient.Dispose();
+        _scope.Dispose();
+    }
+}
+```
+
+`HealthCheckTests.cs`：
+
+```csharp
+using System.Net;
+
+namespace ProductName.Api.IntegrationTests;
+
+public sealed class HealthCheckTests(IntegrationTestWebAppFactory factory) : BaseIntegrationTest(factory)
+{
+    [Fact]
+    public async Task Health_ReturnsOk()
+    {
+        var response = await HttpClient.GetAsync("/health", TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+}
+```
+
+这个冒烟测试证明整合测试基底可以运作：容器启动、迁移执行、Api 启动，而且 `/health` 不带 token 也能回应。它需要 Docker 与 MassTransit 授权（`MT_LICENSE` 或 `MT_LICENSE_PATH`，见 [8.8](../spec/08-design-rules/08-configuration-environments-and-secrets.mdx)）。
+
+整合测试类别继承 `BaseIntegrationTest`，可选择直接以 `Sender` 发送 Command 与 Query，或以 `HttpClient` 从 HTTP 端点测试完整流程，再以 `DbContext` 检查数据库结果。
+
+## 18.5 ValidationPipelineBehaviorTests.cs（Application.UnitTests） \{#18-5-validationpipelinebehaviortests-cs-application-unittests\}
+
+```csharp
+using FluentValidation;
+using MediatR;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using NSubstitute;
+using ProductName.Application.Abstractions.Messaging;
+using ProductName.Domain.Abstractions;
+
+namespace ProductName.Application.UnitTests.Abstractions.Behaviors;
+
+// 在真实的 DI 容器中执行真实的 MediatR 管线。下方的假请求是测试基础设施，
+// 不是业务范例：它们证明验证只套用在 Command 上。
+public sealed class ValidationPipelineBehaviorTests
+{
+    private readonly ISender _sender;
+
+    public ValidationPipelineBehaviorTests()
+    {
+        var testAssembly = typeof(ValidationPipelineBehaviorTests).Assembly;
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddApplication(Substitute.For<IConfiguration>());
+        services.AddMediatR(config => config.RegisterServicesFromAssembly(testAssembly));
+        services.AddValidatorsFromAssembly(testAssembly, includeInternalTypes: true);
+
+        _sender = services.BuildServiceProvider().GetRequiredService<ISender>();
+    }
+
+    [Fact]
+    public async Task Command_WithInvalidInput_ReturnsValidationError()
+    {
+        var result = await _sender.Send(new FakeCommand(string.Empty), TestContext.Current.CancellationToken);
+
+        Assert.True(result.IsFailure);
+        Assert.IsType<ValidationError>(result.Error);
+    }
+
+    [Fact]
+    public async Task CommandWithValue_WithInvalidInput_ReturnsValidationError()
+    {
+        var result = await _sender.Send(new FakeValueCommand(string.Empty), TestContext.Current.CancellationToken);
+
+        Assert.True(result.IsFailure);
+        Assert.IsType<ValidationError>(result.Error);
+    }
+
+    [Fact]
+    public async Task Query_WithInvalidInput_SkipsValidation()
+    {
+        var result = await _sender.Send(new FakeQuery(string.Empty), TestContext.Current.CancellationToken);
+
+        Assert.True(result.IsSuccess);
+    }
+
+    internal sealed record FakeCommand(string Name) : ICommand;
+
+    internal sealed record FakeValueCommand(string Name) : ICommand<int>;
+
+    internal sealed record FakeQuery(string Name) : IQuery<int>;
+
+    internal sealed class FakeCommandHandler : ICommandHandler<FakeCommand>
+    {
+        public Task<Result> Handle(FakeCommand request, CancellationToken cancellationToken) =>
+            Task.FromResult(Result.Success());
+    }
+
+    internal sealed class FakeValueCommandHandler : ICommandHandler<FakeValueCommand, int>
+    {
+        public Task<Result<int>> Handle(FakeValueCommand request, CancellationToken cancellationToken) =>
+            Task.FromResult(Result.Success(1));
+    }
+
+    internal sealed class FakeQueryHandler : IQueryHandler<FakeQuery, int>
+    {
+        public Task<Result<int>> Handle(FakeQuery request, CancellationToken cancellationToken) =>
+            Task.FromResult(Result.Success(1));
+    }
+
+    internal sealed class FakeCommandValidator : AbstractValidator<FakeCommand>
+    {
+        public FakeCommandValidator() => RuleFor(c => c.Name).NotEmpty();
+    }
+
+    internal sealed class FakeValueCommandValidator : AbstractValidator<FakeValueCommand>
+    {
+        public FakeValueCommandValidator() => RuleFor(c => c.Name).NotEmpty();
+    }
+
+    internal sealed class FakeQueryValidator : AbstractValidator<FakeQuery>
+    {
+        public FakeQueryValidator() => RuleFor(q => q.Name).NotEmpty();
+    }
+}
+```
+
+- 使用真实的 `AddApplication` 注册，再加入本文件定义的 Handler 与 Validator，因此测试的正是 Api 执行时的管线顺序与约束。
+- 前两个测试确认 `IResultFactory` 对 `Result` 与 `Result<T>` 都能建立失败结果（[13.11](./13-domain.mdx#13-11-result-cs-and-iresultfactory-cs)、[14.9](./14-application.mdx#14-9-validationpipelinebehavior-cs)）；第三个测试确认即使有 Validator，Query 也会略过验证。
+- 这些假请求是测试基础设施，不是业务范例，因此 [11.1](./11-file-overview.mdx#11-1-generating-with-an-ai-coding-agent) 共通规则第 3 条允许它们存在。
+
+## 18.6 AI Coding Agent 提示词 \{#18-6-ai-coding-agent-prompt\}
+
+<Prompt18Tests />

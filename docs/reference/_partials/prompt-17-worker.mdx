@@ -1,0 +1,11 @@
+```text
+Run section 17 of the document (Worker). Only when the Worker is chosen. Prerequisite: section 16 is done.
+
+1. Create the four settings files of 17.1: start from the four files of 16.12 and remove the Cors, OpenApi, Migrations, Authentication and RateLimiting sections; set Serilog:Properties:Application to <project name>.Worker; set the SIT and Production log path to /var/log/<lowercase project name>/worker/log-.json; copy everything else unchanged.
+2. Confirm all four settings files are copied to the output directory.
+3. Replace Program.cs entirely with the content of 17.2.
+4. Confirm DOTNET_ENVIRONMENT in Properties/launchSettings.json is Development.
+5. Do not create any sample Consumer or BackgroundService.
+
+Done when: dotnet build succeeds; after docker compose up -d, the Worker started in Development connects to RabbitMQ with no errors in the log.
+```

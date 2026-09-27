@@ -1,0 +1,43 @@
+---
+sidebar_label: "附录 B：关键决策纪录"
+---
+
+# 附录 B：关键决策纪录 \{#appendix-b-key-decision-record\}
+
+“主要替代方案”栏中标有“英文 guide”的，是英文 guide 实际采用的做法。
+
+| 决策 | 选择 | 理由 | 主要替代方案 |
+| --- | --- | --- | --- |
+| 表现层命名 | 按宿主命名为 `Api`、`Worker`，不叫 Presentation | 表现层有多个入口，按宿主命名才能区分；与业界主流一致 | 独立的 Presentation 类库 |
+| 端点风格 | Minimal API，`IEndpoint` 自动注册 | 端点与功能切片一一对应，不需 Controller 基类 | Controllers 加 Asp.Versioning（英文 guide） |
+| CQRS 管线 | MediatR，外包一层自建接口 | 管线行为成熟；自建接口强制返回 Result，日后可替换 | 自写 dispatcher、source generator 版 Mediator |
+| 异步消息 | MassTransit v9 与内建 Transactional Outbox | 可靠投递、Inbox 防重复，不需自建 Outbox | MassTransit v8（维护至 2026 年底）、自建 `OutboxMessage` 加 Quartz.NET 轮询（英文 guide） |
+| 领域事件发布时机 | `SaveChangesAsync` 写入之前 | 事件 Handler 的变更与 Outbox 消息和业务资料同一事务 | 写入之后以 `SavedChangesAsync` 发布（英文 guide） |
+| 错误处理 | 可预期失败用 Result，违反不变条件才抛异常 | 流程清楚，不以异常控制流程 | 全部使用异常 |
+| 验证失败结果 | `IResultFactory<TSelf>` 静态抽象工厂，以 `TResponse.CreateFailure(...)` 调用（v1.0） | 由编译器检查，不用反射，裁剪与 AOT 下也安全 | 以 `MakeGenericMethod` 反射建立（v1.1）；抛出 `ValidationException`，因可预期失败必须用 Result 而排除 |
+| Result 位置 | Domain | 聚合方法本身需要返回 Result | Application |
+| 实体基类 | `Entity<TId>`、`AggregateRoot<TId>` | 区分聚合根与一般实体，搭配强类型 ID | `BaseEntity`、`AuditableEntity`（英文 guide） |
+| 值对象 | 直接用 `record`，不建基类 | C# record 已按值比较 | `ValueObject` 基类 |
+| 强类型 ID | `IStronglyTypedId` 加 DbContext 约定自动转换 | 防止 ID 误传，新增 ID 不需逐一设定 | 直接使用 Guid（英文 guide） |
+| 读端查询 | Application 通过 `IApplicationDbContext` 以 `AsNoTracking` 投影 | 读取简单、效能好；业界普遍接受的务实做法 | 读端也走仓储 |
+| 事务 | 不设事务管线，每个 Command 一次 `SaveChangesAsync` | 单次保存本身就是一个事务 | 事务管线 |
+| 代码组织 | Clean Architecture 分层，层内以 Vertical Slice 功能切片组织；端点留在 Api | 分层保护依赖方向，切片让一个用例集中一处；端点留在 Api 才能维持 Application 不依赖 ASP.NET Core | 纯分层按类型分资料夹、纯 Vertical Slice（切片含端点，不分 Application 与 Api） |
+| 模块化 | 单一项目内以功能切片组织 | 小团队维护成本最低 | 模块化单体多项目 |
+| 数据库 | PostgreSQL（可替换） | 开源、功能完整、`jsonb` 适合审计资料 | SQL Server、MySQL |
+| 环境 | Development、SIT、Production，功能开关以设定控制 | 新增环境只需加设定档；未设定时默认最严格的 Production | 在代码中判断环境名称 |
+| 部署 | Ubuntu VM，systemd 服务，Nginx 反向代理 | 跨 DigitalOcean、Azure、AWS 一致 | 容器；Docker 映像推到 Docker Hub，经 Tailscale 与 SSH 部署（英文 guide）；IIS |
+| 日志 | Serilog；SIT 与 Production 写本机 JSON 文件并送 Seq | VM 上业界做法：本机完整纪录加集中搜索，两者互补 | 只写文件、只写控制台（英文 guide）、Grafana Loki |
+| 审计 | 模板提供资料变更与操作审计机制，范围由项目决定 | 历史无法补回，机制须从第一天就存在 | 上线后再加入 |
+| 本地开发环境 | Docker Compose | 简单，不需额外项目 | .NET Aspire |
+| API 文档 | 内建 OpenAPI 加 Scalar | .NET 10 内建，不需第三方产生器 | Swashbuckle |
+| 整合测试 | Testcontainers 使用真实 PostgreSQL 与 RabbitMQ | 行为与正式环境一致 | 内存数据库、CI 的 PostgreSQL 服务（英文 guide） |
+| 测试执行器 | Microsoft.Testing.Platform，在 `global.json` 中选定；覆盖率使用 `Microsoft.Testing.Extensions.CodeCoverage`（v1.0） | 现行 xUnit v3 套件需要它；VSTest 套件与 coverlet 的 data collector 在它之下无法运作 | VSTest 配 `Microsoft.NET.Test.Sdk` 与 `coverlet.collector`（v1.1） |
+| 测试框架 | xUnit v3、NSubstitute、xUnit 内建 Assert | 新项目直接使用现行版本；避开商业授权套件 | xUnit v2 加 Moq、FluentAssertions（英文 guide）、NUnit |
+| 代码品质 | 建置时警告视为错误、架构测试；SonarCloud 与 Qodana 为可选 | 基本规则由建置强制；外部服务按需要启用 | 预设启用 SonarCloud 与 Qodana（英文 guide） |
+| 授权 | JWT Bearer，预设须登入，以权限为单位授权 | 对接任何 OpenID Connect 提供方；忘记设定授权的端点是拒绝而非开放 | 以角色判断、每个端点自行检查 |
+| 并发控制 | 聚合根自动启用乐观并发，PostgreSQL 使用 `xmin` | 防止多人同时修改时互相覆盖，且不影响 Domain | 不处理、悲观锁 |
+| 限流 | 内建 Rate Limiting，按使用者或 IP 计数 | 不需额外服务；单一实例下完全准确 | Redis 分布式限流、只在 Nginx 限流 |
+| 对外 HTTP | `IHttpClientFactory` 加官方标准韧性处理 | 统一处理逾时、重试与熔断；非幂等请求不重试 | 自写重试、Polly 手动设定 |
+| 时间 | 一律 UTC，以 `TimeProvider` 取得，本地时间 API 以分析器禁用 | 避免时区错误，规则由建置强制执行 | 仅靠约定、直接用 `DateTime.UtcNow`（英文 guide） |
+| 发布 | self-contained linux-x64，符号连结切换版本 | VM 不需安装 .NET；回滚只需切换连结 | framework-dependent、容器 |
+| Redis | 不使用 | 目前没有功能需要；单一实例的限流与快取不需要 | 预先加入 |

@@ -1,0 +1,10 @@
+---
+sidebar_label: "8.3 MediatR（进程内请求管线）"
+---
+
+# 8.3 MediatR（进程内请求管线） \{#8-3-mediatr-in-process-request-pipeline\}
+
+- **用途**：派发 Command 与 Query，以及在同一进程内派发领域事件。
+- **管线行为**：日志、操作审计（可选，见 [7.3](../07-optional-components.mdx#7-3-audit-records)）、验证；验证只作用于 Command。
+- **依赖控制**：Domain 只引用 `MediatR.Contracts`（Apache 2.0），不引用 MediatR 本体。
+- **自建接口**：业务代码使用自建的 `ICommand`、`IQuery` 及对应 Handler 接口，所有请求统一返回 `Result`。

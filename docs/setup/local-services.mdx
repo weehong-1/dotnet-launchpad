@@ -1,0 +1,29 @@
+---
+sidebar_label: 3.1 Local services and secrets
+---
+
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 3.1 Start local services and set secrets
+
+```bash
+docker compose up -d
+docker compose ps
+```
+
+The RabbitMQ management UI is at [http://localhost:15672](http://localhost:15672) (guest / guest) and Seq at [http://localhost:5341](http://localhost:5341). The local credentials in `docker-compose.yml` and `appsettings.Development.json` are defaults, not secrets ([Reference 8.8](../reference/spec/08-design-rules/08-configuration-environments-and-secrets.mdx)).
+
+Real secrets go into User Secrets, never into the repository:
+
+```bash
+dotnet user-secrets set "MediatR:LicenseKey" "<key>" --project src/ProductName.Api
+dotnet user-secrets set "MediatR:LicenseKey" "<key>" --project src/ProductName.Worker  # @@worker
+
+# Development Authority and Audience from step 0.5 (not secret: appsettings.Development.json works too)
+dotnet user-secrets set "Authentication:Authority" "https://<identity provider>" --project src/ProductName.Api
+dotnet user-secrets set "Authentication:Audience" "<audience>" --project src/ProductName.Api
+```
+
+The MassTransit license comes from `MT_LICENSE_PATH`, exported in step 0.3. Check it in the terminal you run the Api from: `echo $MT_LICENSE_PATH`.
+
+<DoneConditions step="local-services" />

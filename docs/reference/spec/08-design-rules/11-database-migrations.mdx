@@ -1,0 +1,20 @@
+---
+sidebar_label: "8.11 Database migrations"
+---
+
+import SnippetAddMigration from '../../_partials/snippet-add-migration.mdx';
+import SnippetRevokeAudit from '../../_partials/snippet-revoke-audit.mdx';
+
+# 8.11 Database migrations \{#8-11-database-migrations\}
+
+- Migration files live in `ProductName.Infrastructure/Database/Migrations`.
+- Add a migration:
+
+<SnippetAddMigration />
+
+- **Development**: the Api applies migrations at startup, controlled by `Migrations:ApplyOnStartup`, which is on only in the Development settings file.
+- **SIT and Production**: **no automatic migration at startup**, so several instances never migrate at once and a failed migration never stops the service from starting. Instead, the deployment process runs the bundle produced by `dotnet ef migrations bundle`, or a SQL script from `dotnet ef migrations script --idempotent`, before the new version is deployed.
+- MassTransit's Outbox and Inbox tables and the audit tables are part of the migrations; nothing is created separately.
+- **Separate database accounts**: migrations run with the owner account; the application runs with a less privileged account that can read and write data but not change schema. With auditing enabled, also revoke the application account's update and delete rights on the audit tables, for example in PostgreSQL, with the application account created in Setup Flow step 4.3:
+
+<SnippetRevokeAudit />

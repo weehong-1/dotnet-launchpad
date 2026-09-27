@@ -1,0 +1,46 @@
+---
+sidebar_label: 3.2 Run the Api and Worker
+---
+
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 3.2 Run the Api and Worker
+
+Start each in its own terminal:
+
+```bash
+dotnet run --project src/ProductName.Api
+dotnet run --project src/ProductName.Worker  # @@worker
+```
+
+In Development the Api applies migrations at startup. Take the Api's URL from `Properties/launchSettings.json`, then check it:
+
+```bash
+API=http://localhost:5000   # use the URL from launchSettings.json
+curl -i $API/health         # 200 and Healthy, no token needed
+curl -i $API/openapi/v1.json
+curl -i $API/anything      # 401: every endpoint requires sign in by default
+```
+
+Open `$API/scalar` in a browser for the API documentation.
+
+Then prove that a real token is accepted, not just that a missing one is rejected. Get an access token for the Api's audience the way step 0.5 showed, then:
+
+```bash
+TOKEN=<access token>
+curl -i -H "Authorization: Bearer $TOKEN" $API/anything   # 404: authenticated, and the path does not exist
+```
+
+A 401 here means `Authentication:Authority` or `Authentication:Audience` does not match the token; fix it before going further.
+
+
+Then prove the Api refuses to start without real settings outside Development:
+
+```bash
+ASPNETCORE_ENVIRONMENT=SIT dotnet run --project src/ProductName.Api --no-launch-profile
+# Expected: it fails at startup instead of connecting to the local database
+```
+
+Finally, open Seq at [http://localhost:5341](http://localhost:5341) and check that the log entries arrived.
+
+<DoneConditions step="run-locally" />

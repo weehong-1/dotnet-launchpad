@@ -1,0 +1,215 @@
+---
+sidebar_label: "附录 A：演示代码【整段可删除】"
+---
+
+# 附录 A：演示代码【整段可删除】 \{#appendix-a-demo-code\}
+
+> ⚠ 本附录**全部是演示代码**，不属于模板。它用一个虚构的 `Sample` 功能，示范第二部分的 boilerplate 如何串成一条完整流程。**建立新项目时整个附录删除，不要复制进模板。**
+>
+> 为了方便阅读，同一用例的多个类型放在同一个代码区块中；实际项目按 [8.15](../spec/08-design-rules/15-feature-slices-vertical-slice.mdx) 的规则，一个类型一个文件，放在对应的功能切片资料夹。
+
+## A.1 Domain【演示，可删除】 \{#a-1-domain\}
+
+```csharp
+// 演示代码，可删除
+namespace ProductName.Domain.Samples;
+
+public readonly record struct SampleId(Guid Value) : IStronglyTypedId
+{
+    public static SampleId New() => new(Guid.CreateVersion7());
+}
+
+public sealed record SampleCreatedDomainEvent(SampleId SampleId) : DomainEvent;
+
+public static class SampleErrors
+{
+    public static Error NotFound(SampleId id) =>
+        Error.NotFound("Sample.NotFound", $"Sample {id.Value} was not found.");
+
+    public static readonly Error NameRequired =
+        Error.Validation("Sample.NameRequired", "Name is required.");
+}
+
+public sealed class Sample : AggregateRoot<SampleId>, IHasTimestamps, IAuditable
+{
+    private Sample(SampleId id, string name) : base(id) => Name = name;
+
+    private Sample() { }
+
+    public string Name { get; private set; } = string.Empty;
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset? UpdatedAt { get; set; }
+
+    public static Result<Sample> Create(string name, DateTimeOffset now)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return SampleErrors.NameRequired;
+
+        var sample = new Sample(SampleId.New(), name.Trim());
+        sample.Raise(new SampleCreatedDomainEvent(sample.Id) { OccurredOn = now });
+        return sample;
+    }
+}
+
+public interface ISampleRepository : IRepository<Sample, SampleId> { }
+```
+
+## A.2 Application：Command【演示，可删除】 \{#a-2-application-command\}
+
+```csharp
+// 演示代码，可删除
+namespace ProductName.Application.Features.Samples.CreateSample;
+
+public sealed record CreateSampleCommand(string Name) : ICommand<Guid>;
+
+internal sealed class CreateSampleCommandValidator : AbstractValidator<CreateSampleCommand>
+{
+    public CreateSampleCommandValidator()
+    {
+        RuleFor(c => c.Name).NotEmpty().MaximumLength(200);
+    }
+}
+
+internal sealed class CreateSampleCommandHandler(
+    ISampleRepository samples,
+    IUnitOfWork unitOfWork,
+    TimeProvider timeProvider)
+    : ICommandHandler<CreateSampleCommand, Guid>
+{
+    public async Task<Result<Guid>> Handle(CreateSampleCommand command, CancellationToken ct)
+    {
+        var result = Sample.Create(command.Name, timeProvider.GetUtcNow());
+        if (result.IsFailure)
+            return result.Error;
+
+        samples.Add(result.Value);
+        await unitOfWork.SaveChangesAsync(ct);
+
+        return result.Value.Id.Value;
+    }
+}
+```
+
+写端流程固定为：建立或取出聚合，调用聚合方法，保存。Handler 本身不写业务规则。
+
+## A.3 Application：Query【演示，可删除】 \{#a-3-application-query\}
+
+```csharp
+// 演示代码，可删除
+namespace ProductName.Application.Features.Samples.GetSampleById;
+
+public sealed record GetSampleByIdQuery(Guid SampleId) : IQuery<SampleResponse>;
+
+public sealed record SampleResponse(Guid Id, string Name);
+
+internal sealed class GetSampleByIdQueryHandler(IApplicationDbContext db)
+    : IQueryHandler<GetSampleByIdQuery, SampleResponse>
+{
+    public async Task<Result<SampleResponse>> Handle(GetSampleByIdQuery query, CancellationToken ct)
+    {
+        var sampleId = new SampleId(query.SampleId);
+
+        var sample = await db.Set<Sample>()
+            .AsNoTracking()
+            .Where(s => s.Id == sampleId)
+            .Select(s => new SampleResponse(s.Id.Value, s.Name))
+            .FirstOrDefaultAsync(ct);
+
+        return sample is null ? SampleErrors.NotFound(sampleId) : sample;
+    }
+}
+```
+
+读端不经过聚合与仓储，直接投影成 DTO。
+
+## A.4 Application：领域事件转整合事件【演示，可删除】 \{#a-4-application-domain-event-to-integration-event\}
+
+```csharp
+// 演示代码，可删除
+// 文件：Application/IntegrationEvents/SampleCreatedIntegrationEvent.cs
+namespace ProductName.Application.IntegrationEvents;
+
+public sealed record SampleCreatedIntegrationEvent(Guid SampleId);
+```
+
+```csharp
+// 演示代码，可删除
+// 文件：Application/Features/Samples/EventHandlers/SampleCreatedDomainEventHandler.cs
+namespace ProductName.Application.Features.Samples.EventHandlers;
+
+internal sealed class SampleCreatedDomainEventHandler(IEventBus eventBus)
+    : IDomainEventHandler<SampleCreatedDomainEvent>
+{
+    public Task Handle(SampleCreatedDomainEvent notification, CancellationToken ct) =>
+        eventBus.PublishAsync(new SampleCreatedIntegrationEvent(notification.SampleId.Value), ct);
+}
+```
+
+## A.5 Infrastructure：仓储实现【演示，可删除】 \{#a-5-infrastructure-repository-implementation\}
+
+```csharp
+// 演示代码，可删除
+namespace ProductName.Infrastructure.Database.Repositories;
+
+internal sealed class SampleRepository(ApplicationDbContext db)
+    : Repository<Sample, SampleId>(db), ISampleRepository { }
+```
+
+另需在 `AddInfrastructure` 中注册 `services.AddScoped<ISampleRepository, SampleRepository>();`，以及一个 `IEntityTypeConfiguration<Sample>` 设定主键为 `ValueGeneratedNever()`。`SampleId` 的数据库值转换由约定自动处理，不需要另外设定。这两处同样属于演示，删除附录时一并删除。
+
+## A.6 Api：端点【演示，可删除】 \{#a-6-api-endpoint\}
+
+```csharp
+// 演示代码，可删除
+namespace ProductName.Api.Endpoints.Samples;
+
+internal sealed class CreateSample : IEndpoint
+{
+    private sealed record Request(string Name);
+
+    public void MapEndpoint(IEndpointRouteBuilder app)
+    {
+        app.MapPost("samples", async (Request request, ISender sender, CancellationToken ct) =>
+            {
+                var result = await sender.Send(new CreateSampleCommand(request.Name), ct);
+
+                return result.Match(
+                    id => Results.Created($"/samples/{id}", new { id }),
+                    CustomResults.Problem);
+            })
+            .WithTags("Samples")
+            .RequireAuthorization();
+    }
+}
+```
+
+端点只做三件事：接收参数、通过 `ISender` 发送 Command 或 Query、把 Result 转成 HTTP 响应。
+
+## A.7 Worker：Consumer【演示，可删除】 \{#a-7-worker-consumer\}
+
+```csharp
+// 演示代码，可删除
+namespace ProductName.Worker.Consumers.Samples;
+
+internal sealed class SampleCreatedConsumer(ILogger<SampleCreatedConsumer> logger)
+    : IConsumer<SampleCreatedIntegrationEvent>
+{
+    public Task Consume(ConsumeContext<SampleCreatedIntegrationEvent> context)
+    {
+        logger.LogInformation("Sample {SampleId} created", context.Message.SampleId);
+        return Task.CompletedTask;
+    }
+}
+```
+
+实际项目中，Consumer 会把消息转成 Command，再通过 `ISender` 交给 Application 处理。
+
+**演示的完整流程**
+
+1. Api 端点接收请求，发送 `CreateSampleCommand`
+2. 验证管线检查输入
+3. Handler 建立聚合并保存
+4. 聚合触发领域事件
+5. 领域事件 Handler 通过 `IEventBus` 发布整合事件
+6. MassTransit 把整合事件写入 Outbox，与业务数据同一事务
+7. 投递到消息中间件，Worker 的 Consumer 接收

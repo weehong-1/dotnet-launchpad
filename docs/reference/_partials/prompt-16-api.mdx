@@ -1,0 +1,16 @@
+```text
+Run section 16 of the document (Api). Prerequisite: section 15 is done.
+
+1. Create the files of 16.1 to 16.6 and 16.7 to 16.11 at the paths listed in section 11, with the document's content.
+2. Create the four settings files of 16.12 (appsettings.json, appsettings.Development.json, appsettings.SIT.json, appsettings.Production.json) with the document's content; set the database name in the connection string to the lowercase project name, matching docker-compose.yml; set the SIT and Production log path to /var/log/<lowercase project name>/api/log-.json.
+3. Replace Program.cs entirely with the content of 16.13.
+4. Confirm ASPNETCORE_ENVIRONMENT in Properties/launchSettings.json is Development.
+5. Install dotnet-ef as a local tool (dotnet new tool-manifest, then dotnet tool install dotnet-ef) and create the first migration named InitialCreate with the 8.11 command. It should contain only the MassTransit Outbox and Inbox tables, plus AuditTrails and OperationAudits when auditing is chosen; if any other table appears, stop and explain why.
+6. Do not create any sample endpoint; authentication uses only the generic JWT Bearer setup of 16.7, with no provider specific packages or settings.
+
+Done when:
+(a) dotnet build succeeds.
+(b) After docker compose up -d, starting the Api in Development applies migrations automatically, /health returns Healthy, and /scalar opens.
+(c) Starting with the SIT environment name and no connection string makes the Api fail at startup rather than connect to the local database.
+(d) Without a token, /health returns 200 and /openapi/v1.json and /scalar open in Development (they are public by design); any other path returns 401.
+```

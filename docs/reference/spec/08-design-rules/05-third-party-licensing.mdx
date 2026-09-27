@@ -1,0 +1,12 @@
+---
+sidebar_label: "8.5 Third party licensing"
+---
+
+# 8.5 Third party licensing \{#8-5-third-party-licensing\}
+
+MediatR (from version 13) and MassTransit (from v9) have moved to commercial licenses; confirm licensing before each project starts:
+
+- **MediatR**: organisations with annual revenue under USD 5 million and no more than USD 10 million in outside funding can use the free Community license. Eligibility is judged by **the organisation that actually owns and uses the system**.
+- **MassTransit v9**: organisations with annual revenue under USD 1 million **may** receive a full discount, but the official wording is "may", so apply and confirm. If the system is later handed to another organisation to maintain, that organisation must obtain its own license.
+- **MassTransit v8**: still free under Apache 2.0, but official maintenance ends at the end of 2026; not recommended for new projects.
+- **FluentAssertions**: from version 8, commercial use requires a paid license. The English guide uses FluentAssertions 8; this template does not include it and relies on xUnit's built in `Assert`. For more readable assertions, consider the open source Shouldly.

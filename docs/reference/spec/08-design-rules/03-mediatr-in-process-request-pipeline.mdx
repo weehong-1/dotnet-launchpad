@@ -1,0 +1,10 @@
+---
+sidebar_label: "8.3 MediatR (in process request pipeline)"
+---
+
+# 8.3 MediatR (in process request pipeline) \{#8-3-mediatr-in-process-request-pipeline\}
+
+- **Purpose**: dispatches Commands and Queries, and dispatches domain events within the process.
+- **Pipeline behaviors**: logging, operation audit (optional, see [7.3](../07-optional-components.mdx#7-3-audit-records)), validation; validation applies only to Commands.
+- **Dependency control**: Domain references only `MediatR.Contracts` (Apache 2.0), not MediatR itself.
+- **Own interfaces**: business code uses our own `ICommand`, `IQuery` and matching handler interfaces, and every request returns `Result`.

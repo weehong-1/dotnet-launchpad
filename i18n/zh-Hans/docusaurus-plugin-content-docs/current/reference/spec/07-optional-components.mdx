@@ -1,0 +1,88 @@
+---
+sidebar_label: "7. 可选组件"
+---
+
+import PromptAddAuditing from '../_partials/prompt-add-auditing.mdx';
+
+# 7. 可选组件 \{#7-optional-components\}
+
+以下组件不是每个项目都需要，按项目需求启用。
+
+| 组件 | 建议 | 需要时机 | 相依 |
+| --- | --- | --- | --- |
+| Worker | 多数项目启用 | 有异步消息、定时任务或耗时作业 | 无；没有 Worker 时由 Api 投递 Outbox |
+| 审计纪录 | 建议预设启用 | 需要追查谁在何时改了什么 | 无 |
+
+## 7.1 Worker \{#7-1-worker\}
+
+**何时启用**：项目有不由用户操作直接触发、需要在后台运行的工作，例如消费异步消息、执行定时任务、处理耗时的批次作业。有 Worker 时，Outbox 由 Worker 投递；没有 Worker 时，由 Api 自行投递（见 [7.2](#7-2-outbox-and-the-worker)）。
+
+**为什么与 Api 分开**：
+
+- Api 应快速响应请求后结束；后台工作耗时长、需要重试。
+- 放在 Api 中会拖慢请求，Api 重启时也会中断工作。
+- 分开后两者可以独立部署、独立扩展、独立重启。
+
+**与 Api 的配合**：
+
+- Api 收到需要耗时处理的请求时，只负责记录并发布消息，然后立即返回；实际处理交给 Worker。
+- Worker 本身不写业务逻辑。它和 Api 一样只是入口，最终都调用 Application 层的 Command。
+
+## 7.2 Outbox 与 Worker 的关系 \{#7-2-outbox-and-the-worker\}
+
+Outbox 不是独立开关，它随 MassTransit 一起设定，所有项目都有。使用 MassTransit 内建的 EF Core Transactional Outbox，不自建：发布的消息与业务数据在同一个事务中写入 Outbox 表，再由投递服务送往消息中间件。详见 [8.4](./08-design-rules/04-masstransit-async-messaging.mdx)。
+
+- **有 Worker**：Api 只写入 Outbox 并关闭投递服务，由 Worker 负责投递。
+- **没有 Worker**：由 Api 自行投递，删除 [15.8](../code/15-infrastructure.mdx#15-8-dependencyinjection-cs) 中关闭投递服务的判断即可。
+
+英文 guide 的附录另提出自建 `OutboxMessage` 表加 Quartz.NET 轮询的做法，本模板不采用，理由见[附录 B](../appendix/b-decision-record.mdx)。
+
+## 7.3 审计纪录 \{#7-3-audit-records\}
+
+**何时启用**：需要追查“谁在什么时间、从哪里、改了哪笔资料”的项目。多数正式的业务系统都需要，**建议预设启用**。
+
+**为什么在模板中就要有**：审计纪录只能从启用那一刻开始累积，上线后才补，之前的变更历史永远无法还原。模板只提供通用机制；**审计哪些资料由每个项目决定**，不含任何业务内容。
+
+**分三层**
+
+| 层级 | 记录什么 | 如何产生 | 模板是否提供 |
+| --- | --- | --- | --- |
+| 资料变更审计 | 实体的新增、修改、删除，以及改动栏位的旧值与新值 | EF Core 拦截器自动产生 | 提供 |
+| 操作审计 | 谁执行了哪个 Command 或 Query，包括失败的尝试 | MediatR 管线，只对标记的请求生效 | 提供 |
+| 安全事件 | 登入、登出、密码与权限变更 | 身份认证提供方 | 不提供，由提供方记录 |
+
+**资料变更审计（`AuditTrails` 表）**
+
+- 实体实现标记接口 `IAuditable` 才会被审计，没有实现的实体不记录。
+- 每次 `SaveChangesAsync` 时，拦截器为每个被审计实体的变更产生一笔纪录，与业务资料**在同一个事务中写入**：资料保存成功就一定有审计纪录，保存失败两者都不会写入。应用日志做不到这一点。
+- 新增时记录所有栏位的值；修改时只记录改动过的栏位的旧值与新值；删除时记录删除前的值。
+- 敏感栏位（例如密码杂凑、令牌）加上 `[AuditIgnore]` 排除；`CreatedAt`、`UpdatedAt` 自动排除。
+- 前提：实体 ID 由领域产生（见 [8.13](./08-design-rules/13-strongly-typed-ids.mdx)），因此新增时已有 ID 可以记录。
+- 限制：目前记录一般属性。值对象若以 EF Core 的 Complex Type 映射，须在拦截器中另外处理；以 Owned Type 映射的，须让该类型也实现 `IAuditable`。
+
+**操作审计（`OperationAudits` 表）**
+
+- Command 或 Query 实现标记接口 `IAuditableRequest` 才会被记录。适合用在重要操作，以及读取或导出敏感资料的 Query。
+- 记录请求名称、结果（成功、业务失败、异常）、错误代码，以及下方的共通资讯。
+- 管线位于验证之前，因此**验证失败的尝试也会被记录**。
+- 使用独立的 DbContext 写入：即使业务处理失败，也不会把失败请求留下的未保存变更一并写入。
+- 操作审计写入失败时，记录 Error 日志，但不改变请求结果（资料变更的完整性已由资料变更审计保证）。
+- 不记录请求内容，以免把敏感资料写进审计表。
+
+**两种纪录共通的资讯**
+
+`UserId`、`SessionId`（令牌中的 `sid` 声明）、`ClientIp`、`UserAgent`（设备与浏览器）、`TraceId`（可与应用日志互相对照）、发生时间。由 `IAuditContext` 统一提供；在 Worker 中没有 HTTP 请求，`UserId` 等栏位为空，代表由系统执行。
+
+**保护与保存**
+
+- 审计表**只能新增**：应用执行时使用的数据库帐号，对审计表只有 `INSERT` 与 `SELECT` 权限，不能修改或删除（见 [8.11](./08-design-rules/11-database-migrations.mdx)）。
+- 保留期限按项目适用的法规或合约决定，不在模板中预设；资料量大时按月分区，旧资料移到封存储存。
+- 审计纪录与应用日志完全分开：应用日志用于排查问题，可按期限删除；审计纪录是业务资料，须长期保存。
+
+不需要审计的项目，删除 `IAuditable`、`AuditIgnoreAttribute`、第 [14](../code/14-application.mdx) 节与第 [15](../code/15-infrastructure.mdx) 节中标为“可选：审计”的文件，以及 DI 中的相关注册。
+
+**AI Coding Agent 提示词：为既有项目加入审计**
+
+建立骨架时选择“审计：要”，第 [13](../code/13-domain.mdx) 至 [16](../code/16-api.mdx) 节的提示词已包含审计。若项目当初没有选择审计、之后才要加入，使用以下提示词：
+
+<PromptAddAuditing />

@@ -1,0 +1,56 @@
+```bash
+# Name for C# and lowercase name for database, service account and paths
+export PROJECT="ProductName"
+export PROJECT_LOWER="productname"
+
+# Run inside the repository folder created in Setup Flow step 1.1
+
+# The .NET 10 SDK creates .slnx by default
+dotnet new sln -n ${PROJECT}
+dotnet new install xunit.v3.templates
+
+# Source projects
+dotnet new classlib -n ${PROJECT}.Domain -o src/${PROJECT}.Domain
+dotnet new classlib -n ${PROJECT}.Application -o src/${PROJECT}.Application
+dotnet new classlib -n ${PROJECT}.Infrastructure -o src/${PROJECT}.Infrastructure
+dotnet new web -n ${PROJECT}.Api -o src/${PROJECT}.Api
+dotnet new worker -n ${PROJECT}.Worker -o src/${PROJECT}.Worker  # @@worker
+
+# Test projects
+dotnet new xunit3 -n ${PROJECT}.Domain.UnitTests -o tests/${PROJECT}.Domain.UnitTests
+dotnet new xunit3 -n ${PROJECT}.Application.UnitTests -o tests/${PROJECT}.Application.UnitTests
+dotnet new xunit3 -n ${PROJECT}.Architecture.Tests -o tests/${PROJECT}.Architecture.Tests
+dotnet new xunit3 -n ${PROJECT}.Api.IntegrationTests -o tests/${PROJECT}.Api.IntegrationTests
+# The xUnit v3 template targets an older framework: use net10.0 like every other project
+sed -i.bak 's|<TargetFramework>[^<]*</TargetFramework>|<TargetFramework>net10.0</TargetFramework>|' tests/*/*.csproj && rm -f tests/*/*.bak
+
+# Add to the solution
+for p in src/*/*.csproj; do dotnet sln ${PROJECT}.slnx add "$p" --solution-folder src; done
+for p in tests/*/*.csproj; do dotnet sln ${PROJECT}.slnx add "$p" --solution-folder tests; done
+
+# Project references (matching the 12.2 table)
+S=src/${PROJECT}
+T=tests/${PROJECT}
+dotnet add $S.Application/${PROJECT}.Application.csproj reference $S.Domain/${PROJECT}.Domain.csproj
+dotnet add $S.Infrastructure/${PROJECT}.Infrastructure.csproj reference $S.Application/${PROJECT}.Application.csproj
+dotnet add $S.Api/${PROJECT}.Api.csproj reference $S.Application/${PROJECT}.Application.csproj $S.Infrastructure/${PROJECT}.Infrastructure.csproj
+dotnet add $S.Worker/${PROJECT}.Worker.csproj reference $S.Application/${PROJECT}.Application.csproj $S.Infrastructure/${PROJECT}.Infrastructure.csproj  # @@worker
+dotnet add $T.Domain.UnitTests/${PROJECT}.Domain.UnitTests.csproj reference $S.Domain/${PROJECT}.Domain.csproj
+dotnet add $T.Application.UnitTests/${PROJECT}.Application.UnitTests.csproj reference $S.Application/${PROJECT}.Application.csproj
+dotnet add $T.Architecture.Tests/${PROJECT}.Architecture.Tests.csproj reference src/*/*.csproj
+dotnet add $T.Api.IntegrationTests/${PROJECT}.Api.IntegrationTests.csproj reference $S.Api/${PROJECT}.Api.csproj $S.Infrastructure/${PROJECT}.Infrastructure.csproj
+
+# Other
+dotnet new gitignore
+dotnet new tool-manifest --force
+dotnet tool install dotnet-ef
+dotnet user-secrets init --project $S.Api/${PROJECT}.Api.csproj
+dotnet user-secrets init --project $S.Worker/${PROJECT}.Worker.csproj  # @@worker
+
+# Versions live only in Directory.Packages.props (12.2): remove the versioned references the templates added
+sed -i.bak '/<PackageReference /d' src/*/*.csproj tests/*/*.csproj && rm -f src/*/*.bak tests/*/*.bak
+# Delete the template samples; the Worker must stop registering the deleted Worker class
+rm -f src/*/Class1.cs tests/*/UnitTest1.cs
+rm -f $S.Worker/Worker.cs  # @@worker
+printf 'var builder = Host.CreateApplicationBuilder(args);\nbuilder.Build().Run();\n' > $S.Worker/Program.cs  # @@worker
+```

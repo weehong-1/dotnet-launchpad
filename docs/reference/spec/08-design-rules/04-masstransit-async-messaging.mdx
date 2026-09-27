@@ -1,0 +1,14 @@
+---
+sidebar_label: "8.4 MassTransit (async messaging)"
+---
+
+# 8.4 MassTransit (async messaging) \{#8-4-masstransit-async-messaging\}
+
+- **Purpose**: publishes and consumes integration events.
+- **Outbox**: MassTransit's built in EF Core Transactional Outbox.
+- **Division of work**: with a Worker, the Api only writes messages to the Outbox and the Worker delivers them and hosts every Consumer; without a Worker, the Api delivers (see [7.2](../07-optional-components.mdx#7-2-outbox-and-the-worker)).
+- **Duplicate protection**: Consumers also enable the Inbox, so a message is never processed twice.
+- **Dependency control**: Application publishes through `IEventBus` and never references MassTransit directly.
+- **Broker**: chosen per project, such as RabbitMQ, Azure Service Bus, Amazon SQS, or the database itself through SQL Transport.
+
+**Domain events versus integration events**: domain events are handled inside the system, in the same transaction, and may change freely; integration events are external message contracts, delivered asynchronously through the Outbox, carry only primitive types, and must stay backward compatible when changed.

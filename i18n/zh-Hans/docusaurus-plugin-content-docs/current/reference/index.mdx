@@ -1,0 +1,39 @@
+---
+sidebar_label: 关于 Reference
+sidebar_position: 0
+---
+
+# Reference
+
+Reference 就是 .NET 10 Clean Architecture 项目模板本身：架构规范与 Boilerplate 代码合为一处。[Setup Flow](../setup/index.mdx) 按顺序带你走一遍，细节都在这里。
+
+| 项目 | 内容 |
+| --- | --- |
+| Boilerplate 版本 | 1.0 |
+| 状态 | Skeleton Solution 零警告编译，测试通过（scaffold 脚本，.NET SDK 10.0.401，Worker 与审计全开及全关两种组合）；整合测试需要 MassTransit 授权。VM 上的运行尚未验证。 |
+| 适用 | 所有以 .NET 10 开发的后端项目 |
+| 架构 | Clean Architecture、Vertical Slice、DDD、CQRS |
+
+模板只提供技术骨架，**不包含任何业务逻辑或业务流程**，适用于任何项目。聚合、用例、端点、后台任务一律在各项目中按需求加入。
+
+## 结构
+
+- **第一部分：架构规范**（第 1 至 10 节）：分层、命名、各层职责、可选组件与设计规范。
+- **第二部分：Boilerplate 代码**（第 11 至 18 节）：每个项目的起始文件。每一节末尾附 AI Coding Agent 提示词。
+- **附录 A：演示代码**：用一个虚构的 `Sample` 功能说明各部分如何串起来。它不属于模板，不要复制进项目。
+- **附录 B：关键决策纪录**：重要技术选择的理由，日后想调整时参考。
+
+## 个人化代码
+
+有当前项目时（见每页顶端的项目列），所有代码块都会使用它的项目名称与简短名称，没选用的可选组件内容会被删除或折叠。没有当前项目时，代码显示 `%%ProductName%%`、`%%productname%%` 占位名称与所有可选内容。
+
+## 1.0 版重点
+
+- 验证管线改用新的 `IResultFactory<TSelf>` 静态抽象工厂建立失败结果，不再使用反射（[13.11](./code/13-domain.mdx#13-11-result-cs-and-iresultfactory-cs)、[14.9](./code/14-application.mdx#14-9-validationpipelinebehavior-cs)）。
+- 新增两个测试守住它：架构测试确认所有 Handler 都经由模板的 Handler 接口（[18.1](./code/18-tests.mdx#18-1-layertests-cs)），管线测试确认 Command 会被验证、Query 不会（[18.5](./code/18-tests.mdx#18-5-validationpipelinebehaviortests-cs-application-unittests)）。
+- AI 共通规则带入完整的 Project Settings，包括简短名称、SonarCloud 与 Qodana（[11.1](./code/11-file-overview.mdx#11-1-generating-with-an-ai-coding-agent)）。
+- 以 scaffold 出来的解决方案实际编译验证，找出并修正：缺少的 `Microsoft.Extensions.Configuration.Abstractions` 套件（12.2）；`using` 改由每个项目一个 `GlobalUsings.cs` 提供（[11.3](./code/11-file-overview.mdx#11-3-globalusings-cs-per-project)）；Worker 缺少 `using MassTransit;`（17.2）；EF migration 违反样式规则导致编译失败（[12.4](./code/12-solution-level.mdx#12-4-editorconfig)）；新骨架的 Domain 测试数为零（`ResultTests`，18.2）。
+- 测试改用 Microsoft.Testing.Platform，在 `global.json` 中选定（[12.3](./code/12-solution-level.mdx#12-3-global-json)），覆盖率使用 `Microsoft.Testing.Extensions.CodeCoverage`。
+- MassTransit v9 授权以 `MT_LICENSE` / `MT_LICENSE_PATH` 在本机、CI 与 VM 上具体设定（[8.8](./spec/08-design-rules/08-configuration-environments-and-secrets.mdx)）。
+- 改名或删除栏位要分三次部署，确保每次回滚都相容（[8.21](./spec/08-design-rules/21-deployment.mdx)）。
+- 1.1 版的待决定事项，一部分成为这次的变更，其余成为 [Setup Flow 步骤 0.2](../setup/project-decisions.mdx) 的项目决策。

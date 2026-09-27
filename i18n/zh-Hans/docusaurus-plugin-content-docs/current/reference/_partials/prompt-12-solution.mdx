@@ -1,0 +1,12 @@
+```text
+执行文档第 12 节（解决方案层级）。
+
+1. 以 dotnet CLI 建立 .slnx 解决方案，以及第 5 节列出的所有项目：Domain、Application、Infrastructure 使用 classlib；Api 使用 web（空白 ASP.NET Core）；Worker 使用 worker（未选择 Worker 则不建立）；四个测试项目使用 xUnit v3（先执行 dotnet new install xunit.v3.templates，再以 dotnet new xunit3 建立），并确认 .csproj 设定 <OutputType>Exe</OutputType>。xunit3 模板的目标框架较旧：把所有测试项目的 TargetFramework 设为 net10.0。删除模板加入的所有 PackageReference（版本只写在 Directory.Packages.props）。11.2 的指令完成以上所有事项，可作参考。
+2. 按 12.2 的表格设定每个项目的项目引用与 NuGet 包引用。
+3. 建立 Directory.Build.props、Directory.Packages.props、global.json、.editorconfig、docker-compose.yml，内容照 12.1 至 12.5。global.json 的版本改为本机安装的 .NET 10 SDK 版本；docker-compose.yml 的数据库名称改为项目名称的小写。
+4. 以 dotnet new gitignore 产生 .gitignore；建立 12.6 至 12.10 的文件，文件名称与内容中的 %%productname%% 改为简短名称、%%ProductName%% 改为项目名称；未选择 Worker 时，不建立 Worker 的服务文件与环境变量范本，并删除 CI 中发布 Worker 的步骤。SonarCloud 与 Qodana 按项目设定加入。
+5. 删除各项目模板自动产生的范例文件（例如 Class1.cs、UnitTest1.cs、Worker.cs、WeatherForecast 相关代码），Api 与 Worker 的 Program.cs 暂时保留可编译的最小内容（Worker 的 Program.cs 不能再注册或引用已删除的 Worker 类别；11.2 会写入最小版本），第 16、17 节再取代。
+6. 在 Api 与 Worker 执行 dotnet user-secrets init。
+
+完成条件：dotnet build 成功；docker compose config 验证通过。
+```

@@ -1,0 +1,56 @@
+---
+sidebar_label: "17. Worker（可选）"
+---
+
+import Prompt17Worker from '../_partials/prompt-17-worker.mdx';
+
+# 17. Worker（可选） \{#17-worker-optional\}
+
+<Optional when="worker" page>
+
+## 17.1 appsettings 设定档（4 个） \{#17-1-appsettings-files-4\}
+
+与 Api 相同的四个档案，内容照 [16.12](./16-api.mdx#16-12-appsettings-files-4)，但删除 Worker 用不到的区块：
+
+- 删除 `Cors`、`OpenApi`、`Migrations`、`Authentication`、`RateLimiting` 区块（Worker 不提供 HTTP 端点，也不执行迁移）。
+- 保留 `ConnectionStrings`、`MediatR`、`Serilog`。
+- `Serilog:Properties:Application` 改为 `ProductName.Worker`。
+- SIT 与 Production 的日志文件路径改为 `/var/log/<项目名称小写>/worker/log-.json`。
+- 环境名称以 `DOTNET_ENVIRONMENT` 指定。
+
+## 17.2 Program.cs \{#17-2-program-cs\}
+
+```csharp
+using MassTransit;
+using ProductName.Application;
+using ProductName.Infrastructure;
+using Serilog;
+
+var builder = Host.CreateApplicationBuilder(args);
+
+// 以 systemd 服务执行时，回报启动完成并正确处理停止信号（见 12.7）
+builder.Services.AddSystemd();
+
+builder.Services.AddSerilog((services, logger) => logger
+    .ReadFrom.Configuration(builder.Configuration)
+    .ReadFrom.Services(services));
+
+builder.Services
+    .AddApplication(builder.Configuration)
+    .AddInfrastructure(
+        builder.Configuration,
+        bus => bus.AddConsumers(typeof(Program).Assembly));
+
+var host = builder.Build();
+
+await host.RunAsync();
+```
+
+- Worker 自动注册自己项目内所有 Consumer。Consumer 放在 `Consumers/{功能}/`（见 [8.15](../spec/08-design-rules/15-feature-slices-vertical-slice.mdx)），本身不写业务逻辑，只把消息转成 Command，通过 MediatR 的 `ISender` 交给 Application 处理。
+- 定时任务以 `BackgroundService` 形式放在 Worker 中，按项目需要加入，模板不预设。需要 cron 表达式或持久化排程时，可改用 Quartz.NET（英文 guide 以它轮询 Outbox）。
+
+## 17.3 AI Coding Agent 提示词 \{#17-3-ai-coding-agent-prompt\}
+
+<Prompt17Worker />
+
+</Optional>

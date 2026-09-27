@@ -1,0 +1,11 @@
+---
+sidebar_label: "8.18 Rate limiting"
+---
+
+# 8.18 Rate limiting \{#8-18-rate-limiting\}
+
+- Uses .NET's built in Rate Limiting on every endpoint: signed in requests are counted per `UserId`, anonymous requests per client IP.
+- Default is 100 requests per minute per user or IP, adjustable with `RateLimiting:PermitLimit` and `RateLimiting:WindowSeconds`. Exceeding it returns HTTP 429.
+- The health check is exempt.
+- Counters live in each Api instance's memory: exact with one instance; with several, each counts separately, and Redis is added only when shared counting is needed (see the external services list in section [2](../02-technical-baseline.mdx)).
+- Application level limiting is per user, against abuse and brute force; large volume attacks belong at Nginx or the cloud firewall.

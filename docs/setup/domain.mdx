@@ -1,0 +1,38 @@
+---
+sidebar_label: 2.1 Domain
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import Prompt13Domain from '../reference/_partials/prompt-13-domain.mdx';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 2.1 Domain
+
+Domain holds the shared base types: entities, aggregate roots, domain events, `Result` and errors. It depends on nothing. The code is in [Reference 13](../reference/code/13-domain.mdx).
+
+<Tabs groupId="route" queryString>
+<TabItem value="script" label="Script" default>
+
+Done by the scaffold script in [step 1.2](./empty-solution.mdx). Check the result against the Done Conditions below.
+
+</TabItem>
+<TabItem value="ai" label="AI Agent">
+
+<Prompt13Domain />
+
+</TabItem>
+<TabItem value="manual" label="Manual">
+
+Create each file of [Reference 13.1 to 13.15](../reference/code/13-domain.mdx) in `src/ProductName.Domain/Abstractions/`, at the paths listed in [Reference 11](../reference/code/11-file-overview.mdx). 13.11 holds two files: `Result.cs` and `IResultFactory.cs`. Create 13.14 and 13.15 only with Auditing. 13.16 is a set of conventions and creates no files.
+
+Finish by creating this project's `GlobalUsings.cs` from [Reference 11.3](../reference/code/11-file-overview.mdx#11-3-globalusings-cs-per-project), then build:
+
+```bash
+dotnet build
+```
+
+</TabItem>
+</Tabs>
+
+<DoneConditions step="domain" />

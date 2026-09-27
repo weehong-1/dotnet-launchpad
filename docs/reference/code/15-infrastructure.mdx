@@ -1,0 +1,683 @@
+---
+sidebar_label: "15. Infrastructure"
+---
+
+import Prompt15Infrastructure from '../_partials/prompt-15-infrastructure.mdx';
+
+# 15. Infrastructure \{#15-infrastructure\}
+
+## 15.1 ApplicationDbContext.cs \{#15-1-applicationdbcontext-cs\}
+
+```csharp
+using MassTransit;
+using MediatR;
+using Microsoft.EntityFrameworkCore;
+
+namespace ProductName.Infrastructure.Database;
+
+public sealed class ApplicationDbContext(
+    DbContextOptions<ApplicationDbContext> options,
+    IPublisher publisher)
+    : DbContext(options), IApplicationDbContext, IUnitOfWork
+{
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        // Add database value conversion for every strongly typed ID in Domain
+        var idTypes = typeof(IStronglyTypedId).Assembly
+            .GetTypes()
+            .Where(t => t is { IsValueType: true, IsAbstract: false } && t.IsAssignableTo(typeof(IStronglyTypedId)));
+
+        foreach (var idType in idTypes)
+        {
+            configurationBuilder
+                .Properties(idType)
+                .HaveConversion(typeof(StronglyTypedIdConverter<>).MakeGenericType(idType));
+        }
+    }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
+
+        modelBuilder.AddInboxStateEntity();
+        modelBuilder.AddOutboxMessageEntity();
+        modelBuilder.AddOutboxStateEntity();
+
+        // Optimistic concurrency for every aggregate root; PostgreSQL uses the xmin system column as the version, adding no column (see 8.17)
+        var aggregateTypes = modelBuilder.Model
+            .GetEntityTypes()
+            .Where(t => t.ClrType.IsAssignableTo(typeof(IAggregateRoot)) && !t.IsOwned() && t.BaseType is null)
+            .Select(t => t.ClrType)
+            .ToList();
+
+        foreach (var aggregateType in aggregateTypes)
+            modelBuilder.Entity(aggregateType).Property<uint>("Version").IsRowVersion();
+    }
+
+    public override async Task<int> SaveChangesAsync(CancellationToken ct = default)
+    {
+        await PublishDomainEventsAsync(ct);
+        return await base.SaveChangesAsync(ct);
+    }
+
+    private async Task PublishDomainEventsAsync(CancellationToken ct)
+    {
+        while (true)
+        {
+            var domainEvents = ChangeTracker
+                .Entries<IAggregateRoot>()
+                .Select(entry => entry.Entity)
+                .SelectMany(aggregate =>
+                {
+                    var events = aggregate.DomainEvents.ToList();
+                    aggregate.ClearDomainEvents();
+                    return events;
+                })
+                .ToList();
+
+            if (domainEvents.Count == 0)
+                return;
+
+            foreach (var domainEvent in domainEvents)
+                await publisher.Publish(domainEvent, ct);
+        }
+    }
+}
+```
+
+**Event flow**
+
+1. An aggregate method calls `Raise` for a domain event.
+2. Before writing to the database, `SaveChangesAsync` publishes every domain event through MediatR.
+3. A domain event handler that must notify the outside world or hand work to the Worker publishes an integration event through `IEventBus`.
+4. With MassTransit's Bus Outbox on, the integration event is not sent immediately; it is written to the Outbox table and saved **in the same transaction** as the business data.
+5. The delivery service (in the Worker if there is one, otherwise in the Api) reads the Outbox table and sends to the broker, where a Consumer processes it.
+
+**Notes**
+
+- The `while` loop handles event handlers that raise further events.
+- The three `Add...Entity` methods create the Outbox and Inbox tables MassTransit needs, so no custom `OutboxMessage` class is required.
+- Concurrency uses a shadow property `Version` that Domain never sees; Npgsql maps a `uint` configured as row version to the `xmin` system column, so migrations add no column. Other databases need adjusting (see [8.17](../spec/08-design-rules/17-concurrency-control.mdx)).
+- The English guide publishes domain events **after** the write with a `SavedChangesAsync` interceptor. This template publishes before the write, so the event handlers' changes commit together with the Outbox messages and business data.
+
+## 15.2 StronglyTypedIdConverter.cs \{#15-2-stronglytypedidconverter-cs\}
+
+```csharp
+using System.Linq.Expressions;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+
+namespace ProductName.Infrastructure.Database;
+
+internal sealed class StronglyTypedIdConverter<TId>()
+    : ValueConverter<TId, Guid>(id => id.Value, value => Create(value))
+    where TId : struct, IStronglyTypedId
+{
+    private static readonly Func<Guid, TId> Factory = BuildFactory();
+
+    private static TId Create(Guid value) => Factory(value);
+
+    private static Func<Guid, TId> BuildFactory()
+    {
+        var constructor = typeof(TId).GetConstructor([typeof(Guid)])
+            ?? throw new InvalidOperationException($"{typeof(TId).Name} must have a constructor that takes a Guid.");
+
+        var value = Expression.Parameter(typeof(Guid), "value");
+
+        return Expression.Lambda<Func<Guid, TId>>(Expression.New(constructor, value), value).Compile();
+    }
+}
+```
+
+One generic converter serves every strongly typed ID. The constructor is compiled into a delegate on first use, so later conversions use no reflection.
+
+## 15.3 TimestampsInterceptor.cs \{#15-3-timestampsinterceptor-cs\}
+
+```csharp
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+
+namespace ProductName.Infrastructure.Database;
+
+internal sealed class TimestampsInterceptor(TimeProvider timeProvider) : SaveChangesInterceptor
+{
+    public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
+        DbContextEventData eventData,
+        InterceptionResult<int> result,
+        CancellationToken ct = default)
+    {
+        if (eventData.Context is not null)
+        {
+            var now = timeProvider.GetUtcNow();
+
+            foreach (var entry in eventData.Context.ChangeTracker.Entries<IHasTimestamps>())
+            {
+                if (entry.State == EntityState.Added)
+                    entry.Entity.CreatedAt = now;
+
+                if (entry.State == EntityState.Modified)
+                    entry.Entity.UpdatedAt = now;
+            }
+        }
+
+        return base.SavingChangesAsync(eventData, result, ct);
+    }
+}
+```
+
+Time comes from .NET's built in `TimeProvider`, replaceable with `FakeTimeProvider` in tests, so no custom `IDateTimeProvider` is needed.
+
+## 15.4 Repository.cs \{#15-4-repository-cs\}
+
+```csharp
+namespace ProductName.Infrastructure.Database;
+
+internal abstract class Repository<TAggregate, TId>(ApplicationDbContext db)
+    : IRepository<TAggregate, TId>
+    where TAggregate : AggregateRoot<TId>
+    where TId : notnull
+{
+    protected ApplicationDbContext Db { get; } = db;
+
+    public async Task<TAggregate?> GetByIdAsync(TId id, CancellationToken ct = default) =>
+        await Db.Set<TAggregate>().FindAsync([id], ct);
+
+    public void Add(TAggregate aggregate) => Db.Set<TAggregate>().Add(aggregate);
+
+    public void Remove(TAggregate aggregate) => Db.Set<TAggregate>().Remove(aggregate);
+}
+```
+
+Each aggregate's repository inherits this base class, so the common methods are not repeated.
+
+## 15.5 EventBus.cs \{#15-5-eventbus-cs\}
+
+```csharp
+using MassTransit;
+
+namespace ProductName.Infrastructure.Messaging;
+
+internal sealed class EventBus(IPublishEndpoint publishEndpoint) : IEventBus
+{
+    public Task PublishAsync<T>(T message, CancellationToken ct = default)
+        where T : class =>
+        publishEndpoint.Publish(message, ct);
+}
+```
+
+## 15.6 CurrentUser.cs \{#15-6-currentuser-cs\}
+
+```csharp
+using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
+
+namespace ProductName.Infrastructure.Authentication;
+
+internal sealed class CurrentUser(IHttpContextAccessor httpContextAccessor) : ICurrentUser
+{
+    private ClaimsPrincipal? User => httpContextAccessor.HttpContext?.User;
+
+    public bool IsAuthenticated => User?.Identity?.IsAuthenticated ?? false;
+
+    public string UserId =>
+        User?.FindFirstValue(ClaimTypes.NameIdentifier)
+        ?? throw new InvalidOperationException("User is not authenticated.");
+}
+```
+
+The Worker has no HttpContext, so `IsAuthenticated` is `false` there.
+
+## 15.7 ClaimsPermissionProvider.cs \{#15-7-claimspermissionprovider-cs\}
+
+```csharp
+using System.Security.Claims;
+using Microsoft.Extensions.Configuration;
+
+namespace ProductName.Infrastructure.Authentication;
+
+internal sealed class ClaimsPermissionProvider(IConfiguration configuration) : IPermissionProvider
+{
+    private readonly string _claimType = configuration["Authentication:PermissionClaimType"] ?? "permissions";
+
+    public Task<IReadOnlySet<string>> GetPermissionsAsync(ClaimsPrincipal user, CancellationToken ct = default)
+    {
+        IReadOnlySet<string> permissions = user
+            .FindAll(_claimType)
+            .Select(claim => claim.Value)
+            .ToHashSet(StringComparer.Ordinal);
+
+        return Task.FromResult(permissions);
+    }
+}
+```
+
+Reads permission claims from the token. Most OpenID Connect providers can put permissions in the token; if the claim name differs, change `Authentication:PermissionClaimType` instead of the code.
+
+## 15.8 DependencyInjection.cs \{#15-8-dependencyinjection-cs\}
+
+```csharp
+using MassTransit;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http.Resilience;
+
+namespace ProductName.Infrastructure;
+
+public static class DependencyInjection
+{
+    public static IServiceCollection AddInfrastructure(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        Action<IBusRegistrationConfigurator>? configureConsumers = null)
+    {
+        services.AddSingleton(TimeProvider.System);
+        services.AddHttpContextAccessor();
+        services.AddScoped<ICurrentUser, CurrentUser>();
+        services.AddScoped<IPermissionProvider, ClaimsPermissionProvider>();
+
+        // Auditing (optional) // @@auditing
+        services.AddScoped<IAuditContext, AuditContext>(); // @@auditing
+        services.AddScoped<IOperationAuditWriter, OperationAuditWriter>(); // @@auditing
+        services.AddScoped<AuditTrailInterceptor>(); // @@auditing
+ // @@auditing
+        services.AddSingleton<TimestampsInterceptor>();
+
+        // Interceptors run in order: timestamps first, audit last, so the audit sees final values // @@auditing
+        services.AddDbContext<ApplicationDbContext>((sp, options) => options
+            .UseNpgsql(configuration.GetConnectionString("Database"))
+            .AddInterceptors(
+                sp.GetRequiredService<TimestampsInterceptor>(), // @@auditing
+                sp.GetRequiredService<TimestampsInterceptor>())); // @@!auditing
+                sp.GetRequiredService<AuditTrailInterceptor>())); // @@auditing
+
+        services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
+        services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<ApplicationDbContext>());
+        services.AddScoped<IEventBus, EventBus>();
+
+        services.AddHealthChecks().AddDbContextCheck<ApplicationDbContext>();
+
+        // Standard resilience for every HttpClient; unsafe methods are not retried (see 8.19)
+        services.ConfigureHttpClientDefaults(http => http.AddStandardResilienceHandler(options =>
+            options.Retry.DisableForUnsafeHttpMethods()));
+
+        AddMessaging(services, configuration, configureConsumers);
+
+        return services;
+    }
+
+    private static void AddMessaging(
+        IServiceCollection services,
+        IConfiguration configuration,
+        Action<IBusRegistrationConfigurator>? configureConsumers)
+    {
+        var isWorker = configureConsumers is not null; // @@worker
+ // @@worker
+        services.AddMassTransit(bus =>
+        {
+            configureConsumers?.Invoke(bus);
+
+            bus.AddEntityFrameworkOutbox<ApplicationDbContext>(outbox =>
+            {
+                outbox.UsePostgres();
+                outbox.UseBusOutbox(busOutbox => // @@worker
+                { // @@worker
+                    // With a Worker: the Api only writes to the Outbox and the Worker delivers // @@worker
+                    // Projects without a Worker: remove this check so the Api delivers // @@worker
+                    if (!isWorker) // @@worker
+                        busOutbox.DisableDeliveryService(); // @@worker
+                }); // @@worker
+                outbox.UseBusOutbox(); // @@!worker
+            });
+
+            // Inbox on every Consumer, so a message is never processed twice
+            bus.AddConfigureEndpointsCallback((context, _, endpoint) =>
+                endpoint.UseEntityFrameworkOutbox<ApplicationDbContext>(context));
+
+            bus.UsingRabbitMq((context, cfg) =>
+            {
+                cfg.Host(new Uri(configuration.GetConnectionString("MessageBroker")!));
+                cfg.ConfigureEndpoints(context);
+            });
+        });
+    }
+}
+```
+
+**Notes**
+
+- The `configureConsumers` parameter lets the Api and Worker share one registration method: the Api passes nothing, only writes to the Outbox and disables delivery; the Worker passes its Consumers, delivers and hosts every Consumer. Projects without a Worker remove the check that disables delivery, so the Api delivers.
+- Health checks: the database check is registered here; MassTransit registers the broker health check automatically.
+- `ConfigureHttpClientDefaults` gives every HttpClient registered later timeout, retry and circuit breaker (see [8.19](../spec/08-design-rules/19-outbound-http-calls.mdx)).
+- The permission source defaults to `ClaimsPermissionProvider`; projects storing permissions in the database replace it here (see [8.16](../spec/08-design-rules/16-authentication-and-authorization.mdx)).
+- Projects without auditing delete the three lines marked "Auditing (optional)" and the `AuditTrailInterceptor` in `AddInterceptors`.
+- `AuditTrailInterceptor` depends on per request audit information, so it is Scoped; the `AddDbContext` options run in each scope and resolve it correctly.
+- Repository implementations for new aggregates are registered here as well.
+
+<Optional when="auditing">
+
+## 15.9 AuditTrail.cs (optional: auditing) \{#15-9-audittrail-cs-optional-auditing\}
+
+```csharp
+namespace ProductName.Infrastructure.Auditing;
+
+public sealed class AuditTrail
+{
+    public Guid Id { get; init; }
+    public string EntityType { get; init; } = string.Empty;
+    public string EntityId { get; init; } = string.Empty;
+    public string Action { get; init; } = string.Empty;      // Added, Modified, Deleted
+    public string Changes { get; init; } = string.Empty;     // JSON: { "Property": { "Old": old value, "New": new value } }
+    public string? UserId { get; init; }
+    public string? SessionId { get; init; }
+    public string? ClientIp { get; init; }
+    public string? UserAgent { get; init; }
+    public string? TraceId { get; init; }
+    public DateTimeOffset OccurredAt { get; init; }
+}
+```
+
+The data change audit table. It is an Infrastructure persistence model, not a domain entity, and does not implement `IAuditable`.
+
+</Optional>
+
+<Optional when="auditing">
+
+## 15.10 OperationAudit.cs (optional: auditing) \{#15-10-operationaudit-cs-optional-auditing\}
+
+```csharp
+namespace ProductName.Infrastructure.Auditing;
+
+public sealed class OperationAudit
+{
+    public Guid Id { get; init; }
+    public string RequestName { get; init; } = string.Empty;
+    public string Outcome { get; init; } = string.Empty;     // Succeeded, Failed, Exception
+    public string? ErrorCode { get; init; }
+    public string? UserId { get; init; }
+    public string? SessionId { get; init; }
+    public string? ClientIp { get; init; }
+    public string? UserAgent { get; init; }
+    public string? TraceId { get; init; }
+    public DateTimeOffset OccurredAt { get; init; }
+}
+```
+
+</Optional>
+
+<Optional when="auditing">
+
+## 15.11 AuditConfigurations.cs (optional: auditing) \{#15-11-auditconfigurations-cs-optional-auditing\}
+
+```csharp
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace ProductName.Infrastructure.Auditing;
+
+internal sealed class AuditTrailConfiguration : IEntityTypeConfiguration<AuditTrail>
+{
+    public void Configure(EntityTypeBuilder<AuditTrail> builder)
+    {
+        builder.ToTable("AuditTrails");
+        builder.HasKey(a => a.Id);
+        builder.Property(a => a.Id).ValueGeneratedNever();
+        builder.Property(a => a.EntityType).HasMaxLength(200);
+        builder.Property(a => a.EntityId).HasMaxLength(100);
+        builder.Property(a => a.Action).HasMaxLength(20);
+        builder.Property(a => a.Changes).HasColumnType("jsonb");
+        builder.Property(a => a.UserId).HasMaxLength(200);
+        builder.Property(a => a.SessionId).HasMaxLength(200);
+        builder.Property(a => a.ClientIp).HasMaxLength(50);
+        builder.Property(a => a.UserAgent).HasMaxLength(500);
+        builder.Property(a => a.TraceId).HasMaxLength(50);
+
+        builder.HasIndex(a => new { a.EntityType, a.EntityId });
+        builder.HasIndex(a => a.UserId);
+        builder.HasIndex(a => a.OccurredAt);
+    }
+}
+
+internal sealed class OperationAuditConfiguration : IEntityTypeConfiguration<OperationAudit>
+{
+    public void Configure(EntityTypeBuilder<OperationAudit> builder)
+    {
+        builder.ToTable("OperationAudits");
+        builder.HasKey(a => a.Id);
+        builder.Property(a => a.Id).ValueGeneratedNever();
+        builder.Property(a => a.RequestName).HasMaxLength(200);
+        builder.Property(a => a.Outcome).HasMaxLength(20);
+        builder.Property(a => a.ErrorCode).HasMaxLength(200);
+        builder.Property(a => a.UserId).HasMaxLength(200);
+        builder.Property(a => a.SessionId).HasMaxLength(200);
+        builder.Property(a => a.ClientIp).HasMaxLength(50);
+        builder.Property(a => a.UserAgent).HasMaxLength(500);
+        builder.Property(a => a.TraceId).HasMaxLength(50);
+
+        builder.HasIndex(a => a.UserId);
+        builder.HasIndex(a => a.OccurredAt);
+    }
+}
+```
+
+- Both configurations load automatically through `ApplyConfigurationsFromAssembly`; nothing else to register.
+- `Changes` uses PostgreSQL's `jsonb` type so JSON content can be queried directly; with another database, change it to the equivalent type.
+- The indexes serve the most common queries: one record's change history, what one user did, what happened in a time range.
+
+</Optional>
+
+<Optional when="auditing">
+
+## 15.12 AuditContext.cs (optional: auditing) \{#15-12-auditcontext-cs-optional-auditing\}
+
+```csharp
+using System.Diagnostics;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
+
+namespace ProductName.Infrastructure.Auditing;
+
+internal sealed class AuditContext(IHttpContextAccessor httpContextAccessor) : IAuditContext
+{
+    private HttpContext? HttpContext => httpContextAccessor.HttpContext;
+
+    public string? UserId => HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+    // Standard OpenID Connect session claim; adjust here if the identity provider uses another name
+    public string? SessionId => HttpContext?.User.FindFirstValue("sid");
+
+    public string? ClientIp => HttpContext?.Connection.RemoteIpAddress?.ToString();
+
+    // Cut to the 500 character audit column (15.11): a long header must never fail or skip the audit
+    public string? UserAgent => HttpContext?.Request.Headers.UserAgent.ToString() is { Length: > 0 } userAgent
+        ? userAgent[..Math.Min(userAgent.Length, MaxUserAgentLength)]
+        : null;
+
+    private const int MaxUserAgentLength = 500;
+
+    public string? TraceId => Activity.Current?.TraceId.ToString();
+}
+```
+
+- `ClientIp` depends on the Api's forwarded headers setup (see [16.13](./16-api.mdx#16-13-program-cs)) to get the real IP behind Nginx.
+
+</Optional>
+
+<Optional when="auditing">
+
+## 15.13 AuditTrailInterceptor.cs (optional: auditing) \{#15-13-audittrailinterceptor-cs-optional-auditing\}
+
+```csharp
+using System.Reflection;
+using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+
+namespace ProductName.Infrastructure.Auditing;
+
+internal sealed class AuditTrailInterceptor(IAuditContext auditContext, TimeProvider timeProvider)
+    : SaveChangesInterceptor
+{
+    private static readonly HashSet<string> ExcludedProperties =
+    [
+        nameof(IHasTimestamps.CreatedAt),
+        nameof(IHasTimestamps.UpdatedAt)
+    ];
+
+    public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
+        DbContextEventData eventData,
+        InterceptionResult<int> result,
+        CancellationToken ct = default)
+    {
+        if (eventData.Context is not null)
+            AddAuditTrails(eventData.Context);
+
+        return base.SavingChangesAsync(eventData, result, ct);
+    }
+
+    private void AddAuditTrails(DbContext context)
+    {
+        var now = timeProvider.GetUtcNow();
+
+        var auditTrails = context.ChangeTracker
+            .Entries<IAuditable>()
+            .Where(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
+            .Select(entry => CreateAuditTrail(entry, now))
+            .OfType<AuditTrail>()
+            .ToList();
+
+        context.Set<AuditTrail>().AddRange(auditTrails);
+    }
+
+    private AuditTrail? CreateAuditTrail(EntityEntry<IAuditable> entry, DateTimeOffset now)
+    {
+        var changes = BuildChanges(entry);
+
+        // No record when a modification changed no actual value (or only excluded properties)
+        if (entry.State == EntityState.Modified && changes.Count == 0)
+            return null;
+
+        return new AuditTrail
+        {
+            Id = Guid.CreateVersion7(),
+            EntityType = entry.Metadata.ClrType.Name,
+            EntityId = GetEntityId(entry),
+            Action = entry.State.ToString(),
+            Changes = JsonSerializer.Serialize(changes),
+            UserId = auditContext.UserId,
+            SessionId = auditContext.SessionId,
+            ClientIp = auditContext.ClientIp,
+            UserAgent = auditContext.UserAgent,
+            TraceId = auditContext.TraceId,
+            OccurredAt = now
+        };
+    }
+
+    private static Dictionary<string, object?> BuildChanges(EntityEntry entry)
+    {
+        var changes = new Dictionary<string, object?>();
+
+        foreach (var property in entry.Properties)
+        {
+            var name = property.Metadata.Name;
+
+            if (ExcludedProperties.Contains(name) || IsAuditIgnored(entry, name))
+                continue;
+
+            switch (entry.State)
+            {
+                case EntityState.Added:
+                    changes[name] = new { Old = (object?)null, New = Normalize(property.CurrentValue) };
+                    break;
+
+                case EntityState.Deleted:
+                    changes[name] = new { Old = Normalize(property.OriginalValue), New = (object?)null };
+                    break;
+
+                case EntityState.Modified when property.IsModified
+                    && !Equals(property.OriginalValue, property.CurrentValue):
+                    changes[name] = new { Old = Normalize(property.OriginalValue), New = Normalize(property.CurrentValue) };
+                    break;
+            }
+        }
+
+        return changes;
+    }
+
+    private static bool IsAuditIgnored(EntityEntry entry, string propertyName) =>
+        entry.Metadata.ClrType
+            .GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+            ?.IsDefined(typeof(AuditIgnoreAttribute), inherit: true) ?? false;
+
+    private static string GetEntityId(EntityEntry entry)
+    {
+        var keyValues = entry.Metadata.FindPrimaryKey()!.Properties
+            .Select(p => Normalize(entry.Property(p.Name).CurrentValue)?.ToString());
+
+        return string.Join(",", keyValues);
+    }
+
+    // Strongly typed IDs are recorded as their Guid value; other values stay as they are
+    private static object? Normalize(object? value) =>
+        value is IStronglyTypedId id ? id.Value : value;
+}
+```
+
+- Audit records are added within the same `SaveChangesAsync` transaction, so they are written or fail together with the business data.
+- Updates record only properties that actually changed; `CreatedAt`, `UpdatedAt` and properties marked `[AuditIgnore]` are not recorded.
+- Domain event handlers run before the save, so their changes are audited too.
+
+</Optional>
+
+<Optional when="auditing">
+
+## 15.14 OperationAuditWriter.cs (optional: auditing) \{#15-14-operationauditwriter-cs-optional-auditing\}
+
+```csharp
+using MediatR;
+using Microsoft.EntityFrameworkCore;
+
+namespace ProductName.Infrastructure.Auditing;
+
+internal sealed class OperationAuditWriter(
+    DbContextOptions<ApplicationDbContext> options,
+    IPublisher publisher,
+    IAuditContext auditContext,
+    TimeProvider timeProvider)
+    : IOperationAuditWriter
+{
+    public async Task WriteAsync(
+        string requestName,
+        AuditOutcome outcome,
+        string? errorCode,
+        CancellationToken ct = default)
+    {
+        // Separate DbContext: when business processing fails, the original DbContext's unsaved changes are not written along with this
+        await using var db = new ApplicationDbContext(options, publisher);
+
+        db.Set<OperationAudit>().Add(new OperationAudit
+        {
+            Id = Guid.CreateVersion7(),
+            RequestName = requestName,
+            Outcome = outcome.ToString(),
+            ErrorCode = errorCode,
+            UserId = auditContext.UserId,
+            SessionId = auditContext.SessionId,
+            ClientIp = auditContext.ClientIp,
+            UserAgent = auditContext.UserAgent,
+            TraceId = auditContext.TraceId,
+            OccurredAt = timeProvider.GetUtcNow()
+        });
+
+        await db.SaveChangesAsync(ct);
+    }
+}
+```
+
+- The separately created DbContext shares the same options (connection string and interceptors). Operation audit records do not implement `IAuditable`, so they produce no data change audit.
+
+</Optional>
+
+## 15.15 AI coding agent prompt \{#15-15-ai-coding-agent-prompt\}
+
+<Prompt15Infrastructure />

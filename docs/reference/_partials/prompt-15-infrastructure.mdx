@@ -1,0 +1,10 @@
+```text
+Run section 15 of the document (Infrastructure). Prerequisite: section 14 is done.
+
+1. Create the files of 15.1 to 15.14 at the paths listed in section 11, with the document's content. Without a Worker, remove the check in 15.8 that disables the delivery service (DisableDeliveryService) so the Api delivers the Outbox. Create 15.9 to 15.14 only when auditing is chosen; without auditing, remove the registrations marked "Auditing (optional)" in 15.8 and the AuditTrailInterceptor in AddInterceptors.
+2. Add the Microsoft.AspNetCore.App framework reference to ProductName.Infrastructure.csproj.
+3. If the broker or database is not RabbitMQ and PostgreSQL, stop and confirm the packages to use first, then change UseNpgsql, UsePostgres and UsingRabbitMq.
+4. Do not create any business entity configuration, repository implementation or migration (the first migration is created in section 16); the audit configurations of 15.11 are part of the template and are created when auditing is chosen.
+
+Done when: dotnet build succeeds.
+```

@@ -1,0 +1,16 @@
+---
+sidebar_label: "8.19 Outbound HTTP calls"
+---
+
+# 8.19 Outbound HTTP calls \{#8-19-outbound-http-calls\}
+
+- Always use typed clients registered with `IHttpClientFactory`; never `new HttpClient()` directly.
+- Every HttpClient gets .NET's official standard resilience handler automatically: timeout, retry (exponential backoff) and circuit breaker, configured once in [15.8](../../code/15-infrastructure.mdx#15-8-dependencyinjection-cs); individual clients need no setup.
+- Non idempotent methods such as POST and PATCH are **not retried automatically**, so external systems never receive duplicate requests. When a retry is truly needed, confirm the other side supports idempotency keys.
+- External client interfaces are defined in Application and implemented in Infrastructure; URLs go in settings files and keys in secrets (see [8.8](./08-configuration-environments-and-secrets.mdx)).
+- Registration, with `Xxx` replaced by the external service's name:
+
+```csharp
+services.AddHttpClient<IXxxClient, XxxClient>(client =>
+    client.BaseAddress = new Uri(configuration["Xxx:BaseUrl"]!));
+```

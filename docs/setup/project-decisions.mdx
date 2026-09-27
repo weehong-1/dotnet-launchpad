@@ -1,0 +1,23 @@
+---
+sidebar_label: 0.2 Make the Project Decisions
+---
+
+import ProjectDecisionsForm from '@site/src/components/ProjectDecisionsForm';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 0.2 Make the Project Decisions
+
+These choices are made fresh for each project. The template covers some of them with code; for the others it only records your choice.
+
+| Decision | Template code | Where it matters |
+| --- | --- | --- |
+| API versioning (Asp.Versioning, routes such as `/v1/...`) | None: you implement it yourself | Api endpoints ([Reference 16.2](../reference/code/16-api.mdx#16-2-endpointextensions-cs)) |
+| SonarCloud | CI job in [Reference 12.10](../reference/code/12-solution-level.mdx#12-10-github-workflows-ci-yml) | Steps 1.3 and 4.1 |
+| Qodana | CI job and `qodana.yaml` in [Reference 12.10](../reference/code/12-solution-level.mdx#12-10-github-workflows-ci-yml) | Steps 1.3 and 4.1 |
+| Getting artifacts to the VM | Manual commands in steps 4.4 and 4.7; Tailscale or another tool is yours to build | [Reference 8.21](../reference/spec/08-design-rules/21-deployment.mdx) |
+
+<ProjectDecisionsForm />
+
+For the reasoning behind the template's defaults, see the [decision record](../reference/appendix/b-decision-record.mdx).
+
+<DoneConditions step="project-decisions" />

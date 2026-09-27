@@ -1,0 +1,17 @@
+```bash
+# 启动本地外部服务
+docker compose up -d
+
+# 启动 Api 与 Worker（各开一个终端）
+dotnet run --project src/ProductName.Api
+dotnet run --project src/ProductName.Worker  # @@worker
+
+# 全部测试
+dotnet test
+
+# 单一测试项目
+dotnet test --project tests/ProductName.Domain.UnitTests
+
+# 按名称筛选测试
+dotnet test --filter-method "*CreateSample*"
+```

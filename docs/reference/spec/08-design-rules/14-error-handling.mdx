@@ -1,0 +1,9 @@
+---
+sidebar_label: "8.14 Error handling"
+---
+
+# 8.14 Error handling \{#8-14-error-handling\}
+
+- **Expected business failures** (not found, state not allowed, validation failed): returned as `Result`, which the Api maps to the matching HTTP status.
+- **Domain invariant violations** (should never happen, meaning a bug): throw `DomainException`; the global exception handler logs it and returns 500.
+- **Any other unexpected exception**: also logged by the global exception handler, returning 500.

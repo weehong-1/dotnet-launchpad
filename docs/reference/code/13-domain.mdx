@@ -1,0 +1,335 @@
+---
+sidebar_label: "13. Domain"
+---
+
+import Prompt13Domain from '../_partials/prompt-13-domain.mdx';
+
+# 13. Domain \{#13-domain\}
+
+## 13.1 Entity.cs \{#13-1-entity-cs\}
+
+```csharp
+namespace ProductName.Domain.Abstractions;
+
+public abstract class Entity<TId> : IEquatable<Entity<TId>>
+    where TId : notnull
+{
+    protected Entity(TId id) => Id = id;
+
+    // For EF Core
+    protected Entity() { }
+
+    public TId Id { get; protected init; } = default!;
+
+    public bool Equals(Entity<TId>? other) =>
+        other is not null && GetType() == other.GetType() && Id.Equals(other.Id);
+
+    public override bool Equals(object? obj) => obj is Entity<TId> entity && Equals(entity);
+
+    public override int GetHashCode() => HashCode.Combine(GetType(), Id);
+}
+```
+
+Entities are equal by ID, not by property values.
+
+## 13.2 IAggregateRoot.cs \{#13-2-iaggregateroot-cs\}
+
+```csharp
+namespace ProductName.Domain.Abstractions;
+
+public interface IAggregateRoot
+{
+    IReadOnlyCollection<IDomainEvent> DomainEvents { get; }
+    void ClearDomainEvents();
+}
+```
+
+A non generic interface, so Infrastructure can find every aggregate root and collect events in one pass without knowing each ID type.
+
+## 13.3 AggregateRoot.cs \{#13-3-aggregateroot-cs\}
+
+```csharp
+namespace ProductName.Domain.Abstractions;
+
+public abstract class AggregateRoot<TId> : Entity<TId>, IAggregateRoot
+    where TId : notnull
+{
+    private readonly List<IDomainEvent> _domainEvents = [];
+
+    protected AggregateRoot(TId id) : base(id) { }
+
+    protected AggregateRoot() { }
+
+    public IReadOnlyCollection<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
+
+    protected void Raise(IDomainEvent domainEvent) => _domainEvents.Add(domainEvent);
+
+    public void ClearDomainEvents() => _domainEvents.Clear();
+}
+```
+
+## 13.4 IDomainEvent.cs \{#13-4-idomainevent-cs\}
+
+```csharp
+using MediatR;
+
+namespace ProductName.Domain.Abstractions;
+
+public interface IDomainEvent : INotification
+{
+    Guid Id { get; }
+    DateTimeOffset OccurredOn { get; }
+}
+```
+
+Inheriting `INotification` lets MediatR publish domain events directly. That is why Domain references `MediatR.Contracts`, a package with interfaces only and no implementation.
+
+## 13.5 DomainEvent.cs \{#13-5-domainevent-cs\}
+
+```csharp
+namespace ProductName.Domain.Abstractions;
+
+public abstract record DomainEvent : IDomainEvent
+{
+    public Guid Id { get; init; } = Guid.CreateVersion7();
+    public required DateTimeOffset OccurredOn { get; init; }
+}
+```
+
+`Guid.CreateVersion7()` produces time ordered GUIDs, which index better as primary keys than random GUIDs. `OccurredOn` has no default and is `required`: the code raising an event passes the time it got from `TimeProvider.GetUtcNow()` (8.20), so tests with `FakeTimeProvider` control event times too.
+
+## 13.6 IRepository.cs \{#13-6-irepository-cs\}
+
+```csharp
+namespace ProductName.Domain.Abstractions;
+
+public interface IRepository<TAggregate, in TId>
+    where TAggregate : AggregateRoot<TId>
+    where TId : notnull
+{
+    Task<TAggregate?> GetByIdAsync(TId id, CancellationToken ct = default);
+    void Add(TAggregate aggregate);
+    void Remove(TAggregate aggregate);
+}
+```
+
+Each aggregate's repository interface inherits this and adds only its own query methods.
+
+## 13.7 IHasTimestamps.cs \{#13-7-ihastimestamps-cs\}
+
+```csharp
+namespace ProductName.Domain.Abstractions;
+
+public interface IHasTimestamps
+{
+    DateTimeOffset CreatedAt { get; set; }
+    DateTimeOffset? UpdatedAt { get; set; }
+}
+```
+
+Filled in automatically by an Infrastructure interceptor; business code never sets them.
+
+## 13.8 ErrorType.cs \{#13-8-errortype-cs\}
+
+```csharp
+namespace ProductName.Domain.Abstractions;
+
+public enum ErrorType
+{
+    Failure,
+    Validation,
+    NotFound,
+    Conflict,
+    Unauthorized,
+    Forbidden
+}
+```
+
+Mapped to HTTP status codes in the Api (see [16.5](./16-api.mdx#16-5-customresults-cs)).
+
+## 13.9 Error.cs \{#13-9-error-cs\}
+
+```csharp
+namespace ProductName.Domain.Abstractions;
+
+public record Error(string Code, string Description, ErrorType Type)
+{
+    public static readonly Error None = new(string.Empty, string.Empty, ErrorType.Failure);
+
+    public static Error Failure(string code, string description) =>
+        new(code, description, ErrorType.Failure);
+
+    public static Error Validation(string code, string description) =>
+        new(code, description, ErrorType.Validation);
+
+    public static Error NotFound(string code, string description) =>
+        new(code, description, ErrorType.NotFound);
+
+    public static Error Conflict(string code, string description) =>
+        new(code, description, ErrorType.Conflict);
+
+    public static Error Unauthorized(string code, string description) =>
+        new(code, description, ErrorType.Unauthorized);
+
+    public static Error Forbidden(string code, string description) =>
+        new(code, description, ErrorType.Forbidden);
+}
+```
+
+## 13.10 ValidationError.cs \{#13-10-validationerror-cs\}
+
+```csharp
+namespace ProductName.Domain.Abstractions;
+
+public sealed record ValidationError(Error[] Errors)
+    : Error("Validation.General", "One or more validation errors occurred.", ErrorType.Validation);
+```
+
+## 13.11 Result.cs and IResultFactory.cs \{#13-11-result-cs-and-iresultfactory-cs\}
+
+`Abstractions/Result.cs`:
+
+```csharp
+namespace ProductName.Domain.Abstractions;
+
+public class Result : IResultFactory<Result>
+{
+    protected internal Result(bool isSuccess, Error error)
+    {
+        if (isSuccess && error != Error.None || !isSuccess && error == Error.None)
+            throw new ArgumentException("Invalid error state.", nameof(error));
+
+        IsSuccess = isSuccess;
+        Error = error;
+    }
+
+    public bool IsSuccess { get; }
+    public bool IsFailure => !IsSuccess;
+    public Error Error { get; }
+
+    public static Result Success() => new(true, Error.None);
+    public static Result Failure(Error error) => new(false, error);
+
+    public static Result<T> Success<T>(T value) => new(value, true, Error.None);
+    public static Result<T> Failure<T>(Error error) => new(default, false, error);
+
+    public static implicit operator Result(Error error) => Failure(error);
+
+    static Result IResultFactory<Result>.CreateFailure(Error error) => Failure(error);
+}
+
+public class Result<T> : Result, IResultFactory<Result<T>>
+{
+    private readonly T? _value;
+
+    protected internal Result(T? value, bool isSuccess, Error error)
+        : base(isSuccess, error) => _value = value;
+
+    public T Value => IsSuccess
+        ? _value!
+        : throw new InvalidOperationException("Cannot access the value of a failed result.");
+
+    public static implicit operator Result<T>(T value) => Success(value);
+    public static implicit operator Result<T>(Error error) => Failure<T>(error);
+
+    static Result<T> IResultFactory<Result<T>>.CreateFailure(Error error) => Failure<T>(error);
+}
+```
+
+`Abstractions/IResultFactory.cs`:
+
+```csharp
+namespace ProductName.Domain.Abstractions;
+
+/// <summary>
+/// Static abstract factory used by generic pipeline behaviors to create a failed result
+/// of the exact response type. Not a DI service: it has only static abstract members and
+/// is used only as a generic constraint. It creates failures only; there is no CreateSuccess,
+/// because a generic result needs a value and a plain Result does not.
+/// </summary>
+public interface IResultFactory<TSelf> where TSelf : IResultFactory<TSelf>
+{
+    static abstract TSelf CreateFailure(Error error);
+}
+```
+
+- The implicit conversions let a handler return a value or an Error directly, without writing `Result.Success(...)` each time. For when to use Result and when to throw, see [8.14](../spec/08-design-rules/14-error-handling.mdx).
+- `IResultFactory` lets the validation pipeline ([14.9](./14-application.mdx#14-9-validationpipelinebehavior-cs)) create a failed `Result` or `Result<T>` without knowing `T` and without reflection. Both implementations are explicit, so `CreateFailure` never appears next to `Failure` in everyday code; it is reachable only through a generic constraint.
+- Keep the method name `CreateFailure`. Naming it `Failure` would force `Result<T>` to hide the base `Result.Failure(Error)` with `new`. Never rename the interface to `IResult<TSelf>`: it would clash with ASP.NET Core's `Microsoft.AspNetCore.Http.IResult` in endpoint files.
+
+## 13.12 DomainException.cs \{#13-12-domainexception-cs\}
+
+```csharp
+namespace ProductName.Domain.Abstractions;
+
+public class DomainException(string code, string message) : Exception(message)
+{
+    public string Code { get; } = code;
+}
+```
+
+Used only for **domain invariant violations**, which mean a bug. Expected business failures always use Result, never exceptions (see [8.14](../spec/08-design-rules/14-error-handling.mdx)).
+
+## 13.13 IStronglyTypedId.cs \{#13-13-istronglytypedid-cs\}
+
+```csharp
+namespace ProductName.Domain.Abstractions;
+
+public interface IStronglyTypedId
+{
+    Guid Value { get; }
+}
+```
+
+Define each aggregate's ID like this, replacing `Xxx` with the aggregate name:
+
+```csharp
+public readonly record struct XxxId(Guid Value) : IStronglyTypedId
+{
+    public static XxxId New() => new(Guid.CreateVersion7());
+}
+```
+
+The DbContext adds database value conversion to every type implementing this interface (see [15.1](./15-infrastructure.mdx#15-1-applicationdbcontext-cs), [15.2](./15-infrastructure.mdx#15-2-stronglytypedidconverter-cs)), so none needs individual setup.
+
+<Optional when="auditing">
+
+## 13.14 IAuditable.cs (optional: auditing) \{#13-14-iauditable-cs-optional-auditing\}
+
+```csharp
+namespace ProductName.Domain.Abstractions;
+
+// Marker interface: inserts, updates and deletes of implementing entities are written to the data change audit automatically
+public interface IAuditable { }
+```
+
+</Optional>
+
+<Optional when="auditing">
+
+## 13.15 AuditIgnoreAttribute.cs (optional: auditing) \{#13-15-auditignoreattribute-cs-optional-auditing\}
+
+```csharp
+namespace ProductName.Domain.Abstractions;
+
+// Marks properties that are not written to audit records, such as password hashes or tokens
+[AttributeUsage(AttributeTargets.Property)]
+public sealed class AuditIgnoreAttribute : Attribute { }
+```
+
+</Optional>
+
+## 13.16 Domain conventions (no code) \{#13-16-domain-conventions-no-code\}
+
+Follow these conventions when adding business objects; the template itself ships none:
+
+- **Strongly typed IDs**: implement `IStronglyTypedId`; see [13.13](#13-13-istronglytypedid-cs).
+- **Value objects**: use `sealed record` directly, with no base class; create them through a static `Create` method returning `Result<T>`. A record containing a collection must override `Equals` itself.
+- **Aggregates**: private constructor, created through a static factory method; properties use `private set` and change only through methods; business rules live inside the aggregate.
+- **Errors**: one static `XxxErrors` class per aggregate, holding that aggregate's errors.
+- **Domain events**: aggregate methods that raise events take the current time as a `DateTimeOffset` parameter, which the handler gets from `TimeProvider`, and set `OccurredOn` from it.
+- **Auditing**: entities that need auditing implement `IAuditable`, and sensitive properties get `[AuditIgnore]` (see [7.3](../spec/07-optional-components.mdx#7-3-audit-records)).
+
+## 13.17 AI coding agent prompt \{#13-17-ai-coding-agent-prompt\}
+
+<Prompt13Domain />

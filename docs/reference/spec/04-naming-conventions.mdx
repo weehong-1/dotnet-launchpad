@@ -1,0 +1,10 @@
+---
+sidebar_label: "4. Naming conventions"
+---
+
+# 4. Naming conventions \{#4-naming-conventions\}
+
+- Project names follow `ProductName.LayerName`, for example `ProductName.Domain`.
+- "Presentation" is the conceptual layer name; the projects themselves are named after their host type (`Api`, `Worker`), in line with mainstream practice. The presentation layer can have several entry points, and a single name like Presentation cannot tell them apart.
+- No separate `Presentation` class library holds endpoints, to avoid an unnecessary project.
+- Test files are named `{ClassUnderTest}Tests.cs`, for example `ResultTests.cs` tests `Result.cs`.

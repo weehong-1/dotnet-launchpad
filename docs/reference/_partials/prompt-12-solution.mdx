@@ -1,0 +1,12 @@
+```text
+Run section 12 of the document (solution level).
+
+1. Use the dotnet CLI to create the .slnx solution and every project in section 5: Domain, Application and Infrastructure with classlib; Api with web (empty ASP.NET Core); Worker with worker (skip if no Worker); the four test projects with xUnit v3 (first run dotnet new install xunit.v3.templates, then create them with dotnet new xunit3), and confirm each .csproj sets <OutputType>Exe</OutputType>. The xunit3 template targets an older framework: set every test project's TargetFramework to net10.0. Remove every PackageReference the templates add (versions live only in Directory.Packages.props). The commands in 11.2 do all of this and can be used as a reference.
+2. Set each project's project references and NuGet package references per the 12.2 table.
+3. Create Directory.Build.props, Directory.Packages.props, global.json, .editorconfig and docker-compose.yml with the content of 12.1 to 12.5. Set the global.json version to the locally installed .NET 10 SDK; set the database name in docker-compose.yml to the lowercase project name.
+4. Generate .gitignore with dotnet new gitignore; create the files of 12.6 to 12.10, replacing %%productname%% in file names and content with the short name and %%ProductName%% with the project name. Without a Worker, do not create the Worker service file or environment template, and delete the CI step that publishes the Worker. Add SonarCloud and Qodana per the project settings.
+5. Delete the sample files the project templates generate (such as Class1.cs, UnitTest1.cs, Worker.cs, WeatherForecast code); keep a minimal compilable Program.cs in the Api and Worker for now (the Worker's Program.cs must no longer register or import the deleted Worker class; 11.2 writes a minimal one), to be replaced in sections 16 and 17.
+6. Run dotnet user-secrets init in the Api and the Worker.
+
+Done when: dotnet build succeeds; docker compose config validates.
+```

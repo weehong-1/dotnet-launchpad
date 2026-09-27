@@ -1,0 +1,28 @@
+---
+sidebar_label: "5. 解决方案结构"
+---
+
+# 5. 解决方案结构 \{#5-solution-structure\}
+
+```
+src/
+    ProductName.Domain
+    ProductName.Application
+    ProductName.Infrastructure
+    ProductName.Api
+    ProductName.Worker                      （可选）  # @@worker
+tests/
+    ProductName.Domain.UnitTests
+    ProductName.Application.UnitTests
+    ProductName.Architecture.Tests
+    ProductName.Api.IntegrationTests
+.editorconfig
+.gitignore
+docker-compose.yml
+global.json
+Directory.Build.props
+Directory.Packages.props
+ProductName.slnx
+```
+
+根目录文件的作用见 [8.6](./08-design-rules/06-solution-infrastructure.mdx)。

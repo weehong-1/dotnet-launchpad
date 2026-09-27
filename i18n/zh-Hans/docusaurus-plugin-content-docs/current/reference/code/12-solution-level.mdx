@@ -1,0 +1,513 @@
+---
+sidebar_label: "12. 解决方案层级"
+---
+
+import Prompt12Solution from '../_partials/prompt-12-solution.mdx';
+
+# 12. 解决方案层级 \{#12-solution-level\}
+
+## 12.1 Directory.Build.props \{#12-1-directory-build-props\}
+
+```xml
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <AnalysisLevel>latest</AnalysisLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.txt" />
+  </ItemGroup>
+</Project>
+```
+
+`EnforceCodeStyleInBuild` 让 `.editorconfig` 的代码风格规则在建置时也会检查，配合 `TreatWarningsAsErrors`，风格不符会直接建置失败。
+
+## 12.2 Directory.Packages.props \{#12-2-directory-packages-props\}
+
+版本号在建立模板时填入当时的最新稳定版。
+
+```xml
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- CQRS 与验证 -->
+    <PackageVersion Include="MediatR" Version="" />
+    <PackageVersion Include="MediatR.Contracts" Version="" />
+    <PackageVersion Include="FluentValidation" Version="" />
+    <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="" />
+
+    <!-- 数据库 -->
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="" />
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="" />
+
+    <!-- 所有项目共用的分析器 -->
+    <GlobalPackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="" />
+
+    <!-- 消息 -->
+    <PackageVersion Include="MassTransit" Version="" />
+    <PackageVersion Include="MassTransit.EntityFrameworkCore" Version="" />
+    <PackageVersion Include="MassTransit.RabbitMQ" Version="" />
+
+    <!-- Api -->
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="" />
+    <PackageVersion Include="Scalar.AspNetCore" Version="" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="" />
+
+    <!-- 托管与韧性 -->
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Systemd" Version="" />
+    <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="" />
+
+    <!-- 日志 -->
+    <PackageVersion Include="Serilog.AspNetCore" Version="" />
+    <PackageVersion Include="Serilog.Extensions.Hosting" Version="" />
+    <PackageVersion Include="Serilog.Settings.Configuration" Version="" />
+    <PackageVersion Include="Serilog.Sinks.Console" Version="" />
+    <PackageVersion Include="Serilog.Sinks.Seq" Version="" />
+    <PackageVersion Include="Serilog.Formatting.Compact" Version="" />
+    <PackageVersion Include="Serilog.Sinks.File" Version="" />
+    <PackageVersion Include="Serilog.Sinks.Async" Version="" />
+    <PackageVersion Include="Serilog.Enrichers.Environment" Version="" />
+
+    <!-- 测试 -->
+    <PackageVersion Include="xunit.v3" Version="" />
+    <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="" />
+    <PackageVersion Include="NSubstitute" Version="" />
+    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="" />
+    <PackageVersion Include="NetArchTest.Rules" Version="" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="" />
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="" />
+    <PackageVersion Include="Testcontainers.RabbitMq" Version="" />
+  </ItemGroup>
+</Project>
+```
+
+**各项目引用关系**
+
+| 项目 | 项目引用 | NuGet 包 |
+| --- | --- | --- |
+| Domain | 无 | `MediatR.Contracts` |
+| Application | Domain | `MediatR`、`FluentValidation`、`FluentValidation.DependencyInjectionExtensions`、`Microsoft.EntityFrameworkCore`、`Microsoft.Extensions.Configuration.Abstractions` |
+| Infrastructure | Application | `Npgsql.EntityFrameworkCore.PostgreSQL`、`Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore`、`MassTransit`、`MassTransit.EntityFrameworkCore`、`MassTransit.RabbitMQ`、`Microsoft.Extensions.Http.Resilience`；另加 `Microsoft.AspNetCore.App` 框架引用 |
+| Api | Application、Infrastructure | `Microsoft.AspNetCore.OpenApi`、`Scalar.AspNetCore`、`Microsoft.AspNetCore.Authentication.JwtBearer`、`Microsoft.Extensions.Hosting.Systemd`、`Serilog.AspNetCore`、`Serilog.Sinks.Seq`、`Serilog.Sinks.File`、`Serilog.Sinks.Async`、`Serilog.Enrichers.Environment`、`Microsoft.EntityFrameworkCore.Design` |
+| Worker | Application、Infrastructure | `Microsoft.Extensions.Hosting.Systemd`、`Serilog.Extensions.Hosting`、`Serilog.Settings.Configuration`、`Serilog.Sinks.Console`、`Serilog.Sinks.Seq`、`Serilog.Formatting.Compact`、`Serilog.Sinks.File`、`Serilog.Sinks.Async`、`Serilog.Enrichers.Environment` |
+| Domain.UnitTests | Domain | `xunit` 系列 |
+| Application.UnitTests | Application | `xunit` 系列、`NSubstitute`、`Microsoft.Extensions.TimeProvider.Testing` |
+| Architecture.Tests | 全部 src 项目 | `xunit` 系列、`NetArchTest.Rules` |
+| Api.IntegrationTests | Api、Infrastructure | `xunit` 系列、`Microsoft.AspNetCore.Mvc.Testing`、`Testcontainers.PostgreSql`、`Testcontainers.RabbitMq` |
+
+`xunit` 系列指 `xunit.v3` 与 `Microsoft.Testing.Extensions.CodeCoverage`。测试以 Microsoft.Testing.Platform 执行（在 `global.json` 中选定，见 [12.3](#12-3-global-json)），因此不使用 VSTest 的 `Microsoft.NET.Test.Sdk`、`xunit.runner.visualstudio`、`coverlet.collector`。xUnit v3 的测试项目须在 `.csproj` 设定 `<OutputType>Exe</OutputType>`。Application 引用 `Microsoft.Extensions.Configuration.Abstractions`，因为 `AddApplication` 读取 `IConfiguration`（14.15）。`Microsoft.CodeAnalysis.BannedApiAnalyzers` 以 `GlobalPackageReference` 自动套用到所有项目，不需个别引用。Api 与 Worker 都需在 `.csproj` 中设定 `<UserSecretsId>`，以使用 User Secrets（见 [8.8](../spec/08-design-rules/08-configuration-environments-and-secrets.mdx)）。
+
+**版本参考**
+
+英文 guide 实际使用过的版本，只列与本模板重叠的套件。建立项目时仍应改用当时的最新稳定版。
+
+| 套件 | 版本 |
+| --- | --- |
+| `MediatR` | 14.1.0 |
+| `FluentValidation`、`FluentValidation.DependencyInjectionExtensions` | 12.1.1 |
+| `Microsoft.EntityFrameworkCore`、`Microsoft.EntityFrameworkCore.Design` | 10.0.5 |
+| `Npgsql.EntityFrameworkCore.PostgreSQL` | 10.0.1 |
+| `Microsoft.AspNetCore.OpenApi` | 10.0.5 |
+| `Microsoft.AspNetCore.Mvc.Testing` | 10.0.5 |
+| `Serilog.AspNetCore` | 10.0.0 |
+| `Serilog.Enrichers.Environment` | 3.0.1 |
+
+## 12.3 global.json \{#12-3-global-json\}
+
+```json
+{
+  "sdk": {
+    "version": "10.0.100",
+    "rollForward": "latestFeature"
+  },
+  "test": {
+    "runner": "Microsoft.Testing.Platform"
+  }
+}
+```
+
+版本号按建立模板时安装的 SDK 调整（英文 guide 使用 10.0.103）。`latestFeature` 会前滚到已安装、主版本与次版本相同（10.0）的最新 SDK，包括较新的功能带，例如 10.0.2xx。`test` 区段让 `dotnet test` 使用 xUnit v3 所需的 Microsoft.Testing.Platform，其选项与 VSTest 不同（见 [8.10](../spec/08-design-rules/10-local-development.mdx)、[8.12](../spec/08-design-rules/12-testing-strategy.mdx)）。
+
+## 12.4 .editorconfig \{#12-4-editorconfig\}
+
+```ini
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{json,yml,yaml,xml,csproj,props,slnx}]
+indent_size = 2
+
+[*.cs]
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_prefer_braces = when_multiline:suggestion
+dotnet_sort_system_directives_first = true
+dotnet_style_readonly_field = true:warning
+
+[**/Migrations/*.cs]
+generated_code = true
+```
+
+这里只列基本规则，按团队习惯增减。最后一段把 EF Core migration 标为自动产生的代码：migration 使用区块式命名空间，少了这段，第一个 migration 就会在“警告视为错误”下让编译失败。
+
+## 12.5 docker-compose.yml \{#12-5-docker-compose-yml\}
+
+```yaml
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: productname
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+
+  seq:
+    image: datalust/seq:latest
+    environment:
+      ACCEPT_EULA: "Y"
+      SEQ_FIRSTRUN_NOAUTHENTICATION: "true"
+    ports:
+      - "127.0.0.1:5341:80"
+
+volumes:
+  postgres-data:
+```
+
+**只供本地开发使用**，帐号密码均为预设值，因此所有端口只发布在 `127.0.0.1`，网络上的其他机器无法连线。启动后：RabbitMQ 管理界面在 `http://localhost:15672`（帐号密码 guest），Seq 在 `http://localhost:5341`。
+
+## 12.6 BannedSymbols.txt \{#12-6-bannedsymbols-txt\}
+
+```text
+P:System.DateTime.Now;使用 TimeProvider.GetUtcNow()，数据库一律存 UTC（见 8.20）
+P:System.DateTime.Today;使用 TimeProvider.GetUtcNow() 并明确指定时区（见 8.20）
+P:System.DateTimeOffset.Now;使用 TimeProvider.GetUtcNow()（见 8.20）
+```
+
+由 `Microsoft.CodeAnalysis.BannedApiAnalyzers` 读取，使用清单中的 API 会产生警告，配合“警告视为错误”直接导致建置失败。日后发现其他应禁用的 API，加入此清单即可。
+
+## 12.7 deploy/systemd 服务文件 \{#12-7-deploy-systemd-service-files\}
+
+`deploy/systemd/productname-api.service`：
+
+```ini
+[Unit]
+Description=ProductName Api
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+User=productname
+Group=productname
+WorkingDirectory=/opt/productname/api
+ExecStart=/opt/productname/api/ProductName.Api
+EnvironmentFile=/etc/productname/api.env
+Environment=ASPNETCORE_URLS=http://127.0.0.1:5000
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+SyslogIdentifier=productname-api
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/var/log/productname
+
+[Install]
+WantedBy=multi-user.target
+```
+
+<Optional when="worker">
+
+`deploy/systemd/productname-worker.service`（可选：Worker）：
+
+```ini
+[Unit]
+Description=ProductName Worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+User=productname
+Group=productname
+WorkingDirectory=/opt/productname/worker
+ExecStart=/opt/productname/worker/ProductName.Worker
+EnvironmentFile=/etc/productname/worker.env
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+SyslogIdentifier=productname-worker
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/var/log/productname
+
+[Install]
+WantedBy=multi-user.target
+```
+
+</Optional>
+
+- `Type=notify` 搭配程序中的 `AddSystemd()`（见 [16.13](./16-api.mdx#16-13-program-cs)、[17.2](./17-worker-optional.mdx#17-2-program-cs)）：应用启动完成才回报 systemd，停止时能正确完成进行中的工作。
+- Api 只监听本机的 5000 埠，外部请求一律经过 Nginx。
+- 环境名称与机密都放在 `EnvironmentFile` 中，服务文件在各环境完全相同。
+- `Restart=always` 让服务异常结束时自动重启；`ProtectSystem` 等设定限制服务能写入的位置。
+
+## 12.8 deploy/nginx/productname-api.conf \{#12-8-deploy-nginx-productname-api-conf\}
+
+```nginx
+server {
+    listen 80;
+    server_name api.example.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name api.example.com;
+
+    ssl_certificate     /etc/letsencrypt/live/api.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/api.example.com/privkey.pem;
+
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "no-referrer" always;
+
+    client_max_body_size 10m;
+
+    location / {
+        proxy_pass         http://127.0.0.1:5000;
+        proxy_http_version 1.1;
+        proxy_set_header   Host $host;
+        proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
+    }
+}
+```
+
+- `api.example.com` 替换为实际网域；凭证由 certbot 申请与自动续期。
+- HTTP 一律转向 HTTPS；安全标头在 Nginx 统一加上，应用不需处理。
+- `X-Forwarded-For` 与 `X-Forwarded-Proto` 让 Api 取得真实的客户端 IP 与通讯协定（见 [16.13](./16-api.mdx#16-13-program-cs) 的转发标头设定）。
+- `client_max_body_size` 为上传大小上限，按项目需要调整。
+
+## 12.9 deploy/env 环境变量范本 \{#12-9-deploy-env-environment-variable-templates\}
+
+`deploy/env/api.env.example`：
+
+```ini
+# 复制到 /etc/productname/api.env，填入该环境的值；拥有者 root，权限 600
+ASPNETCORE_ENVIRONMENT=Production
+ConnectionStrings__Database=Host=<主机>;Port=5432;Database=productname;Username=<应用帐号>;Password=<密码>
+ConnectionStrings__MessageBroker=amqps://<帐号>:<密码>@<主机>:5671
+MediatR__LicenseKey=
+Authentication__Authority=
+Authentication__Audience=
+Cors__AllowedOrigins__0=
+Serilog__WriteTo__Seq__Args__serverUrl=
+Serilog__WriteTo__Seq__Args__apiKey=
+# MassTransit v9 授权内容；也可改用 MT_LICENSE_PATH=<文件路径>
+MT_LICENSE=
+```
+
+<Optional when="worker">
+
+`deploy/env/worker.env.example`（可选：Worker）：
+
+```ini
+# 复制到 /etc/productname/worker.env，填入该环境的值；拥有者 root，权限 600
+DOTNET_ENVIRONMENT=Production
+ConnectionStrings__Database=Host=<主机>;Port=5432;Database=productname;Username=<应用帐号>;Password=<密码>
+ConnectionStrings__MessageBroker=amqps://<帐号>:<密码>@<主机>:5671
+MediatR__LicenseKey=
+Serilog__WriteTo__Seq__Args__serverUrl=
+Serilog__WriteTo__Seq__Args__apiKey=
+# MassTransit v9 授权内容；也可改用 MT_LICENSE_PATH=<文件路径>
+MT_LICENSE=
+```
+
+</Optional>
+
+- 范本只列出须按环境提供的设定，不含任何实际值，可以提交到版本控制；填好值的 `.env` 文件**绝不**提交。
+- SIT 的 VM 把环境名称改为 `SIT`（大小写须一致，见 [8.8](../spec/08-design-rules/08-configuration-environments-and-secrets.mdx)）。
+- 连接字符串使用应用帐号，不使用数据库拥有者帐号（见 [8.11](../spec/08-design-rules/11-database-migrations.mdx)）。
+
+## 12.10 .github/workflows/ci.yml \{#12-10-github-workflows-ci-yml\}
+
+```yaml
+name: ci
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      MT_LICENSE: ${{ secrets.MT_LICENSE }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - run: dotnet restore
+      - run: dotnet build --no-restore -c Release
+      - run: dotnet test --no-build -c Release
+
+      - run: dotnet publish src/ProductName.Api -c Release -r linux-x64 --self-contained -o artifacts/api
+      - run: dotnet publish src/ProductName.Worker -c Release -r linux-x64 --self-contained -o artifacts/worker  # @@worker
+
+      - run: dotnet tool restore
+      - run: >
+          dotnet ef migrations bundle
+          --project src/ProductName.Infrastructure
+          --startup-project src/ProductName.Api
+          -r linux-x64 --self-contained
+          -o artifacts/migrations/efbundle
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: productname-${{ github.sha }}
+          path: artifacts/
+```
+
+- 以 GitHub Actions 为例；使用其他 CI 平台时，按相同步骤改写。
+- 每次推送与合并请求都会建置并执行全部测试（包括以 Testcontainers 执行的整合测试）；只有测试通过才产生部署产物。
+- 产物包含 Api、Worker 与迁移程序，部署步骤见 [8.21](../spec/08-design-rules/21-deployment.mdx)。
+- 未选择 Worker 的项目，删除发布 Worker 的步骤。
+- 第一次 push 之前先设定 `MT_LICENSE` secret：整合测试会启动 MassTransit，没有授权就无法执行（`gh secret set MT_LICENSE < license.txt`）。
+
+<Optional when="sonar,qodana">
+
+**可选：代码品质检查（SonarCloud 与 Qodana）**
+
+来自英文 guide。需要静态分析与覆盖率报告时，在 `ci.yml` 的 `jobs:` 下加入以下两个 job，它们在 `build` 通过后并行执行。整合测试以 Testcontainers 自行启动数据库，因此不需要 CI 的 `services`。
+
+```yaml
+  # @@sonar-begin
+  sonar:
+    name: SonarCloud
+    runs-on: ubuntu-latest
+    needs: build
+    env:
+      MT_LICENSE: ${{ secrets.MT_LICENSE }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      # SonarScanner 需要 Java
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - run: dotnet tool install --global dotnet-sonarscanner
+
+      - run: >
+          dotnet sonarscanner begin
+          /k:"${{ vars.SONAR_PROJECT_KEY }}"
+          /o:"${{ vars.SONAR_ORGANIZATION_KEY }}"
+          /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+          /d:sonar.host.url="https://sonarcloud.io"
+          /d:sonar.cs.vscoveragexml.reportsPaths="TestResults/*.xml"
+          /d:sonar.exclusions="**/obj/**,**/bin/**"
+          /d:sonar.coverage.exclusions="**/obj/**,**/bin/**,**/Migrations/**"
+
+      - run: dotnet build -c Release
+
+      - run: >
+          dotnet test --no-build -c Release
+          --coverage --coverage-output-format xml
+          --results-directory TestResults
+
+      - run: dotnet sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+
+  # @@sonar-end
+  # @@qodana-begin
+  qodana:
+    name: Qodana
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: write
+      pull-requests: write
+      checks: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: JetBrains/qodana-action@v2025.1
+        env:
+          QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
+  # @@qodana-end
+```
+
+<Optional when="qodana">
+
+启用 Qodana 时，在根目录加入 `qodana.yaml`：
+
+```yaml
+# 不要在此文件存放敏感资料，内容会出现在 Qodana 报告中
+version: "1.0"
+ide: QDNET
+dotnet:
+  solution: ProductName.slnx
+profile:
+  name: qodana.starter
+```
+
+</Optional>
+
+需要在 GitHub 设定的机密与变量：
+
+| 类型 | 名称 | 说明 |
+| --- | --- | --- |
+| Secret | `SONAR_TOKEN` | SonarCloud 认证令牌 |
+| Secret | `QODANA_TOKEN` | Qodana Cloud 认证令牌 |
+| Secret | `MT_LICENSE` | MassTransit v9 授权内容；测试会启动 bus，所有执行测试的 job 都需要它 |
+| Variable | `SONAR_PROJECT_KEY` | SonarCloud 项目键 |
+| Variable | `SONAR_ORGANIZATION_KEY` | SonarCloud 组织键 |
+
+</Optional>
+
+## 12.11 AI Coding Agent 提示词 \{#12-11-ai-coding-agent-prompt\}
+
+<Prompt12Solution />

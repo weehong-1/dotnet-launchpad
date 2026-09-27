@@ -1,0 +1,20 @@
+---
+sidebar_label: "8.11 数据库迁移"
+---
+
+import SnippetAddMigration from '../../_partials/snippet-add-migration.mdx';
+import SnippetRevokeAudit from '../../_partials/snippet-revoke-audit.mdx';
+
+# 8.11 数据库迁移 \{#8-11-database-migrations\}
+
+- 迁移文件放在 `ProductName.Infrastructure/Database/Migrations`。
+- 新增迁移：
+
+<SnippetAddMigration />
+
+- **Development**：Api 启动时自动执行迁移，由设定 `Migrations:ApplyOnStartup` 控制，只在 Development 设定档中开启。
+- **SIT 与 Production**：**不在应用启动时自动迁移**，以免多个实例同时迁移或迁移失败导致服务无法启动。改为在部署流程中执行 `dotnet ef migrations bundle` 产生的迁移程序，或以 `dotnet ef migrations script --idempotent` 产生的 SQL 脚本，在部署新版本前执行。
+- MassTransit 的 Outbox 与 Inbox 数据表、审计数据表也包含在迁移中，不需另外建立。
+- **数据库帐号分开**：执行迁移使用拥有者帐号；应用执行时使用权限较小的帐号，只能读写资料，不能修改数据表结构。启用审计时，再撤销应用帐号对审计表的修改与删除权限，以 PostgreSQL 为例（应用程序帐号即 Setup Flow 步骤 4.3 建立的帐号）：
+
+<SnippetRevokeAudit />

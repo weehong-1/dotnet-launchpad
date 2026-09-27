@@ -1,0 +1,47 @@
+---
+sidebar_label: 2.3 Infrastructure
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import Prompt15Infrastructure from '../reference/_partials/prompt-15-infrastructure.mdx';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 2.3 Infrastructure
+
+Infrastructure 实现 Application 的抽象：EF Core、带 Outbox 的 MassTransit、当前用户、权限、弹性处理，以及可选的审计。代码见 [Reference 15](../reference/code/15-infrastructure.mdx)。
+
+<Tabs groupId="route" queryString>
+<TabItem value="script" label="脚本" default>
+
+已由[步骤 1.2](./empty-solution.mdx) 的 scaffold 脚本完成。请对照下方的完成条件检查结果。
+
+</TabItem>
+<TabItem value="ai" label="AI Agent">
+
+<Prompt15Infrastructure />
+
+</TabItem>
+<TabItem value="manual" label="手动">
+
+按 [Reference 11](../reference/code/11-file-overview.mdx) 列出的路径，创建 [Reference 15.1 至 15.14](../reference/code/15-infrastructure.mdx) 中的每个文件，然后加入 framework 引用：
+
+```xml
+<!-- src/ProductName.Infrastructure/ProductName.Infrastructure.csproj -->
+<ItemGroup>
+  <FrameworkReference Include="Microsoft.AspNetCore.App" />
+</ItemGroup>
+```
+
+为你的项目显示的 15.8 代码已包含正确的 Outbox 投递检查和审计注册。使用其他 broker 或数据库？请将 `UseNpgsql`、`UsePostgres` 和 `UsingRabbitMq` 连同对应的 package 一起更换。
+
+最后按 [Reference 11.3](../reference/code/11-file-overview.mdx#11-3-globalusings-cs-per-project) 建立此项目的 `GlobalUsings.cs`，然后编译：
+
+```bash
+dotnet build
+```
+
+</TabItem>
+</Tabs>
+
+<DoneConditions step="infrastructure" />

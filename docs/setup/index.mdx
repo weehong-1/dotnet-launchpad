@@ -1,0 +1,24 @@
+---
+sidebar_label: Overview
+sidebar_position: 0
+---
+
+import StepList from '@site/src/components/StepList';
+
+# The Setup Flow
+
+The Setup Flow takes a new backend from an empty folder to a Skeleton Solution running on SIT and Production, ready for its first feature. Follow the Steps in order; each ends with **Done Conditions** that must all be true before you move on.
+
+## How it works
+
+1. **Start a project in [step 0.1](./project-settings.mdx).** Its Project Name and Short Name replace `%%ProductName%%` and `%%productname%%` in every command and file on the site, and the Worker and Auditing switches hide what the project does not need.
+2. **Pick a route for the code steps.** Steps 1.2 to 2.6 have three tabs: **Script** (one command in step 1.2 generates the whole Skeleton Solution from the Reference), **AI Agent** (paste each section's prompt into Claude Code, Cursor or Copilot) and **Manual** (create the files yourself). All three end with the same Done Conditions.
+3. **Tick the Done Conditions.** Progress is saved in this browser for the active project. [Projects](/projects) shows every project, its next step, and exports a backup.
+
+:::info[What has been verified]
+Boilerplate v1.0 was checked by running the step 1.2 scaffold script on .NET SDK 10.0.401, with Worker and Auditing both on and both off: the Skeleton Solution builds with zero warnings, the first migration is created, and all tests pass once the MassTransit license is set. Running on a VM (steps 4.2 to 4.7) is not yet verified. If a step fails for you, fix the Reference first, so the next project starts from working code.
+:::
+
+## Steps
+
+<StepList />

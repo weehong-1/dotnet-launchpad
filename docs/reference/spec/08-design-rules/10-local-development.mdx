@@ -1,0 +1,18 @@
+---
+sidebar_label: "8.10 Local development"
+---
+
+import SnippetEverydayCommands from '../../_partials/snippet-everyday-commands.mdx';
+
+# 8.10 Local development \{#8-10-local-development\}
+
+- The root `docker-compose.yml` starts PostgreSQL, RabbitMQ (with the management UI) and Seq.
+- Developers only run `docker compose up -d`, then start the Api and Worker.
+- Default connection strings match the Docker Compose settings, so local development needs no extra configuration.
+
+**Everyday commands**
+
+<SnippetEverydayCommands />
+
+- The Api URL is in `Properties/launchSettings.json`; the health check is at `/health`, and in Development the API docs are at `/scalar`.
+- See [12.5](../../code/12-solution-level.mdx#12-5-docker-compose-yml) for the RabbitMQ management UI and Seq URLs.

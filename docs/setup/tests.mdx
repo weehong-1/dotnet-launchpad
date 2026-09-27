@@ -1,0 +1,38 @@
+---
+sidebar_label: 2.6 Tests
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import Prompt18Tests from '../reference/_partials/prompt-18-tests.mdx';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 2.6 Tests
+
+The four test projects get their shared base classes, the architecture tests and the validation pipeline test. The code is in [Reference 18](../reference/code/18-tests.mdx). Docker must be running: the integration tests start PostgreSQL and RabbitMQ with Testcontainers.
+
+<Tabs groupId="route" queryString>
+<TabItem value="script" label="Script" default>
+
+Done by the scaffold script in [step 1.2](./empty-solution.mdx). Check the result against the Done Conditions below.
+
+</TabItem>
+<TabItem value="ai" label="AI Agent">
+
+<Prompt18Tests />
+
+</TabItem>
+<TabItem value="manual" label="Manual">
+
+1. Create each file of [Reference 18.1 to 18.5](../reference/code/18-tests.mdx) at the paths listed in [Reference 11](../reference/code/11-file-overview.mdx).
+2. Create the `GlobalUsings.cs` of the four test projects from [Reference 11.3](../reference/code/11-file-overview.mdx#11-3-globalusings-cs-per-project).
+3. Check that `MT_LICENSE_PATH` is set (step 0.3) and Docker is running, then test:
+
+```bash
+dotnet test
+```
+
+</TabItem>
+</Tabs>
+
+<DoneConditions step="tests" />

@@ -1,0 +1,16 @@
+---
+sidebar_label: 4.5 Production backing services
+---
+
+import {BackingServices} from '@site/src/components/Commands';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 4.5 Production: backing services
+
+Production needs its own PostgreSQL, RabbitMQ and Seq, shared with nothing else ([Reference 2](../reference/spec/02-technical-baseline.mdx), [8.8](../reference/spec/08-design-rules/08-configuration-environments-and-secrets.mdx)). This step creates them: PostgreSQL and RabbitMQ as managed services, Seq on its own small VM. Create the Production VM of step 4.6 first (x86-64, Ubuntu 24.04 LTS) so you know the IP address the database and broker must allow.
+
+<BackingServices env="Production" />
+
+Keep every password, URL and API key from this step in your password manager. They go into the env files in step 4.6.
+
+<DoneConditions step="prod-services" />

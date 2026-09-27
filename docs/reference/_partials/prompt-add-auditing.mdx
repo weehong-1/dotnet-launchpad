@@ -1,0 +1,12 @@
+```text
+Add the auditing mechanism to this project, following the design in section 7.3 and the code in Part 2 marked "optional: auditing". Prerequisite: the project was built per sections 12 to 16.
+
+1. Domain: create 13.14 IAuditable and 13.15 AuditIgnoreAttribute.
+2. Application: create 14.16 to 14.19; register OperationAuditPipelineBehavior in the MediatR setup of 14.15, in the order logging, operation audit, validation.
+3. Infrastructure: create 15.9 to 15.14; register IAuditContext, IOperationAuditWriter and AuditTrailInterceptor per 15.8, and add AuditTrailInterceptor last in AddInterceptors.
+4. Create a migration named AddAuditTables containing only the AuditTrails and OperationAudits tables; if any other change appears, stop and explain why.
+5. Do not add IAuditable to any existing entity, and do not add IAuditableRequest to any Command or Query; I will decide the audit scope.
+6. List the permission statements that must run on the database at deployment (see 8.11), but do not run them.
+
+Done when: dotnet build has zero warnings and zero errors; dotnet test passes.
+```

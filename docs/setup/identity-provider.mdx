@@ -1,0 +1,43 @@
+---
+sidebar_label: 0.5 Prepare the identity provider
+---
+
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 0.5 Prepare the identity provider
+
+The Api accepts JWT access tokens from any OpenID Connect provider and requires sign in on every endpoint except the public ones ([Reference 8.16](../reference/spec/08-design-rules/16-authentication-and-authorization.mdx)). The template ships no provider, so prepare one now: steps 3.1, 3.2, 4.4 and 4.7 need it.
+
+Each environment (Development, SIT, Production) needs its own values:
+
+| Setting | What it is | Where it goes |
+| --- | --- | --- |
+| `Authentication:Authority` | The provider's issuer URL; `<Authority>/.well-known/openid-configuration` must open | Development: User Secrets (step 3.1). SIT and Production: the env files (steps 4.3 and 4.6) |
+| `Authentication:Audience` | The identifier the Api is registered under; tokens for the Api carry it in `aud` | Same as above |
+| `Authentication:PermissionClaimType` | The claim that holds permissions; default `permissions` | Change it in `appsettings.json` only if your provider uses another claim |
+
+In your provider (for example Microsoft Entra ID, Auth0, Keycloak or Okta), for each environment:
+
+1. Register the Api as an API or resource server. Its identifier is the **Audience**.
+2. Register a test client that can get access tokens for that audience. The simplest is a machine-to-machine client using the client credentials grant; a test user with the authorization code flow works too.
+3. If endpoints will require permissions, make the provider put them in the `permissions` claim (or change `PermissionClaimType`).
+
+Check the Authority, then get a test token for Development. The request below is the standard OAuth 2.0 client credentials grant. Some providers take `scope=<audience>/.default` instead of `audience=<audience>`; check your provider's documentation. Every field is URL-encoded, and the secret is read without echo and sent through standard input, so special characters such as `+` or `&` arrive intact and the secret never appears in history or process arguments.
+
+```bash
+AUTHORITY=https://<your issuer>
+TOKEN_ENDPOINT=$(curl -fsS "$AUTHORITY/.well-known/openid-configuration" | jq -er .token_endpoint)
+echo "$TOKEN_ENDPOINT"
+
+IFS= read -rs CLIENT_SECRET   # paste the client secret, then press Enter (not echoed)
+TOKEN=$(printf '%s' "$CLIENT_SECRET" | curl -fsS -X POST "$TOKEN_ENDPOINT" \
+  --data-urlencode grant_type=client_credentials \
+  --data-urlencode "client_id=<client id>" \
+  --data-urlencode "audience=<audience>" \
+  --data-urlencode client_secret@- | jq -er .access_token); unset CLIENT_SECRET
+echo "${TOKEN:0:20}..."   # a JWT starts with eyJ
+```
+
+Keep the client secret out of the repository, like every other secret. Step 3.2 uses such a token to prove the Api accepts it.
+
+<DoneConditions step="identity-provider" />

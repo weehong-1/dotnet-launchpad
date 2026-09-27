@@ -1,0 +1,17 @@
+```bash
+# Start local external services
+docker compose up -d
+
+# Start the Api and Worker (one terminal each)
+dotnet run --project src/ProductName.Api
+dotnet run --project src/ProductName.Worker  # @@worker
+
+# All tests
+dotnet test
+
+# One test project
+dotnet test --project tests/ProductName.Domain.UnitTests
+
+# Filter tests by name
+dotnet test --filter-method "*CreateSample*"
+```

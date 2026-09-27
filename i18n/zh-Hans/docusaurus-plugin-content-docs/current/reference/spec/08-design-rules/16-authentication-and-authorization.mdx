@@ -1,0 +1,21 @@
+---
+sidebar_label: "8.16 身份认证与授权"
+---
+
+# 8.16 身份认证与授权 \{#8-16-authentication-and-authorization\}
+
+**身份认证**
+
+- 使用 JWT Bearer，可对接任一 OpenID Connect 提供方；设定只有 `Authentication:Authority` 与 `Authentication:Audience` 两项（见 [16.7](../../code/16-api.mdx#16-7-authextensions-cs)）。
+- **预设所有端点都须登入**：未标记的端点一律要求已登入的使用者。公开端点必须明确加上 `.AllowAnonymous()`，健康检查与 OpenAPI 已经标记。忘记加授权的端点因此是“拒绝”而不是“开放”。
+
+**授权以权限为单位**
+
+- 端点以 `.RequirePermission("权限名称")` 声明需要的权限（见 [16.10](../../code/16-api.mdx#16-10-permissionendpointextensions-cs)），不直接以角色判断。角色只是一组权限的组合，由身份认证提供方或项目自行管理，角色调整时不需要改代码。
+- 权限名称格式为 `{功能}.{动作}`，全部小写。每个功能的权限常数集中在 `Application/Features/{功能}/{功能}Permissions.cs`。
+- 权限来源由 `IPermissionProvider` 提供（见 [14.13](../../code/14-application.mdx#14-13-ipermissionprovider-cs)）。模板预设的 `ClaimsPermissionProvider` 从令牌的声明读取，声明名称以 `Authentication:PermissionClaimType` 设定（预设为 `permissions`）。若权限由系统自行管理并存在数据库中，替换这个实现即可，并应加上快取。
+- **资源层级的授权**（例如只能修改自己建立的资料）属于业务规则，在 Handler 中以 `ICurrentUser` 判断，不符合时返回 `Error.Forbidden`。
+
+**测试**
+
+需要登入的端点，在整合测试的 `IntegrationTestWebAppFactory` 中加入测试用的认证处理器，以指定的使用者与权限执行。

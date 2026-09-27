@@ -1,0 +1,79 @@
+---
+sidebar_label: "8.9 Logging rules"
+---
+
+# 8.9 Logging rules \{#8-9-logging-rules\}
+
+Logs are the only basis for troubleshooting in production; every project must follow this section.
+
+**Deployment assumption**
+
+SIT and Production run on Ubuntu VMs (DigitalOcean, Azure and AWS alike). The Api and Worker run as systemd services behind an Nginx reverse proxy. No containers and no IIS.
+
+**Outputs by environment**
+
+| Output | Development | SIT | Production | Purpose |
+| --- | --- | --- | --- | --- |
+| Console | Everything, text format | Warning and above, text format | Warning and above, text format | Collected by systemd's journald; `journalctl` gives a quick view of service state and startup errors |
+| Local file | None | JSON, rolled daily, kept 14 days | JSON, rolled daily, kept 30 days | Complete record on the machine; still searchable when central logging is down |
+| Seq | Local Docker | SIT Seq | Production Seq | Central search, filtering and alerts; the main place for day to day troubleshooting |
+
+**Why this design**
+
+- On VMs, standard practice is **local files plus a central logging system**, used together. With local files only, every incident means logging in to each VM and digging through files, which stops scaling as servers grow; with the central system only, logs are lost while it is down.
+- Files always use **JSON format**, easy for tools to read and forward to another system later; people read logs in Seq.
+- File writes are wrapped in an **asynchronous** sink, so a slow disk never slows requests.
+- The console carries only Warning and above, so journald and files do not store the same large volume twice, yet serious problems such as a failed startup still show immediately with `journalctl -u <service name>`.
+
+**File rolling and disk protection**
+
+- Paths: `/var/log/<project name lowercase>/api/` and `/var/log/<project name lowercase>/worker/`, owned by the service's system account.
+- A new file every day; a file over 100 MB rolls early.
+- Both retention days and file count are limited, whichever comes first, so log disk use has a ceiling (about 10 GB for Production, about 5 GB for SIT).
+- journald is also capped with `SystemMaxUse` in `/etc/systemd/journald.conf` (1 GB recommended) so console logs cannot fill the disk.
+
+**Central logging: Seq**
+
+- Seq integrates natively with Serilog and is the most common self hosted central log system for .NET. **Install it on its own VM**, not with the application, so logs stay available when an application server fails.
+- Connect over HTTPS with a separate API key per environment and per service; SIT and Production must at least use different keys, and a dedicated Production Seq is recommended.
+- The Seq URL and API key come from environment variables, not settings files (see [8.8](./08-configuration-environments-and-secrets.mdx)).
+- Configure Seq alerts: notify the owner automatically when the Error count spikes or a specific error code appears.
+- Licensing: Seq is free for a single user and paid for multiple users; check the current terms before enabling. Without Seq, remove the `Seq` sink from the settings files, switch to another central system (for example Grafana Loki), and let a collector agent on the VM ship the local JSON files.
+
+**Information on every log entry**
+
+| Information | Source |
+| --- | --- |
+| Time, level, message, exception | Serilog |
+| `TraceId`, `SpanId` | Trace data .NET creates for each request, added by Serilog automatically; MassTransit passes trace data along with messages, so one request's logs in the Api and the Worker share a `TraceId` |
+| `Application` | Settings file; distinguishes Api from Worker |
+| `EnvironmentName`, `MachineName` | Environment variable and host name; distinguish environment and machine |
+| `RequestName`, duration | MediatR logging pipeline ([14.8](../../code/14-application.mdx#14-8-loggingpipelinebehavior-cs)) |
+| Request path, status code, duration, `UserId`, `ClientIp` | Api request logging ([16.13](../../code/16-api.mdx#16-13-program-cs)) |
+
+**Levels**
+
+| Level | Use | Example |
+| --- | --- | --- |
+| Debug | Development detail; not output in SIT or Production | Intermediate calculation results |
+| Information | Key points of normal flow | Request completed, message processed |
+| Warning | Expected, recoverable problems | Validation failed, business rule rejected, succeeded after retry |
+| Error | An operation failed and someone must act | Unhandled exception, external call finally failed |
+| Fatal | The service cannot continue | Startup failure |
+
+**Writing rules**
+
+- Always use structured parameters: `logger.LogInformation("Processed {RequestName}", name)`. Never use string concatenation or `$""` interpolation, which makes properties unsearchable.
+- Property names use PascalCase, and one concept uses one name across the system (for example always `UserId`, never a mix of `UserID` and `uid`).
+- When logging an exception, pass the exception object as the first argument rather than just `ex.Message`, or the stack trace is lost.
+- Log each error once: where it is handled, not at every layer it passes through.
+- **Never log**: passwords, tokens, API keys, full card or ID numbers, or unnecessary personal data. Never log whole request or response bodies.
+- Never enable EF Core's `EnableSensitiveDataLogging` in production.
+
+**Application logs versus audit records**
+
+Application logs serve developers and operations for troubleshooting, are deleted after their retention period, and may change format. "Who changed what data and when" is an audit record: business data written to the database by the audit mechanism (see [7.3](../07-optional-components.mdx#7-3-audit-records)), never something to rely on application logs for. The two can be cross referenced by `TraceId`.
+
+**Later extensions**
+
+For distributed tracing and performance metrics, add OpenTelemetry alongside Serilog.

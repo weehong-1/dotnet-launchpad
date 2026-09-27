@@ -1,0 +1,55 @@
+---
+sidebar_label: "8.21 部署"
+---
+
+# 8.21 部署 \{#8-21-deployment\}
+
+**发布方式**
+
+以 self-contained 方式发布为 linux-x64，执行档已包含 .NET 执行环境，VM 不需另外安装 .NET，每个应用锁定自己的执行环境版本。CI 流程见 [12.10](../../code/12-solution-level.mdx#12-10-github-workflows-ci-yml)。
+
+**VM 目录结构**
+
+```
+/opt/productname/
+    releases/<版本>/api/             每次部署一个新目录
+    releases/<版本>/worker/  # @@worker
+    api      -> releases/<版本>/api       符号连结，指向目前的版本
+    worker   -> releases/<版本>/worker  # @@worker
+/etc/productname/
+    api.env                          环境变量与机密，拥有者 root，权限 600
+    worker.env  # @@worker
+/var/log/productname/
+    api/                             日志文件（见 8.9）
+    worker/  # @@worker
+```
+
+**首次准备 VM**
+
+1. 建立执行服务的系统帐号（与项目名称小写相同，不可登入）。
+2. 建立上述目录；`/opt/productname` 与 `/var/log/productname` 的拥有者为该帐号。
+3. 依 [12.9](../../code/12-solution-level.mdx#12-9-deploy-env-environment-variable-templates) 的范本建立 `/etc/productname/api.env` 与 `worker.env`，填入该环境的设定与机密，拥有者 root，权限 600。
+4. 把 [12.7](../../code/12-solution-level.mdx#12-7-deploy-systemd-service-files) 的 systemd 服务文件放到 `/etc/systemd/system/`，执行 `systemctl enable`。
+5. 安装 Nginx 与 certbot，放置 [12.8](../../code/12-solution-level.mdx#12-8-deploy-nginx-productname-api-conf) 的站台设定，申请 HTTPS 凭证。
+6. 设定 journald 的 `SystemMaxUse`（见 [8.9](./09-logging-rules.mdx)）、系统时区为 UTC；防火墙只开放 80、443 与 SSH。
+7. 在数据库建立拥有者帐号与应用帐号（见 [8.11](./11-database-migrations.mdx)）。
+
+**每次部署**
+
+1. 取得 CI 产物：api、worker、迁移程序。
+2. 解压到 `/opt/productname/releases/<版本>/`。
+3. 以数据库拥有者帐号执行迁移程序，连接字符串经由环境变量传入，不会出现在 shell 历史或程序参数中：先 `read -rs OWNER_CONNECTION`，再 `ConnectionStrings__Database="$OWNER_CONNECTION" ./efbundle; unset OWNER_CONNECTION`。不要使用 `--connection`。
+4. 把 `api` 与 `worker` 符号连结切换到新版本，重启两个服务。
+5. 确认 `/health` 返回 Healthy，并在 Seq 确认没有新的错误。
+
+**回滚**
+
+把符号连结切回上一个版本并重启服务。迁移不会自动回滚，因此**每个迁移都必须向后相容**：新版本的迁移不能让旧版本无法运作。删除或改名栏位要分三次部署，确保每次回滚后的代码都与数据库结构相符：（1）加入新栏位并同时写入新旧栏位；（2）读写全部改用新栏位，不再碰旧栏位；（3）确认（2）稳定后，再删除旧栏位。回滚（3）会回到（2），而（2）已不使用被删除的栏位。
+
+**备份**
+
+数据库每日自动备份，保留期限依项目要求决定，并定期演练还原；使用云端托管数据库时，启用其自动备份与时间点还原功能。
+
+**产物送到 VM 的方式**
+
+按团队习惯决定（脚本或 CD 工具），模板不预设。可参考英文 guide 的做法：GitHub Actions 以 Tailscale OAuth 加入私有网络，再以 SCP 与 SSH 把产物复制到 VM 并执行上述部署步骤，VM 的 SSH 不需对公网开放。是否采用属于项目决策（[Setup Flow 步骤 0.2](../../../setup/project-decisions.mdx)），模板没有提供对应代码。

@@ -1,0 +1,16 @@
+---
+sidebar_label: 4.5 Production 后端服务
+---
+
+import {BackingServices} from '@site/src/components/Commands';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 4.5 Production：后端服务
+
+Production 需要自己的 PostgreSQL、RabbitMQ 与 Seq，不与其他环境共用（[Reference 2](../reference/spec/02-technical-baseline.mdx)、[8.8](../reference/spec/08-design-rules/08-configuration-environments-and-secrets.mdx)）。这一步建立它们：PostgreSQL 与 RabbitMQ 使用托管服务，Seq 放在自己的小型 VM 上。请先建立步骤 4.6 的 Production VM（x86-64、Ubuntu 24.04 LTS），才知道数据库与 broker 要允许哪个 IP。
+
+<BackingServices env="Production" />
+
+这一步产生的所有密码、URL 与 API key 都存入密码管理器，步骤 4.6 会把它们填入环境变量文件。
+
+<DoneConditions step="prod-services" />

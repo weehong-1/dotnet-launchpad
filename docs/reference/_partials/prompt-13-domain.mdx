@@ -1,0 +1,9 @@
+```text
+Run section 13 of the document (Domain). Prerequisite: section 12 is done.
+
+1. In ProductName.Domain/Abstractions create the files of 13.1 to 13.15 with the document's content (13.11 holds two files: Result.cs and IResultFactory.cs).
+2. Create 13.14 IAuditable and 13.15 AuditIgnoreAttribute only when auditing is chosen.
+3. 13.16 is a set of conventions and produces no files; do not create any sample aggregate, entity, value object or strongly typed ID.
+
+Done when: dotnet build succeeds; ProductName.Domain has no project references and its only NuGet package is MediatR.Contracts.
+```

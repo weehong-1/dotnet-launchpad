@@ -1,0 +1,11 @@
+---
+sidebar_label: "8.2 Architecture tests"
+---
+
+# 8.2 Architecture tests \{#8-2-architecture-tests\}
+
+NetArchTest in `ProductName.Architecture.Tests` checks layer dependencies automatically, so layering is not broken by accident. Every project must keep this test project.
+
+**Why**: in solo or small team development there is no code review, and layering is easily broken quietly under deadline pressure (for example Domain referencing EF Core). Architecture tests turn dependency rules into tests that fail, so problems surface during testing.
+
+The architecture tests also check that feature slices do not reference each other (see [8.15](./15-feature-slices-vertical-slice.mdx)).

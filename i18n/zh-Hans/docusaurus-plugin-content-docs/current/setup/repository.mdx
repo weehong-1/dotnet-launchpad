@@ -1,0 +1,45 @@
+---
+sidebar_label: 1.1 创建 repo
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import PromptCommonRules from '../reference/_partials/prompt-common-rules.mdx';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 1.1 创建 repo
+
+```bash
+mkdir productname && cd productname
+git init -b main
+mkdir docs
+curl -fsSL https://dotnet-launchpad.vercel.app/TEMPLATE.zh.md -o docs/TEMPLATE.md
+```
+
+也可以直接下载：[TEMPLATE.zh.md（中文）](pathname:///TEMPLATE.zh.md) · [TEMPLATE.md（English）](pathname:///TEMPLATE.md)。保存为 repo 中的 `docs/TEMPLATE.md`。
+
+`TEMPLATE.md` 是合成一个 Markdown 文件的完整 Reference，每次发布本站点时重新生成。AI agent 会读取它；走手动路径时，它是一份方便的离线副本。
+
+<Tabs groupId="route" queryString>
+<TabItem value="script" label="脚本" default>
+
+这里不需要再做什么：步骤 1.2 会执行 scaffold 脚本。
+
+</TabItem>
+<TabItem value="ai" label="AI Agent">
+
+把下面的**通用规则**保存到 agent 的项目指令文件中：Claude Code 用 `CLAUDE.md`，或用 `AGENTS.md`，GitHub Copilot 用 `.github/copilot-instructions.md`。顶部的项目设定已根据步骤 0.1 填好。
+
+<PromptCommonRules />
+
+建议在规则下方补充：构建和运行命令（[Reference 8.10](../reference/spec/08-design-rules/10-local-development.mdx)、[8.11](../reference/spec/08-design-rules/11-database-migrations.mdx)）、分层规则（[Reference 3](../reference/spec/03-layers-and-dependency-direction.mdx)）以及测试约定（[Reference 8.12](../reference/spec/08-design-rules/12-testing-strategy.mdx)）。
+
+</TabItem>
+<TabItem value="manual" label="手动">
+
+这里无需再做什么。步骤 1.2 至 2.6 会链接到包含每个文件代码的 Reference 章节。
+
+</TabItem>
+</Tabs>
+
+<DoneConditions step="repository" />

@@ -1,0 +1,683 @@
+---
+sidebar_label: "15. Infrastructure"
+---
+
+import Prompt15Infrastructure from '../_partials/prompt-15-infrastructure.mdx';
+
+# 15. Infrastructure \{#15-infrastructure\}
+
+## 15.1 ApplicationDbContext.cs \{#15-1-applicationdbcontext-cs\}
+
+```csharp
+using MassTransit;
+using MediatR;
+using Microsoft.EntityFrameworkCore;
+
+namespace ProductName.Infrastructure.Database;
+
+public sealed class ApplicationDbContext(
+    DbContextOptions<ApplicationDbContext> options,
+    IPublisher publisher)
+    : DbContext(options), IApplicationDbContext, IUnitOfWork
+{
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        // 为 Domain 中所有强类型 ID 自动加上数据库值转换
+        var idTypes = typeof(IStronglyTypedId).Assembly
+            .GetTypes()
+            .Where(t => t is { IsValueType: true, IsAbstract: false } && t.IsAssignableTo(typeof(IStronglyTypedId)));
+
+        foreach (var idType in idTypes)
+        {
+            configurationBuilder
+                .Properties(idType)
+                .HaveConversion(typeof(StronglyTypedIdConverter<>).MakeGenericType(idType));
+        }
+    }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
+
+        modelBuilder.AddInboxStateEntity();
+        modelBuilder.AddOutboxMessageEntity();
+        modelBuilder.AddOutboxStateEntity();
+
+        // 所有聚合根启用乐观并发控制；PostgreSQL 以系统栏位 xmin 作为版本号，不新增栏位（见 8.17）
+        var aggregateTypes = modelBuilder.Model
+            .GetEntityTypes()
+            .Where(t => t.ClrType.IsAssignableTo(typeof(IAggregateRoot)) && !t.IsOwned() && t.BaseType is null)
+            .Select(t => t.ClrType)
+            .ToList();
+
+        foreach (var aggregateType in aggregateTypes)
+            modelBuilder.Entity(aggregateType).Property<uint>("Version").IsRowVersion();
+    }
+
+    public override async Task<int> SaveChangesAsync(CancellationToken ct = default)
+    {
+        await PublishDomainEventsAsync(ct);
+        return await base.SaveChangesAsync(ct);
+    }
+
+    private async Task PublishDomainEventsAsync(CancellationToken ct)
+    {
+        while (true)
+        {
+            var domainEvents = ChangeTracker
+                .Entries<IAggregateRoot>()
+                .Select(entry => entry.Entity)
+                .SelectMany(aggregate =>
+                {
+                    var events = aggregate.DomainEvents.ToList();
+                    aggregate.ClearDomainEvents();
+                    return events;
+                })
+                .ToList();
+
+            if (domainEvents.Count == 0)
+                return;
+
+            foreach (var domainEvent in domainEvents)
+                await publisher.Publish(domainEvent, ct);
+        }
+    }
+}
+```
+
+**事件流程**
+
+1. 聚合在方法中 `Raise` 领域事件。
+2. `SaveChangesAsync` 在写入数据库前，通过 MediatR 发布所有领域事件。
+3. 领域事件的 Handler 若需要通知外部或交给 Worker 处理，就通过 `IEventBus` 发布整合事件。
+4. 启用 MassTransit 的 Bus Outbox 后，整合事件不会立刻送出，而是写入 Outbox 表，与业务数据在**同一个事务**中保存。
+5. 投递服务（有 Worker 时在 Worker 执行，没有时在 Api 执行）再从 Outbox 表读取并送往消息中间件，由 Consumer 接收处理。
+
+**其他说明**
+
+- `while` 循环用来处理事件 Handler 又触发新事件的情况。
+- 三个 `Add...Entity` 方法建立 MassTransit 所需的 Outbox 与 Inbox 表，不需要自己写 `OutboxMessage` 类。
+- 并发控制以影子属性 `Version` 设定，Domain 看不到这个属性；Npgsql 把设定为 row version 的 `uint` 对应到系统栏位 `xmin`，迁移不会新增栏位。换用其他数据库时须调整（见 [8.17](../spec/08-design-rules/17-concurrency-control.mdx)）。
+- 英文 guide 以 `SavedChangesAsync` 拦截器在写入**之后**发布领域事件。本模板改在写入之前发布，让事件 Handler 的变更与 Outbox 消息和业务资料一起提交。
+
+## 15.2 StronglyTypedIdConverter.cs \{#15-2-stronglytypedidconverter-cs\}
+
+```csharp
+using System.Linq.Expressions;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+
+namespace ProductName.Infrastructure.Database;
+
+internal sealed class StronglyTypedIdConverter<TId>()
+    : ValueConverter<TId, Guid>(id => id.Value, value => Create(value))
+    where TId : struct, IStronglyTypedId
+{
+    private static readonly Func<Guid, TId> Factory = BuildFactory();
+
+    private static TId Create(Guid value) => Factory(value);
+
+    private static Func<Guid, TId> BuildFactory()
+    {
+        var constructor = typeof(TId).GetConstructor([typeof(Guid)])
+            ?? throw new InvalidOperationException($"{typeof(TId).Name} must have a constructor that takes a Guid.");
+
+        var value = Expression.Parameter(typeof(Guid), "value");
+
+        return Expression.Lambda<Func<Guid, TId>>(Expression.New(constructor, value), value).Compile();
+    }
+}
+```
+
+一个泛型转换器适用于所有强类型 ID。建构函数在第一次使用时编译成委托，之后每次转换都不再使用反射。
+
+## 15.3 TimestampsInterceptor.cs \{#15-3-timestampsinterceptor-cs\}
+
+```csharp
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+
+namespace ProductName.Infrastructure.Database;
+
+internal sealed class TimestampsInterceptor(TimeProvider timeProvider) : SaveChangesInterceptor
+{
+    public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
+        DbContextEventData eventData,
+        InterceptionResult<int> result,
+        CancellationToken ct = default)
+    {
+        if (eventData.Context is not null)
+        {
+            var now = timeProvider.GetUtcNow();
+
+            foreach (var entry in eventData.Context.ChangeTracker.Entries<IHasTimestamps>())
+            {
+                if (entry.State == EntityState.Added)
+                    entry.Entity.CreatedAt = now;
+
+                if (entry.State == EntityState.Modified)
+                    entry.Entity.UpdatedAt = now;
+            }
+        }
+
+        return base.SavingChangesAsync(eventData, result, ct);
+    }
+}
+```
+
+时间使用 .NET 内建的 `TimeProvider`，测试时可替换为 `FakeTimeProvider`，不需要自建 `IDateTimeProvider`。
+
+## 15.4 Repository.cs \{#15-4-repository-cs\}
+
+```csharp
+namespace ProductName.Infrastructure.Database;
+
+internal abstract class Repository<TAggregate, TId>(ApplicationDbContext db)
+    : IRepository<TAggregate, TId>
+    where TAggregate : AggregateRoot<TId>
+    where TId : notnull
+{
+    protected ApplicationDbContext Db { get; } = db;
+
+    public async Task<TAggregate?> GetByIdAsync(TId id, CancellationToken ct = default) =>
+        await Db.Set<TAggregate>().FindAsync([id], ct);
+
+    public void Add(TAggregate aggregate) => Db.Set<TAggregate>().Add(aggregate);
+
+    public void Remove(TAggregate aggregate) => Db.Set<TAggregate>().Remove(aggregate);
+}
+```
+
+各聚合的仓储继承这个基类，通用方法不必重复实现。
+
+## 15.5 EventBus.cs \{#15-5-eventbus-cs\}
+
+```csharp
+using MassTransit;
+
+namespace ProductName.Infrastructure.Messaging;
+
+internal sealed class EventBus(IPublishEndpoint publishEndpoint) : IEventBus
+{
+    public Task PublishAsync<T>(T message, CancellationToken ct = default)
+        where T : class =>
+        publishEndpoint.Publish(message, ct);
+}
+```
+
+## 15.6 CurrentUser.cs \{#15-6-currentuser-cs\}
+
+```csharp
+using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
+
+namespace ProductName.Infrastructure.Authentication;
+
+internal sealed class CurrentUser(IHttpContextAccessor httpContextAccessor) : ICurrentUser
+{
+    private ClaimsPrincipal? User => httpContextAccessor.HttpContext?.User;
+
+    public bool IsAuthenticated => User?.Identity?.IsAuthenticated ?? false;
+
+    public string UserId =>
+        User?.FindFirstValue(ClaimTypes.NameIdentifier)
+        ?? throw new InvalidOperationException("User is not authenticated.");
+}
+```
+
+在 Worker 中没有 HttpContext，`IsAuthenticated` 会是 `false`。
+
+## 15.7 ClaimsPermissionProvider.cs \{#15-7-claimspermissionprovider-cs\}
+
+```csharp
+using System.Security.Claims;
+using Microsoft.Extensions.Configuration;
+
+namespace ProductName.Infrastructure.Authentication;
+
+internal sealed class ClaimsPermissionProvider(IConfiguration configuration) : IPermissionProvider
+{
+    private readonly string _claimType = configuration["Authentication:PermissionClaimType"] ?? "permissions";
+
+    public Task<IReadOnlySet<string>> GetPermissionsAsync(ClaimsPrincipal user, CancellationToken ct = default)
+    {
+        IReadOnlySet<string> permissions = user
+            .FindAll(_claimType)
+            .Select(claim => claim.Value)
+            .ToHashSet(StringComparer.Ordinal);
+
+        return Task.FromResult(permissions);
+    }
+}
+```
+
+从令牌中读取权限声明。多数 OpenID Connect 提供方可设定在令牌中放入权限；声明名称不同时，修改设定 `Authentication:PermissionClaimType`，不需改代码。
+
+## 15.8 DependencyInjection.cs \{#15-8-dependencyinjection-cs\}
+
+```csharp
+using MassTransit;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http.Resilience;
+
+namespace ProductName.Infrastructure;
+
+public static class DependencyInjection
+{
+    public static IServiceCollection AddInfrastructure(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        Action<IBusRegistrationConfigurator>? configureConsumers = null)
+    {
+        services.AddSingleton(TimeProvider.System);
+        services.AddHttpContextAccessor();
+        services.AddScoped<ICurrentUser, CurrentUser>();
+        services.AddScoped<IPermissionProvider, ClaimsPermissionProvider>();
+
+        // 审计（可选） // @@auditing
+        services.AddScoped<IAuditContext, AuditContext>(); // @@auditing
+        services.AddScoped<IOperationAuditWriter, OperationAuditWriter>(); // @@auditing
+        services.AddScoped<AuditTrailInterceptor>(); // @@auditing
+ // @@auditing
+        services.AddSingleton<TimestampsInterceptor>();
+
+        // 拦截器依序执行：先填时间，最后产生审计纪录，才能记录到完整的值 // @@auditing
+        services.AddDbContext<ApplicationDbContext>((sp, options) => options
+            .UseNpgsql(configuration.GetConnectionString("Database"))
+            .AddInterceptors(
+                sp.GetRequiredService<TimestampsInterceptor>(), // @@auditing
+                sp.GetRequiredService<TimestampsInterceptor>())); // @@!auditing
+                sp.GetRequiredService<AuditTrailInterceptor>())); // @@auditing
+
+        services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
+        services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<ApplicationDbContext>());
+        services.AddScoped<IEventBus, EventBus>();
+
+        services.AddHealthChecks().AddDbContextCheck<ApplicationDbContext>();
+
+        // 所有 HttpClient 统一套用标准韧性处理；非幂等方法不自动重试（见 8.19）
+        services.ConfigureHttpClientDefaults(http => http.AddStandardResilienceHandler(options =>
+            options.Retry.DisableForUnsafeHttpMethods()));
+
+        AddMessaging(services, configuration, configureConsumers);
+
+        return services;
+    }
+
+    private static void AddMessaging(
+        IServiceCollection services,
+        IConfiguration configuration,
+        Action<IBusRegistrationConfigurator>? configureConsumers)
+    {
+        var isWorker = configureConsumers is not null; // @@worker
+ // @@worker
+        services.AddMassTransit(bus =>
+        {
+            configureConsumers?.Invoke(bus);
+
+            bus.AddEntityFrameworkOutbox<ApplicationDbContext>(outbox =>
+            {
+                outbox.UsePostgres();
+                outbox.UseBusOutbox(busOutbox => // @@worker
+                { // @@worker
+                    // 有 Worker 时：Api 只写入 Outbox，由 Worker 负责投递 // @@worker
+                    // 没有 Worker 的项目：删除此判断，由 Api 自行投递 // @@worker
+                    if (!isWorker) // @@worker
+                        busOutbox.DisableDeliveryService(); // @@worker
+                }); // @@worker
+                outbox.UseBusOutbox(); // @@!worker
+            });
+
+            // 所有 Consumer 启用 Inbox，同一消息不会被重复处理
+            bus.AddConfigureEndpointsCallback((context, _, endpoint) =>
+                endpoint.UseEntityFrameworkOutbox<ApplicationDbContext>(context));
+
+            bus.UsingRabbitMq((context, cfg) =>
+            {
+                cfg.Host(new Uri(configuration.GetConnectionString("MessageBroker")!));
+                cfg.ConfigureEndpoints(context);
+            });
+        });
+    }
+}
+```
+
+**说明**
+
+- `configureConsumers` 参数让 Api 与 Worker 共用同一个注册方法：Api 不传，只把消息写入 Outbox 并关闭投递服务；Worker 传入自己的 Consumer，负责投递并托管所有 Consumer。没有 Worker 的项目，删除关闭投递服务的判断，由 Api 投递。
+- 健康检查：此处注册数据库检查；MassTransit 会自动注册消息中间件的健康检查。
+- `ConfigureHttpClientDefaults` 让之后注册的所有 HttpClient 自动具备逾时、重试与熔断（见 [8.19](../spec/08-design-rules/19-outbound-http-calls.mdx)）。
+- 权限来源预设为 `ClaimsPermissionProvider`；权限存在数据库的项目，在此替换为自己的实现（见 [8.16](../spec/08-design-rules/16-authentication-and-authorization.mdx)）。
+- 不需要审计的项目，删除标有“审计（可选）”的三行，以及 `AddInterceptors` 中的 `AuditTrailInterceptor`。
+- `AuditTrailInterceptor` 依赖每个请求的审计资讯，因此注册为 Scoped；`AddDbContext` 的设定在每个 Scope 中执行，可以正确取得。
+- 之后新增的各聚合仓储实现也在这里注册。
+
+<Optional when="auditing">
+
+## 15.9 AuditTrail.cs（可选：审计） \{#15-9-audittrail-cs-optional-auditing\}
+
+```csharp
+namespace ProductName.Infrastructure.Auditing;
+
+public sealed class AuditTrail
+{
+    public Guid Id { get; init; }
+    public string EntityType { get; init; } = string.Empty;
+    public string EntityId { get; init; } = string.Empty;
+    public string Action { get; init; } = string.Empty;      // Added、Modified、Deleted
+    public string Changes { get; init; } = string.Empty;     // JSON：{ "属性": { "Old": 旧值, "New": 新值 } }
+    public string? UserId { get; init; }
+    public string? SessionId { get; init; }
+    public string? ClientIp { get; init; }
+    public string? UserAgent { get; init; }
+    public string? TraceId { get; init; }
+    public DateTimeOffset OccurredAt { get; init; }
+}
+```
+
+资料变更审计的数据表。属于 Infrastructure 的持久化模型，不是领域实体，也不实现 `IAuditable`。
+
+</Optional>
+
+<Optional when="auditing">
+
+## 15.10 OperationAudit.cs（可选：审计） \{#15-10-operationaudit-cs-optional-auditing\}
+
+```csharp
+namespace ProductName.Infrastructure.Auditing;
+
+public sealed class OperationAudit
+{
+    public Guid Id { get; init; }
+    public string RequestName { get; init; } = string.Empty;
+    public string Outcome { get; init; } = string.Empty;     // Succeeded、Failed、Exception
+    public string? ErrorCode { get; init; }
+    public string? UserId { get; init; }
+    public string? SessionId { get; init; }
+    public string? ClientIp { get; init; }
+    public string? UserAgent { get; init; }
+    public string? TraceId { get; init; }
+    public DateTimeOffset OccurredAt { get; init; }
+}
+```
+
+</Optional>
+
+<Optional when="auditing">
+
+## 15.11 AuditConfigurations.cs（可选：审计） \{#15-11-auditconfigurations-cs-optional-auditing\}
+
+```csharp
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace ProductName.Infrastructure.Auditing;
+
+internal sealed class AuditTrailConfiguration : IEntityTypeConfiguration<AuditTrail>
+{
+    public void Configure(EntityTypeBuilder<AuditTrail> builder)
+    {
+        builder.ToTable("AuditTrails");
+        builder.HasKey(a => a.Id);
+        builder.Property(a => a.Id).ValueGeneratedNever();
+        builder.Property(a => a.EntityType).HasMaxLength(200);
+        builder.Property(a => a.EntityId).HasMaxLength(100);
+        builder.Property(a => a.Action).HasMaxLength(20);
+        builder.Property(a => a.Changes).HasColumnType("jsonb");
+        builder.Property(a => a.UserId).HasMaxLength(200);
+        builder.Property(a => a.SessionId).HasMaxLength(200);
+        builder.Property(a => a.ClientIp).HasMaxLength(50);
+        builder.Property(a => a.UserAgent).HasMaxLength(500);
+        builder.Property(a => a.TraceId).HasMaxLength(50);
+
+        builder.HasIndex(a => new { a.EntityType, a.EntityId });
+        builder.HasIndex(a => a.UserId);
+        builder.HasIndex(a => a.OccurredAt);
+    }
+}
+
+internal sealed class OperationAuditConfiguration : IEntityTypeConfiguration<OperationAudit>
+{
+    public void Configure(EntityTypeBuilder<OperationAudit> builder)
+    {
+        builder.ToTable("OperationAudits");
+        builder.HasKey(a => a.Id);
+        builder.Property(a => a.Id).ValueGeneratedNever();
+        builder.Property(a => a.RequestName).HasMaxLength(200);
+        builder.Property(a => a.Outcome).HasMaxLength(20);
+        builder.Property(a => a.ErrorCode).HasMaxLength(200);
+        builder.Property(a => a.UserId).HasMaxLength(200);
+        builder.Property(a => a.SessionId).HasMaxLength(200);
+        builder.Property(a => a.ClientIp).HasMaxLength(50);
+        builder.Property(a => a.UserAgent).HasMaxLength(500);
+        builder.Property(a => a.TraceId).HasMaxLength(50);
+
+        builder.HasIndex(a => a.UserId);
+        builder.HasIndex(a => a.OccurredAt);
+    }
+}
+```
+
+- 两个设定由 `ApplyConfigurationsFromAssembly` 自动载入，不需另外注册。
+- `Changes` 使用 PostgreSQL 的 `jsonb` 类型，可以直接查询 JSON 内容；换用其他数据库时改为对应类型。
+- 索引对应最常见的查询：某笔资料的变更历史、某个用户做过什么、某段时间发生了什么。
+
+</Optional>
+
+<Optional when="auditing">
+
+## 15.12 AuditContext.cs（可选：审计） \{#15-12-auditcontext-cs-optional-auditing\}
+
+```csharp
+using System.Diagnostics;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
+
+namespace ProductName.Infrastructure.Auditing;
+
+internal sealed class AuditContext(IHttpContextAccessor httpContextAccessor) : IAuditContext
+{
+    private HttpContext? HttpContext => httpContextAccessor.HttpContext;
+
+    public string? UserId => HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+    // OpenID Connect 标准的 session 声明；身份认证提供方使用其他名称时在此调整
+    public string? SessionId => HttpContext?.User.FindFirstValue("sid");
+
+    public string? ClientIp => HttpContext?.Connection.RemoteIpAddress?.ToString();
+
+    // 截断到审计栏位的 500 个字符（15.11）：过长的标头绝不能让审计失败或被略过
+    public string? UserAgent => HttpContext?.Request.Headers.UserAgent.ToString() is { Length: > 0 } userAgent
+        ? userAgent[..Math.Min(userAgent.Length, MaxUserAgentLength)]
+        : null;
+
+    private const int MaxUserAgentLength = 500;
+
+    public string? TraceId => Activity.Current?.TraceId.ToString();
+}
+```
+
+- `ClientIp` 依赖 Api 的转发标头设定（见 [16.13](./16-api.mdx#16-13-program-cs)），才能取得 Nginx 之后的真实 IP。
+
+</Optional>
+
+<Optional when="auditing">
+
+## 15.13 AuditTrailInterceptor.cs（可选：审计） \{#15-13-audittrailinterceptor-cs-optional-auditing\}
+
+```csharp
+using System.Reflection;
+using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+
+namespace ProductName.Infrastructure.Auditing;
+
+internal sealed class AuditTrailInterceptor(IAuditContext auditContext, TimeProvider timeProvider)
+    : SaveChangesInterceptor
+{
+    private static readonly HashSet<string> ExcludedProperties =
+    [
+        nameof(IHasTimestamps.CreatedAt),
+        nameof(IHasTimestamps.UpdatedAt)
+    ];
+
+    public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
+        DbContextEventData eventData,
+        InterceptionResult<int> result,
+        CancellationToken ct = default)
+    {
+        if (eventData.Context is not null)
+            AddAuditTrails(eventData.Context);
+
+        return base.SavingChangesAsync(eventData, result, ct);
+    }
+
+    private void AddAuditTrails(DbContext context)
+    {
+        var now = timeProvider.GetUtcNow();
+
+        var auditTrails = context.ChangeTracker
+            .Entries<IAuditable>()
+            .Where(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
+            .Select(entry => CreateAuditTrail(entry, now))
+            .OfType<AuditTrail>()
+            .ToList();
+
+        context.Set<AuditTrail>().AddRange(auditTrails);
+    }
+
+    private AuditTrail? CreateAuditTrail(EntityEntry<IAuditable> entry, DateTimeOffset now)
+    {
+        var changes = BuildChanges(entry);
+
+        // 修改后实际值没有变化（或只改了排除的属性）时不产生纪录
+        if (entry.State == EntityState.Modified && changes.Count == 0)
+            return null;
+
+        return new AuditTrail
+        {
+            Id = Guid.CreateVersion7(),
+            EntityType = entry.Metadata.ClrType.Name,
+            EntityId = GetEntityId(entry),
+            Action = entry.State.ToString(),
+            Changes = JsonSerializer.Serialize(changes),
+            UserId = auditContext.UserId,
+            SessionId = auditContext.SessionId,
+            ClientIp = auditContext.ClientIp,
+            UserAgent = auditContext.UserAgent,
+            TraceId = auditContext.TraceId,
+            OccurredAt = now
+        };
+    }
+
+    private static Dictionary<string, object?> BuildChanges(EntityEntry entry)
+    {
+        var changes = new Dictionary<string, object?>();
+
+        foreach (var property in entry.Properties)
+        {
+            var name = property.Metadata.Name;
+
+            if (ExcludedProperties.Contains(name) || IsAuditIgnored(entry, name))
+                continue;
+
+            switch (entry.State)
+            {
+                case EntityState.Added:
+                    changes[name] = new { Old = (object?)null, New = Normalize(property.CurrentValue) };
+                    break;
+
+                case EntityState.Deleted:
+                    changes[name] = new { Old = Normalize(property.OriginalValue), New = (object?)null };
+                    break;
+
+                case EntityState.Modified when property.IsModified
+                    && !Equals(property.OriginalValue, property.CurrentValue):
+                    changes[name] = new { Old = Normalize(property.OriginalValue), New = Normalize(property.CurrentValue) };
+                    break;
+            }
+        }
+
+        return changes;
+    }
+
+    private static bool IsAuditIgnored(EntityEntry entry, string propertyName) =>
+        entry.Metadata.ClrType
+            .GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+            ?.IsDefined(typeof(AuditIgnoreAttribute), inherit: true) ?? false;
+
+    private static string GetEntityId(EntityEntry entry)
+    {
+        var keyValues = entry.Metadata.FindPrimaryKey()!.Properties
+            .Select(p => Normalize(entry.Property(p.Name).CurrentValue)?.ToString());
+
+        return string.Join(",", keyValues);
+    }
+
+    // 强类型 ID 以其 Guid 值记录，其他值维持原样
+    private static object? Normalize(object? value) =>
+        value is IStronglyTypedId id ? id.Value : value;
+}
+```
+
+- 在 `SaveChangesAsync` 的同一个事务中加入审计纪录，与业务资料一起写入或一起失败。
+- 修改时只记录实际改变的属性；`CreatedAt`、`UpdatedAt` 与标记 `[AuditIgnore]` 的属性不记录。
+- 领域事件的 Handler 在保存前执行，它们造成的变更也会被审计。
+
+</Optional>
+
+<Optional when="auditing">
+
+## 15.14 OperationAuditWriter.cs（可选：审计） \{#15-14-operationauditwriter-cs-optional-auditing\}
+
+```csharp
+using MediatR;
+using Microsoft.EntityFrameworkCore;
+
+namespace ProductName.Infrastructure.Auditing;
+
+internal sealed class OperationAuditWriter(
+    DbContextOptions<ApplicationDbContext> options,
+    IPublisher publisher,
+    IAuditContext auditContext,
+    TimeProvider timeProvider)
+    : IOperationAuditWriter
+{
+    public async Task WriteAsync(
+        string requestName,
+        AuditOutcome outcome,
+        string? errorCode,
+        CancellationToken ct = default)
+    {
+        // 使用独立的 DbContext：业务处理失败时，原 DbContext 中未保存的变更不会被一并写入
+        await using var db = new ApplicationDbContext(options, publisher);
+
+        db.Set<OperationAudit>().Add(new OperationAudit
+        {
+            Id = Guid.CreateVersion7(),
+            RequestName = requestName,
+            Outcome = outcome.ToString(),
+            ErrorCode = errorCode,
+            UserId = auditContext.UserId,
+            SessionId = auditContext.SessionId,
+            ClientIp = auditContext.ClientIp,
+            UserAgent = auditContext.UserAgent,
+            TraceId = auditContext.TraceId,
+            OccurredAt = timeProvider.GetUtcNow()
+        });
+
+        await db.SaveChangesAsync(ct);
+    }
+}
+```
+
+- 独立建立的 DbContext 共用同一组设定（连接字符串与拦截器），操作审计纪录本身不实现 `IAuditable`，不会产生资料变更审计。
+
+</Optional>
+
+## 15.15 AI Coding Agent 提示词 \{#15-15-ai-coding-agent-prompt\}
+
+<Prompt15Infrastructure />

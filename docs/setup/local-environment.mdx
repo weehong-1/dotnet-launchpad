@@ -1,0 +1,22 @@
+---
+sidebar_label: 0.4 Prepare this machine
+---
+
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 0.4 Prepare this machine
+
+The shell was set up in [step 0.3](./licenses.mdx). Check the tools:
+
+```bash
+dotnet --list-sdks          # a 10.0.x SDK must be listed; note the exact version for global.json
+docker compose version      # Docker must be running: local services and Testcontainers need it
+git --version
+gh auth status              # GitHub CLI, used to create the repository and download CI artifacts
+jq --version                # JSON parser, used in step 0.5 (sudo apt install -y jq)
+```
+
+- Install the .NET 10 SDK from the official .NET download page if it is missing. The exact version goes into `global.json` in step 1.3 ([Reference 12.3](../reference/code/12-solution-level.mdx#12-3-global-json)).
+- On the AI route, have your coding agent (Claude Code, Cursor or GitHub Copilot) ready in a terminal or IDE.
+
+<DoneConditions step="local-environment" />

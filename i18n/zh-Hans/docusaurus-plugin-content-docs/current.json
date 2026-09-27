@@ -1,0 +1,46 @@
+{
+  "version.label": {
+    "message": "Next",
+    "description": "The label for version current"
+  },
+  "sidebar.setup.category.0. Before you start": {
+    "message": "0. 开工前",
+    "description": "The label for category '0. Before you start' in sidebar 'setup'"
+  },
+  "sidebar.setup.category.1. Create the solution": {
+    "message": "1. 建立 solution",
+    "description": "The label for category '1. Create the solution' in sidebar 'setup'"
+  },
+  "sidebar.setup.category.2. Generate the layers": {
+    "message": "2. 逐层生成",
+    "description": "The label for category '2. Generate the layers' in sidebar 'setup'"
+  },
+  "sidebar.setup.category.3. Run it locally": {
+    "message": "3. 本地跑通",
+    "description": "The label for category '3. Run it locally' in sidebar 'setup'"
+  },
+  "sidebar.setup.category.4. Get ready to go live": {
+    "message": "4. 上线准备",
+    "description": "The label for category '4. Get ready to go live' in sidebar 'setup'"
+  },
+  "sidebar.setup.category.5. Hand over to feature work": {
+    "message": "5. 交棒",
+    "description": "The label for category '5. Hand over to feature work' in sidebar 'setup'"
+  },
+  "sidebar.reference.category.Part 1: Architecture specification": {
+    "message": "第一部分：架构规范",
+    "description": "The label for category 'Part 1: Architecture specification' in sidebar 'reference'"
+  },
+  "sidebar.reference.category.8. Design rules": {
+    "message": "8. 统一设计规范",
+    "description": "The label for category '8. Design rules' in sidebar 'reference'"
+  },
+  "sidebar.reference.category.Part 2: Boilerplate code": {
+    "message": "第二部分：Boilerplate 代码",
+    "description": "The label for category 'Part 2: Boilerplate code' in sidebar 'reference'"
+  },
+  "sidebar.reference.category.Appendices": {
+    "message": "附录",
+    "description": "The label for category 'Appendices' in sidebar 'reference'"
+  }
+}

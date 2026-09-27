@@ -1,0 +1,18 @@
+---
+sidebar_label: "8.12 测试策略"
+---
+
+# 8.12 测试策略 \{#8-12-testing-strategy\}
+
+| 测试项目 | 测什么 | 工具 |
+| --- | --- | --- |
+| Domain.UnitTests | 聚合、值对象的业务规则，以及领域事件是否正确触发 | xUnit v3 |
+| Application.UnitTests | Handler 的流程，外部依赖以替身取代 | xUnit v3、NSubstitute、FakeTimeProvider |
+| Architecture.Tests | 分层依赖与命名约定 | NetArchTest |
+| Api.IntegrationTests | 从 HTTP 端点到真实数据库的完整流程 | WebApplicationFactory、Testcontainers |
+
+- 整合测试以 Testcontainers 启动真实的 PostgreSQL 与 RabbitMQ 容器，不使用内存数据库，确保行为与正式环境一致。
+- 模板为 Domain 与整合测试提供共用基底类别（见第 [18](../../code/18-tests.mdx) 节）；Application 单元测试直接使用 NSubstitute，不需要基底类别。
+- 每个测试项目只引用它测试的那一层（见 [12.2](../../code/12-solution-level.mdx#12-2-directory-packages-props) 表格），与分层的依赖规则一致。
+- **覆盖率**：每个测试项目引用 `Microsoft.Testing.Extensions.CodeCoverage`；以 `dotnet test --coverage --coverage-output-format xml --results-directory TestResults` 收集，每个测试项目各输出一份报告到 `TestResults/`（SonarCloud 读取它们，见 [12.10](../../code/12-solution-level.mdx#12-10-github-workflows-ci-yml)）。
+- **MassTransit 授权**：整合测试会启动真实的 bus，因此执行测试的地方都必须设定 `MT_LICENSE` 或 `MT_LICENSE_PATH`（见 [8.8](./08-configuration-environments-and-secrets.mdx)）。

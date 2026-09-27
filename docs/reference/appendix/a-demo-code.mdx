@@ -1,0 +1,215 @@
+---
+sidebar_label: "Appendix A: Demo code [delete entire appendix]"
+---
+
+# Appendix A: Demo code [delete entire appendix] \{#appendix-a-demo-code\}
+
+> ⚠ This appendix is **all demo code** and not part of the template. It uses a fictional `Sample` feature to show how the Part 2 boilerplate connects into one complete flow. **Delete the whole appendix when creating a new project; do not copy it into the template.**
+>
+> For readability, several types from one use case share a code block; real projects follow the [8.15](../spec/08-design-rules/15-feature-slices-vertical-slice.mdx) rules, one type per file, in the matching feature slice folder.
+
+## A.1 Domain [Demo, delete] \{#a-1-domain\}
+
+```csharp
+// Demo code, delete
+namespace ProductName.Domain.Samples;
+
+public readonly record struct SampleId(Guid Value) : IStronglyTypedId
+{
+    public static SampleId New() => new(Guid.CreateVersion7());
+}
+
+public sealed record SampleCreatedDomainEvent(SampleId SampleId) : DomainEvent;
+
+public static class SampleErrors
+{
+    public static Error NotFound(SampleId id) =>
+        Error.NotFound("Sample.NotFound", $"Sample {id.Value} was not found.");
+
+    public static readonly Error NameRequired =
+        Error.Validation("Sample.NameRequired", "Name is required.");
+}
+
+public sealed class Sample : AggregateRoot<SampleId>, IHasTimestamps, IAuditable
+{
+    private Sample(SampleId id, string name) : base(id) => Name = name;
+
+    private Sample() { }
+
+    public string Name { get; private set; } = string.Empty;
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset? UpdatedAt { get; set; }
+
+    public static Result<Sample> Create(string name, DateTimeOffset now)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return SampleErrors.NameRequired;
+
+        var sample = new Sample(SampleId.New(), name.Trim());
+        sample.Raise(new SampleCreatedDomainEvent(sample.Id) { OccurredOn = now });
+        return sample;
+    }
+}
+
+public interface ISampleRepository : IRepository<Sample, SampleId> { }
+```
+
+## A.2 Application: Command [Demo, delete] \{#a-2-application-command\}
+
+```csharp
+// Demo code, delete
+namespace ProductName.Application.Features.Samples.CreateSample;
+
+public sealed record CreateSampleCommand(string Name) : ICommand<Guid>;
+
+internal sealed class CreateSampleCommandValidator : AbstractValidator<CreateSampleCommand>
+{
+    public CreateSampleCommandValidator()
+    {
+        RuleFor(c => c.Name).NotEmpty().MaximumLength(200);
+    }
+}
+
+internal sealed class CreateSampleCommandHandler(
+    ISampleRepository samples,
+    IUnitOfWork unitOfWork,
+    TimeProvider timeProvider)
+    : ICommandHandler<CreateSampleCommand, Guid>
+{
+    public async Task<Result<Guid>> Handle(CreateSampleCommand command, CancellationToken ct)
+    {
+        var result = Sample.Create(command.Name, timeProvider.GetUtcNow());
+        if (result.IsFailure)
+            return result.Error;
+
+        samples.Add(result.Value);
+        await unitOfWork.SaveChangesAsync(ct);
+
+        return result.Value.Id.Value;
+    }
+}
+```
+
+The write flow is always: create or load the aggregate, call its method, save. The handler itself holds no business rules.
+
+## A.3 Application: Query [Demo, delete] \{#a-3-application-query\}
+
+```csharp
+// Demo code, delete
+namespace ProductName.Application.Features.Samples.GetSampleById;
+
+public sealed record GetSampleByIdQuery(Guid SampleId) : IQuery<SampleResponse>;
+
+public sealed record SampleResponse(Guid Id, string Name);
+
+internal sealed class GetSampleByIdQueryHandler(IApplicationDbContext db)
+    : IQueryHandler<GetSampleByIdQuery, SampleResponse>
+{
+    public async Task<Result<SampleResponse>> Handle(GetSampleByIdQuery query, CancellationToken ct)
+    {
+        var sampleId = new SampleId(query.SampleId);
+
+        var sample = await db.Set<Sample>()
+            .AsNoTracking()
+            .Where(s => s.Id == sampleId)
+            .Select(s => new SampleResponse(s.Id.Value, s.Name))
+            .FirstOrDefaultAsync(ct);
+
+        return sample is null ? SampleErrors.NotFound(sampleId) : sample;
+    }
+}
+```
+
+The read side skips aggregates and repositories and projects straight to a DTO.
+
+## A.4 Application: domain event to integration event [Demo, delete] \{#a-4-application-domain-event-to-integration-event\}
+
+```csharp
+// Demo code, delete
+// File: Application/IntegrationEvents/SampleCreatedIntegrationEvent.cs
+namespace ProductName.Application.IntegrationEvents;
+
+public sealed record SampleCreatedIntegrationEvent(Guid SampleId);
+```
+
+```csharp
+// Demo code, delete
+// File: Application/Features/Samples/EventHandlers/SampleCreatedDomainEventHandler.cs
+namespace ProductName.Application.Features.Samples.EventHandlers;
+
+internal sealed class SampleCreatedDomainEventHandler(IEventBus eventBus)
+    : IDomainEventHandler<SampleCreatedDomainEvent>
+{
+    public Task Handle(SampleCreatedDomainEvent notification, CancellationToken ct) =>
+        eventBus.PublishAsync(new SampleCreatedIntegrationEvent(notification.SampleId.Value), ct);
+}
+```
+
+## A.5 Infrastructure: repository implementation [Demo, delete] \{#a-5-infrastructure-repository-implementation\}
+
+```csharp
+// Demo code, delete
+namespace ProductName.Infrastructure.Database.Repositories;
+
+internal sealed class SampleRepository(ApplicationDbContext db)
+    : Repository<Sample, SampleId>(db), ISampleRepository { }
+```
+
+Also register `services.AddScoped<ISampleRepository, SampleRepository>();` in `AddInfrastructure`, and add an `IEntityTypeConfiguration<Sample>` that sets the key to `ValueGeneratedNever()`. `SampleId`'s database value conversion is handled by convention, so nothing else is needed. Both are demo code too and go when the appendix is deleted.
+
+## A.6 Api: endpoint [Demo, delete] \{#a-6-api-endpoint\}
+
+```csharp
+// Demo code, delete
+namespace ProductName.Api.Endpoints.Samples;
+
+internal sealed class CreateSample : IEndpoint
+{
+    private sealed record Request(string Name);
+
+    public void MapEndpoint(IEndpointRouteBuilder app)
+    {
+        app.MapPost("samples", async (Request request, ISender sender, CancellationToken ct) =>
+            {
+                var result = await sender.Send(new CreateSampleCommand(request.Name), ct);
+
+                return result.Match(
+                    id => Results.Created($"/samples/{id}", new { id }),
+                    CustomResults.Problem);
+            })
+            .WithTags("Samples")
+            .RequireAuthorization();
+    }
+}
+```
+
+An endpoint does three things only: bind parameters, send a Command or Query through `ISender`, and turn the Result into an HTTP response.
+
+## A.7 Worker: Consumer [Demo, delete] \{#a-7-worker-consumer\}
+
+```csharp
+// Demo code, delete
+namespace ProductName.Worker.Consumers.Samples;
+
+internal sealed class SampleCreatedConsumer(ILogger<SampleCreatedConsumer> logger)
+    : IConsumer<SampleCreatedIntegrationEvent>
+{
+    public Task Consume(ConsumeContext<SampleCreatedIntegrationEvent> context)
+    {
+        logger.LogInformation("Sample {SampleId} created", context.Message.SampleId);
+        return Task.CompletedTask;
+    }
+}
+```
+
+In a real project, the Consumer turns the message into a Command and hands it to Application through `ISender`.
+
+**The complete demo flow**
+
+1. The Api endpoint receives the request and sends `CreateSampleCommand`
+2. The validation pipeline checks the input
+3. The handler creates the aggregate and saves it
+4. The aggregate raises a domain event
+5. The domain event handler publishes an integration event through `IEventBus`
+6. MassTransit writes the integration event to the Outbox, in the same transaction as the business data
+7. It is delivered to the broker and the Worker's Consumer receives it

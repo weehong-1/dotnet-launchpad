@@ -1,0 +1,43 @@
+---
+sidebar_label: 2.5 Worker
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import Prompt17Worker from '../reference/_partials/prompt-17-worker.mdx';
+import DoneConditions from '@site/src/components/DoneConditions';
+import StepApplies from '@site/src/components/StepApplies';
+
+# 2.5 Worker
+
+<StepApplies step="worker" flag="worker" />
+
+Worker 承载 consumer 并投递 Outbox。它不包含业务逻辑：每个 consumer 都把消息转成一个 Command。代码见 [Reference 17](../reference/code/17-worker-optional.mdx)。
+
+<Tabs groupId="route" queryString>
+<TabItem value="script" label="脚本" default>
+
+已由[步骤 1.2](./empty-solution.mdx) 的 scaffold 脚本完成。请对照下方的完成条件检查结果。
+
+</TabItem>
+<TabItem value="ai" label="AI Agent">
+
+<Prompt17Worker />
+
+</TabItem>
+<TabItem value="manual" label="手动">
+
+1. 复制 [Reference 16.12](../reference/code/16-api.mdx#16-12-appsettings-files-4) 中的四个设定文件，并按 [Reference 17.1](../reference/code/17-worker-optional.mdx#17-1-appsettings-files-4) 所列修改：删除 `Cors`、`OpenApi`、`Migrations`、`Authentication` 和 `RateLimiting`，将 `Serilog:Properties:Application` 设为 `ProductName.Worker`，并将日志路径设为 `/var/log/productname/worker/log-.json`。
+2. 用 [Reference 17.2](../reference/code/17-worker-optional.mdx#17-2-program-cs) 替换 `Program.cs`。
+3. 检查 `Properties/launchSettings.json` 是否将 `DOTNET_ENVIRONMENT` 设为 `Development`。
+
+最后按 [Reference 11.3](../reference/code/11-file-overview.mdx#11-3-globalusings-cs-per-project) 建立此项目的 `GlobalUsings.cs`，然后编译：
+
+```bash
+dotnet build
+```
+
+</TabItem>
+</Tabs>
+
+<DoneConditions step="worker" />

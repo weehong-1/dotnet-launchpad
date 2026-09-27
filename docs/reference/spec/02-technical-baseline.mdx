@@ -1,0 +1,42 @@
+---
+sidebar_label: "2. Technical baseline"
+---
+
+# 2. Technical baseline \{#2-technical-baseline\}
+
+- Framework: .NET 10
+- Architecture: Clean Architecture (CA) + Vertical Slice + DDD + CQRS
+- In process request pipeline: MediatR
+- Async messaging: MassTransit v9 (with EF Core Transactional Outbox)
+- Validation: FluentValidation
+- Database: EF Core; the code uses PostgreSQL as the example, swap per project
+- Message broker: the code uses RabbitMQ as the example, swap per project
+- Logging: Serilog; Development writes to the console and a local Seq, SIT and Production write to local JSON files and a central Seq (see [8.9](./08-design-rules/09-logging-rules.mdx))
+- Deployment: SIT and Production run on Ubuntu VMs as systemd services behind an Nginx reverse proxy
+- API documentation: built in .NET 10 OpenAPI, with Scalar as the UI
+- Local development: Docker Compose
+- Environments: Development, SIT and Production, each with its own settings file (see [8.8](./08-design-rules/08-configuration-environments-and-secrets.mdx))
+- Testing: xUnit v3, NSubstitute, Testcontainers, NetArchTest; coverage collected with coverlet (see [8.12](./08-design-rules/12-testing-strategy.mdx))
+- Solution format: `.slnx`
+- Package management: Central Package Management (`Directory.Packages.props`)
+- Authentication: JWT Bearer against any OpenID Connect provider; authorization by permission (see [8.16](./08-design-rules/16-authentication-and-authorization.mdx))
+- Outbound HTTP: `IHttpClientFactory` with the official standard resilience handler (see [8.19](./08-design-rules/19-outbound-http-calls.mdx))
+- Publishing: self contained (linux-x64); the VM needs no .NET runtime installed (see [8.21](./08-design-rules/21-deployment.mdx))
+
+**External services**
+
+| Service | Used | Purpose | Development | SIT and Production |
+| --- | --- | --- | --- | --- |
+| PostgreSQL | Yes (required) | Main database, including Outbox, Inbox and audit tables | Docker Compose | Dedicated database server or managed cloud database |
+| RabbitMQ | Yes (required) | MassTransit broker for integration events | Docker Compose | Dedicated RabbitMQ server or managed cloud service |
+| Seq | Yes | Central logging (see [8.9](./08-design-rules/09-logging-rules.mdx)) | Docker Compose | Its own VM |
+| Nginx | Yes | Reverse proxy and HTTPS (see [8.21](./08-design-rules/21-deployment.mdx)) | Not needed | Same VM as the Api |
+| Redis | **No** | Not applicable | Not applicable | Not applicable |
+
+- **RabbitMQ**: any use of MassTransit needs a broker. For a very small project that wants one service fewer, switch to MassTransit's PostgreSQL transport (SQL Transport), which carries messages through the existing database; replace `UsingRabbitMq` in [15.8](../code/15-infrastructure.mdx#15-8-dependencyinjection-cs) and remove RabbitMQ from Docker Compose.
+- **Redis**: nothing in the template needs Redis. Caching is off; rate limiting counts in each Api instance's memory; there is no distributed lock and no SignalR. Add Redis only in these cases, and update this list and Docker Compose at the same time:
+  1. The Api runs several instances and they must share rate limit counters or cache.
+  2. HybridCache needs its second level distributed cache.
+  3. SignalR runs on several instances and needs a backplane.
+  4. A distributed lock across instances is needed.
+- Any new external service (for example Redis, file storage, email) must first be added to this list, with its purpose and how each environment provides it.

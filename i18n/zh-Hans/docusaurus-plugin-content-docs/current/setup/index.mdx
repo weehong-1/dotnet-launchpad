@@ -1,0 +1,24 @@
+---
+sidebar_label: 概览
+sidebar_position: 0
+---
+
+import StepList from '@site/src/components/StepList';
+
+# Setup Flow
+
+Setup Flow 把一个新的后端从空文件夹带到在 SIT 和 Production 上运行的 Skeleton Solution，可以开始编写第一个 feature。按顺序完成各步骤；每个步骤最后都有**完成条件**，全部满足后才能继续。
+
+## 使用方式
+
+1. **在[步骤 0.1](./project-settings.mdx) 开始一个项目。** 它的项目名称和简短名称会替换站点上所有命令和文件中的 `%%ProductName%%` 和 `%%productname%%`，Worker 和审计开关会隐藏项目不需要的内容。
+2. **为代码步骤选择一种路径。** 步骤 1.2 至 2.6 有三个标签页：**脚本**（步骤 1.2 的一条指令由 Reference 产生整个 Skeleton Solution）、**AI Agent**（把各节提示词粘贴到 Claude Code、Cursor 或 Copilot）和**手动**（自己建立文件）。三者最后都是同样的完成条件。
+3. **勾选完成条件。** 进度按当前项目保存在此浏览器中。[项目](/projects)页面显示每个项目及其下一步骤，并可导出备份。
+
+:::info[已验证的范围]
+Boilerplate v1.0 已用步骤 1.2 的 scaffold 脚本在 .NET SDK 10.0.401 上验证，Worker 与审计全开、全关两种组合都试过：Skeleton Solution 零警告编译，第一个 migration 可以建立，设定 MassTransit 授权后测试全部通过。VM 上的运行（步骤 4.2 至 4.7）尚未验证。如果某个步骤失败，请先修正 Reference，让下一个项目从可运作的代码开始。
+:::
+
+## 步骤
+
+<StepList />

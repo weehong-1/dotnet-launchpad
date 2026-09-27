@@ -1,0 +1,16 @@
+---
+sidebar_label: 4.3 SIT VM 设置
+---
+
+import {VmSetup} from '@site/src/components/Commands';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 4.3 SIT：首次 VM 设置
+
+按照 [Reference 8.21](../reference/spec/08-design-rules/21-deployment.mdx)，一次性准备 SIT 的 Ubuntu VM。SIT 使用**自己的**数据库、broker、Seq API key 和密钥；不与 Production 共享任何东西（[Reference 8.8](../reference/spec/08-design-rules/08-configuration-environments-and-secrets.mdx)）。
+
+开始前，准备好以下内容：运行 Ubuntu 24.04 LTS 的 x86-64 VM（CI 只发布 linux-x64 产物，以下指令即针对 24.04），且可通过 SSH 访问；指向它的 Api DNS 名称；以及[步骤 4.2](./sit-services.mdx) 建立的后端服务。
+
+<VmSetup env="SIT" />
+
+<DoneConditions step="sit-vm" />

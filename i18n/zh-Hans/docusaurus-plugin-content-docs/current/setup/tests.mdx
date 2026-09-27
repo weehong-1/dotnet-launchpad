@@ -1,0 +1,38 @@
+---
+sidebar_label: 2.6 测试
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import Prompt18Tests from '../reference/_partials/prompt-18-tests.mdx';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 2.6 测试
+
+四个测试项目将获得共享的基类、架构测试和验证 pipeline 测试。代码见 [Reference 18](../reference/code/18-tests.mdx)。Docker 必须在运行：集成测试会用 Testcontainers 启动 PostgreSQL 和 RabbitMQ。
+
+<Tabs groupId="route" queryString>
+<TabItem value="script" label="脚本" default>
+
+已由[步骤 1.2](./empty-solution.mdx) 的 scaffold 脚本完成。请对照下方的完成条件检查结果。
+
+</TabItem>
+<TabItem value="ai" label="AI Agent">
+
+<Prompt18Tests />
+
+</TabItem>
+<TabItem value="manual" label="手动">
+
+1. 按 [Reference 11](../reference/code/11-file-overview.mdx) 列出的路径，创建 [Reference 18.1 至 18.5](../reference/code/18-tests.mdx) 中的每个文件。
+2. 按 [Reference 11.3](../reference/code/11-file-overview.mdx#11-3-globalusings-cs-per-project) 建立四个测试项目的 `GlobalUsings.cs`。
+3. 确认已设定 `MT_LICENSE_PATH`（步骤 0.3）且 Docker 正在运行，然后执行测试：
+
+```bash
+dotnet test
+```
+
+</TabItem>
+</Tabs>
+
+<DoneConditions step="tests" />

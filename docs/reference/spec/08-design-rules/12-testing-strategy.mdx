@@ -1,0 +1,18 @@
+---
+sidebar_label: "8.12 Testing strategy"
+---
+
+# 8.12 Testing strategy \{#8-12-testing-strategy\}
+
+| Test project | What it tests | Tools |
+| --- | --- | --- |
+| Domain.UnitTests | Business rules of aggregates and value objects, and whether domain events are raised | xUnit v3 |
+| Application.UnitTests | Handler flow, with external dependencies replaced by test doubles | xUnit v3, NSubstitute, FakeTimeProvider |
+| Architecture.Tests | Layer dependencies and naming conventions | NetArchTest |
+| Api.IntegrationTests | The full flow from HTTP endpoint to a real database | WebApplicationFactory, Testcontainers |
+
+- Integration tests start real PostgreSQL and RabbitMQ containers with Testcontainers instead of an in memory database, so behaviour matches production.
+- The template provides shared base classes for Domain and integration tests (see section [18](../../code/18-tests.mdx)); Application unit tests use NSubstitute directly and need no base class.
+- Each test project references only the layer it tests (see the [12.2](../../code/12-solution-level.mdx#12-2-directory-packages-props) table), matching the layering rule.
+- **Coverage**: every test project references `Microsoft.Testing.Extensions.CodeCoverage`; collect with `dotnet test --coverage --coverage-output-format xml --results-directory TestResults`, which writes one report per test project into `TestResults/` (SonarCloud reads them, see [12.10](../../code/12-solution-level.mdx#12-10-github-workflows-ci-yml)).
+- **MassTransit license**: the integration tests start the real bus, so `MT_LICENSE` or `MT_LICENSE_PATH` must be set wherever they run (see [8.8](./08-configuration-environments-and-secrets.mdx)).

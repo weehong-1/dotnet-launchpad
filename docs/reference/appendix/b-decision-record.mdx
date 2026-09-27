@@ -1,0 +1,43 @@
+---
+sidebar_label: "Appendix B: Key decision record"
+---
+
+# Appendix B: Key decision record \{#appendix-b-key-decision-record\}
+
+Alternatives marked "English guide" are the approach the English guide actually uses.
+
+| Decision | Choice | Reason | Main alternatives |
+| --- | --- | --- | --- |
+| Presentation naming | Named by host as `Api` and `Worker`, not Presentation | The presentation layer has several entry points, and host names tell them apart; matches mainstream practice | A separate Presentation class library |
+| Endpoint style | Minimal API, auto registered `IEndpoint` | Endpoints map one to one to feature slices, with no Controller base class | Controllers plus Asp.Versioning (English guide) |
+| CQRS pipeline | MediatR wrapped in our own interfaces | Mature pipeline behaviors; own interfaces force Result and allow replacement later | Custom dispatcher, source generated Mediator |
+| Async messaging | MassTransit v9 with the built in Transactional Outbox | Reliable delivery and Inbox deduplication, no custom Outbox | MassTransit v8 (maintained until end of 2026); custom `OutboxMessage` polled by Quartz.NET (English guide) |
+| When domain events are published | Before `SaveChangesAsync` writes | Event handler changes commit in one transaction with Outbox messages and business data | After the write with `SavedChangesAsync` (English guide) |
+| Error handling | Result for expected failures; exceptions only for invariant violations | Clear flow; exceptions are not used for control flow | Exceptions everywhere |
+| Validation failure result | `IResultFactory<TSelf>` static abstract factory, called as `TResponse.CreateFailure(...)` (v1.0) | Checked by the compiler, no reflection, safe under trimming and AOT | Reflection with `MakeGenericMethod` (v1.1); throwing `ValidationException`, rejected because expected failures must be Results |
+| Result location | Domain | Aggregate methods themselves return Result | Application |
+| Entity base classes | `Entity<TId>`, `AggregateRoot<TId>` | Distinguishes aggregate roots from ordinary entities and works with strongly typed IDs | `BaseEntity`, `AuditableEntity` (English guide) |
+| Value objects | Plain `record`, no base class | C# records already compare by value | `ValueObject` base class |
+| Strongly typed IDs | `IStronglyTypedId` with automatic conversion by DbContext convention | Prevents passing the wrong ID; new IDs need no setup | Plain Guid (English guide) |
+| Read side | Application projects with `AsNoTracking` through `IApplicationDbContext` | Simple, fast reads; a widely accepted pragmatic approach | Reads through repositories as well |
+| Transactions | No transaction pipeline; one `SaveChangesAsync` per Command | A single save is already one transaction | Transaction pipeline |
+| Code organisation | Clean Architecture layers with Vertical Slice folders inside each layer; endpoints stay in the Api | Layers protect dependency direction, slices keep a use case in one place; keeping endpoints in the Api keeps Application free of ASP.NET Core | Pure layers with type based folders; pure Vertical Slice (slices include endpoints, no Application and Api split) |
+| Modularity | Feature slices within single projects | Lowest maintenance cost for a small team | Modular monolith with many projects |
+| Database | PostgreSQL (replaceable) | Open source, full featured, `jsonb` suits audit data | SQL Server, MySQL |
+| Environments | Development, SIT, Production, with feature toggles in settings | A new environment needs only a settings file; unset means the strictest Production | Checking the environment name in code |
+| Deployment | Ubuntu VM, systemd services, Nginx reverse proxy | Consistent across DigitalOcean, Azure and AWS | Containers; Docker image on Docker Hub deployed over Tailscale and SSH (English guide); IIS |
+| Logging | Serilog; SIT and Production write local JSON files and send to Seq | Standard VM practice: complete local record plus central search, each covering the other | Files only, console only (English guide), Grafana Loki |
+| Auditing | Template provides data change and operation audit mechanisms; each project decides scope | History cannot be recovered later, so the mechanism must exist from day one | Add after go live |
+| Local development | Docker Compose | Simple, no extra project | .NET Aspire |
+| API documentation | Built in OpenAPI plus Scalar | Built into .NET 10, no third party generator | Swashbuckle |
+| Integration tests | Testcontainers with real PostgreSQL and RabbitMQ | Behaviour matches production | In memory database; PostgreSQL as a CI service (English guide) |
+| Test runner | Microsoft.Testing.Platform, selected in `global.json`; coverage with `Microsoft.Testing.Extensions.CodeCoverage` (v1.0) | Current xUnit v3 packages need it; VSTest packages and coverlet's data collector do not work with it | VSTest with `Microsoft.NET.Test.Sdk` and `coverlet.collector` (v1.1) |
+| Test framework | xUnit v3, NSubstitute, xUnit's built in Assert | Current version for new projects; avoids commercially licensed packages | xUnit v2 with Moq and FluentAssertions (English guide), NUnit |
+| Code quality | Warnings as errors and architecture tests at build time; SonarCloud and Qodana optional | Core rules are enforced by the build; external services are added when needed | SonarCloud and Qodana on by default (English guide) |
+| Authorization | JWT Bearer, sign in required by default, permission based | Works with any OpenID Connect provider; a forgotten authorization setting means denied, not open | Role checks, per endpoint checks |
+| Concurrency | Optimistic concurrency on every aggregate root, PostgreSQL `xmin` | Prevents concurrent edits from overwriting each other without touching Domain | None, pessimistic locking |
+| Rate limiting | Built in Rate Limiting, counted per user or IP | No extra service; exact with a single instance | Redis distributed limiting, Nginx only |
+| Outbound HTTP | `IHttpClientFactory` with the official standard resilience handler | Uniform timeout, retry and circuit breaker; unsafe requests are not retried | Custom retries, manual Polly setup |
+| Time | Always UTC via `TimeProvider`; local time APIs banned by an analyzer | Avoids time zone bugs, with the rule enforced by the build | Convention only; `DateTime.UtcNow` directly (English guide) |
+| Publishing | Self contained linux-x64, versions switched by symbolic link | No .NET install on the VM; rollback is a link switch | Framework dependent, containers |
+| Redis | Not used | Nothing needs it yet; single instance rate limiting and caching do not | Add up front |

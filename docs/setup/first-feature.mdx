@@ -1,0 +1,27 @@
+---
+sidebar_label: 5.1 Ready for feature work
+---
+
+import PromptFeatureSlice from '../reference/_partials/prompt-feature-slice.mdx';
+import Optional from '@site/src/components/Optional';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 5.1 Ready for feature work
+
+The Setup Flow ends here: the Skeleton Solution is deployed, and no business feature exists yet. From now on every use case is a feature slice ([Reference 8.15](../reference/spec/08-design-rules/15-feature-slices-vertical-slice.mdx)). This step only prepares the hand over; building features is ordinary project work, not part of the setup.
+
+When you write the first use case, fill in the angle brackets and give this prompt to the agent, once per use case:
+
+<PromptFeatureSlice />
+
+Keep it where you will find it: add it below the common rules in the agent instruction file (step 1.1), or bookmark this page.
+
+To see how the pieces connect end to end, read the [Appendix A demo](../reference/appendix/a-demo-code.mdx). It is a reading aid only: never copy it into the project.
+
+<Optional when="auditing">
+
+Decide the audit rule now, before features arrive ([Reference 7.3](../reference/spec/07-optional-components.mdx#7-3-audit-records)): which kinds of entities will implement `IAuditable`, which properties carry `[AuditIgnore]`, and which kinds of Commands or Queries implement `IAuditableRequest`. Write it down in the project instruction file so every feature slice follows it.
+
+</Optional>
+
+<DoneConditions step="first-feature" />

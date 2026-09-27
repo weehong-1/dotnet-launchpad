@@ -1,0 +1,14 @@
+---
+sidebar_label: "8.4 MassTransit（异步消息）"
+---
+
+# 8.4 MassTransit（异步消息） \{#8-4-masstransit-async-messaging\}
+
+- **用途**：发布与消费整合事件。
+- **Outbox**：使用 MassTransit 内建的 EF Core Transactional Outbox。
+- **分工**：有 Worker 时，Api 只把消息写入 Outbox，Worker 负责投递并托管所有 Consumer；没有 Worker 时，由 Api 投递（见 [7.2](../07-optional-components.mdx#7-2-outbox-and-the-worker)）。
+- **防重复**：Consumer 同时启用 Inbox，同一消息不会被重复处理。
+- **依赖控制**：Application 通过 `IEventBus` 发布，不直接引用 MassTransit。
+- **消息中间件**：按项目选定，如 RabbitMQ、Azure Service Bus、Amazon SQS，或直接使用数据库的 SQL Transport。
+
+**领域事件与整合事件的分别**：领域事件在系统内部、同一事务内处理，可随时修改；整合事件是对外的消息契约，经 Outbox 异步投递，只放基本类型，修改时必须考虑向下兼容。

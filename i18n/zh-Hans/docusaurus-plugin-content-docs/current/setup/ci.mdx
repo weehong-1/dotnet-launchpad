@@ -1,0 +1,19 @@
+---
+sidebar_label: 4.1 设置 CI
+---
+
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 4.1 设置 CI
+
+步骤 3.3 的 push 已触发 `.github/workflows/ci.yml`（[Reference 12.10](../reference/code/12-solution-level.mdx#12-10-github-workflows-ci-yml)）。它会构建、运行所有测试（包括 Testcontainers 集成测试），并且只在测试通过时发布部署 artifact。
+
+```bash
+gh run watch                        # 跟踪最新一次运行
+gh run list --workflow ci --limit 5
+gh run view <run-id>                # artifact productname-<sha> 列在底部
+```
+
+`MT_LICENSE`、SonarCloud 与 Qodana 的 secrets 已在第一次 push 之前于[步骤 3.3](./commit.mdx) 设定。若某次运行因缺少 secret 而失败，补上后重新运行：`gh run rerun <run-id>`。
+
+<DoneConditions step="ci" />

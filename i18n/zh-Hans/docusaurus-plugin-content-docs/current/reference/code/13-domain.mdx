@@ -1,0 +1,335 @@
+---
+sidebar_label: "13. Domain"
+---
+
+import Prompt13Domain from '../_partials/prompt-13-domain.mdx';
+
+# 13. Domain \{#13-domain\}
+
+## 13.1 Entity.cs \{#13-1-entity-cs\}
+
+```csharp
+namespace ProductName.Domain.Abstractions;
+
+public abstract class Entity<TId> : IEquatable<Entity<TId>>
+    where TId : notnull
+{
+    protected Entity(TId id) => Id = id;
+
+    // 供 EF Core 使用
+    protected Entity() { }
+
+    public TId Id { get; protected init; } = default!;
+
+    public bool Equals(Entity<TId>? other) =>
+        other is not null && GetType() == other.GetType() && Id.Equals(other.Id);
+
+    public override bool Equals(object? obj) => obj is Entity<TId> entity && Equals(entity);
+
+    public override int GetHashCode() => HashCode.Combine(GetType(), Id);
+}
+```
+
+实体以 ID 判断相等，不以属性值判断。
+
+## 13.2 IAggregateRoot.cs \{#13-2-iaggregateroot-cs\}
+
+```csharp
+namespace ProductName.Domain.Abstractions;
+
+public interface IAggregateRoot
+{
+    IReadOnlyCollection<IDomainEvent> DomainEvents { get; }
+    void ClearDomainEvents();
+}
+```
+
+非泛型接口，让 Infrastructure 能一次找出所有聚合根收集事件，不必知道各自的 ID 类型。
+
+## 13.3 AggregateRoot.cs \{#13-3-aggregateroot-cs\}
+
+```csharp
+namespace ProductName.Domain.Abstractions;
+
+public abstract class AggregateRoot<TId> : Entity<TId>, IAggregateRoot
+    where TId : notnull
+{
+    private readonly List<IDomainEvent> _domainEvents = [];
+
+    protected AggregateRoot(TId id) : base(id) { }
+
+    protected AggregateRoot() { }
+
+    public IReadOnlyCollection<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
+
+    protected void Raise(IDomainEvent domainEvent) => _domainEvents.Add(domainEvent);
+
+    public void ClearDomainEvents() => _domainEvents.Clear();
+}
+```
+
+## 13.4 IDomainEvent.cs \{#13-4-idomainevent-cs\}
+
+```csharp
+using MediatR;
+
+namespace ProductName.Domain.Abstractions;
+
+public interface IDomainEvent : INotification
+{
+    Guid Id { get; }
+    DateTimeOffset OccurredOn { get; }
+}
+```
+
+继承 `INotification` 让领域事件可直接由 MediatR 发布。Domain 因此引用 `MediatR.Contracts`，这个包只含接口，不含实现。
+
+## 13.5 DomainEvent.cs \{#13-5-domainevent-cs\}
+
+```csharp
+namespace ProductName.Domain.Abstractions;
+
+public abstract record DomainEvent : IDomainEvent
+{
+    public Guid Id { get; init; } = Guid.CreateVersion7();
+    public required DateTimeOffset OccurredOn { get; init; }
+}
+```
+
+`Guid.CreateVersion7()` 生成按时间排序的 GUID，作为主键时索引效率比随机 GUID 好。`OccurredOn` 没有预设值且为 `required`：触发事件的代码传入从 `TimeProvider.GetUtcNow()` 取得的时间（8.20），因此使用 `FakeTimeProvider` 的测试也能控制事件时间。
+
+## 13.6 IRepository.cs \{#13-6-irepository-cs\}
+
+```csharp
+namespace ProductName.Domain.Abstractions;
+
+public interface IRepository<TAggregate, in TId>
+    where TAggregate : AggregateRoot<TId>
+    where TId : notnull
+{
+    Task<TAggregate?> GetByIdAsync(TId id, CancellationToken ct = default);
+    void Add(TAggregate aggregate);
+    void Remove(TAggregate aggregate);
+}
+```
+
+每个聚合的仓储接口继承它，只需补充该聚合特有的查询方法。
+
+## 13.7 IHasTimestamps.cs \{#13-7-ihastimestamps-cs\}
+
+```csharp
+namespace ProductName.Domain.Abstractions;
+
+public interface IHasTimestamps
+{
+    DateTimeOffset CreatedAt { get; set; }
+    DateTimeOffset? UpdatedAt { get; set; }
+}
+```
+
+由 Infrastructure 的拦截器自动填写，业务代码不需要手动设置。
+
+## 13.8 ErrorType.cs \{#13-8-errortype-cs\}
+
+```csharp
+namespace ProductName.Domain.Abstractions;
+
+public enum ErrorType
+{
+    Failure,
+    Validation,
+    NotFound,
+    Conflict,
+    Unauthorized,
+    Forbidden
+}
+```
+
+在 Api 层对应 HTTP 状态码（见 [16.5](./16-api.mdx#16-5-customresults-cs)）。
+
+## 13.9 Error.cs \{#13-9-error-cs\}
+
+```csharp
+namespace ProductName.Domain.Abstractions;
+
+public record Error(string Code, string Description, ErrorType Type)
+{
+    public static readonly Error None = new(string.Empty, string.Empty, ErrorType.Failure);
+
+    public static Error Failure(string code, string description) =>
+        new(code, description, ErrorType.Failure);
+
+    public static Error Validation(string code, string description) =>
+        new(code, description, ErrorType.Validation);
+
+    public static Error NotFound(string code, string description) =>
+        new(code, description, ErrorType.NotFound);
+
+    public static Error Conflict(string code, string description) =>
+        new(code, description, ErrorType.Conflict);
+
+    public static Error Unauthorized(string code, string description) =>
+        new(code, description, ErrorType.Unauthorized);
+
+    public static Error Forbidden(string code, string description) =>
+        new(code, description, ErrorType.Forbidden);
+}
+```
+
+## 13.10 ValidationError.cs \{#13-10-validationerror-cs\}
+
+```csharp
+namespace ProductName.Domain.Abstractions;
+
+public sealed record ValidationError(Error[] Errors)
+    : Error("Validation.General", "One or more validation errors occurred.", ErrorType.Validation);
+```
+
+## 13.11 Result.cs 与 IResultFactory.cs \{#13-11-result-cs-and-iresultfactory-cs\}
+
+`Abstractions/Result.cs`：
+
+```csharp
+namespace ProductName.Domain.Abstractions;
+
+public class Result : IResultFactory<Result>
+{
+    protected internal Result(bool isSuccess, Error error)
+    {
+        if (isSuccess && error != Error.None || !isSuccess && error == Error.None)
+            throw new ArgumentException("Invalid error state.", nameof(error));
+
+        IsSuccess = isSuccess;
+        Error = error;
+    }
+
+    public bool IsSuccess { get; }
+    public bool IsFailure => !IsSuccess;
+    public Error Error { get; }
+
+    public static Result Success() => new(true, Error.None);
+    public static Result Failure(Error error) => new(false, error);
+
+    public static Result<T> Success<T>(T value) => new(value, true, Error.None);
+    public static Result<T> Failure<T>(Error error) => new(default, false, error);
+
+    public static implicit operator Result(Error error) => Failure(error);
+
+    static Result IResultFactory<Result>.CreateFailure(Error error) => Failure(error);
+}
+
+public class Result<T> : Result, IResultFactory<Result<T>>
+{
+    private readonly T? _value;
+
+    protected internal Result(T? value, bool isSuccess, Error error)
+        : base(isSuccess, error) => _value = value;
+
+    public T Value => IsSuccess
+        ? _value!
+        : throw new InvalidOperationException("Cannot access the value of a failed result.");
+
+    public static implicit operator Result<T>(T value) => Success(value);
+    public static implicit operator Result<T>(Error error) => Failure<T>(error);
+
+    static Result<T> IResultFactory<Result<T>>.CreateFailure(Error error) => Failure<T>(error);
+}
+```
+
+`Abstractions/IResultFactory.cs`：
+
+```csharp
+namespace ProductName.Domain.Abstractions;
+
+/// <summary>
+/// 静态抽象工厂：让泛型管线行为建立与回应类型完全一致的失败结果。
+/// 它不是 DI 服务：只有静态抽象成员，只用于泛型约束。
+/// 它只建立失败结果，没有 CreateSuccess：
+/// 泛型结果需要值，非泛型的 Result 不需要，两者没有共同签名。
+/// </summary>
+public interface IResultFactory<TSelf> where TSelf : IResultFactory<TSelf>
+{
+    static abstract TSelf CreateFailure(Error error);
+}
+```
+
+- 隐式转换让 Handler 可以直接返回值或 Error，不必每次写 `Result.Success(...)`。何时用 Result、何时抛异常，见 [8.14](../spec/08-design-rules/14-error-handling.mdx)。
+- `IResultFactory` 让验证管线（[14.9](./14-application.mdx#14-9-validationpipelinebehavior-cs)）不必知道 `T`、也不用反射，就能建立失败的 `Result` 或 `Result<T>`。两个实现都是显式实现，平常写业务代码时 `CreateFailure` 不会和 `Failure` 挤在一起，只有通过泛型约束才能调用。
+- 方法名保持 `CreateFailure`。若命名为 `Failure`，`Result<T>` 就必须用 `new` 隐藏基类的 `Result.Failure(Error)`。接口也不要改名为 `IResult<TSelf>`，否则会在端点文件中与 ASP.NET Core 的 `Microsoft.AspNetCore.Http.IResult` 冲突。
+
+## 13.12 DomainException.cs \{#13-12-domainexception-cs\}
+
+```csharp
+namespace ProductName.Domain.Abstractions;
+
+public class DomainException(string code, string message) : Exception(message)
+{
+    public string Code { get; } = code;
+}
+```
+
+只用于**违反领域不变条件**的情况，代表程序有错。可预期的业务失败一律用 Result，不要用异常（见 [8.14](../spec/08-design-rules/14-error-handling.mdx)）。
+
+## 13.13 IStronglyTypedId.cs \{#13-13-istronglytypedid-cs\}
+
+```csharp
+namespace ProductName.Domain.Abstractions;
+
+public interface IStronglyTypedId
+{
+    Guid Value { get; }
+}
+```
+
+每个聚合的 ID 按以下写法定义，`Xxx` 替换为聚合名称：
+
+```csharp
+public readonly record struct XxxId(Guid Value) : IStronglyTypedId
+{
+    public static XxxId New() => new(Guid.CreateVersion7());
+}
+```
+
+实现此接口的类型会被 DbContext 自动加上数据库值转换（见 [15.1](./15-infrastructure.mdx#15-1-applicationdbcontext-cs)、[15.2](./15-infrastructure.mdx#15-2-stronglytypedidconverter-cs)），不需要逐一设定。
+
+<Optional when="auditing">
+
+## 13.14 IAuditable.cs（可选：审计） \{#13-14-iauditable-cs-optional-auditing\}
+
+```csharp
+namespace ProductName.Domain.Abstractions;
+
+// 标记接口：实现此接口的实体，其新增、修改、删除都会自动写入资料变更审计
+public interface IAuditable { }
+```
+
+</Optional>
+
+<Optional when="auditing">
+
+## 13.15 AuditIgnoreAttribute.cs（可选：审计） \{#13-15-auditignoreattribute-cs-optional-auditing\}
+
+```csharp
+namespace ProductName.Domain.Abstractions;
+
+// 标记不写入审计纪录的属性，例如密码杂凑、令牌
+[AttributeUsage(AttributeTargets.Property)]
+public sealed class AuditIgnoreAttribute : Attribute { }
+```
+
+</Optional>
+
+## 13.16 Domain 编写约定（无代码） \{#13-16-domain-conventions-no-code\}
+
+以下是新增业务对象时要遵守的写法，模板本身不附带任何业务对象：
+
+- **强类型 ID**：实现 `IStronglyTypedId`，写法见 [13.13](#13-13-istronglytypedid-cs)。
+- **值对象**：直接用 `sealed record`，不另建基类；以静态 `Create` 方法建立并返回 `Result<T>`。record 内若含集合需自行覆写 `Equals`。
+- **聚合**：构造函数私有，通过静态工厂方法建立；属性 `private set`，只能通过方法修改；业务规则写在聚合内部。
+- **错误定义**：每个聚合一个 `XxxErrors` 静态类，集中定义该聚合的错误。
+- **领域事件**：会触发事件的聚合方法以 `DateTimeOffset` 参数接收当前时间（由 Handler 从 `TimeProvider` 取得），并用它设定 `OccurredOn`。
+- **审计**：需要审计的实体实现 `IAuditable`，敏感属性加上 `[AuditIgnore]`（见 [7.3](../spec/07-optional-components.mdx#7-3-audit-records)）。
+
+## 13.17 AI Coding Agent 提示词 \{#13-17-ai-coding-agent-prompt\}
+
+<Prompt13Domain />

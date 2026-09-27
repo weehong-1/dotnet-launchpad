@@ -1,0 +1,11 @@
+```text
+执行文档第 17 节（Worker）。只在选择 Worker 时执行。前置条件：第 16 节已完成。
+
+1. 建立 17.1 的四个设定档：以 16.12 的四个档案为基础，删除 Cors、OpenApi、Migrations、Authentication、RateLimiting 区块；Serilog:Properties:Application 改为 <项目名称>.Worker；SIT 与 Production 的日志文件路径改为 /var/log/<项目名称小写>/worker/log-.json；其余照抄。
+2. 确认四个设定档都会复制到输出目录。
+3. 以 17.2 的内容完全取代 Program.cs。
+4. 确认 Properties/launchSettings.json 的 DOTNET_ENVIRONMENT 为 Development。
+5. 不要建立任何 Consumer 或 BackgroundService 范例。
+
+完成条件：dotnet build 成功；执行 docker compose up -d 后，以 Development 启动 Worker，能连上 RabbitMQ，日志中没有错误。
+```

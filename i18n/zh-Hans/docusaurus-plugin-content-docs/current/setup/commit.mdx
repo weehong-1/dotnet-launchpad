@@ -1,0 +1,64 @@
+---
+sidebar_label: 3.3 Commit 并 push
+---
+
+import Optional from '@site/src/components/Optional';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 3.3 Commit 并 push Skeleton Solution
+
+Skeleton Solution 已完成。把它作为项目的第一个 commit 提交，从干净的 clone 检查一次，设定 CI 需要的 secrets，然后 push，让 CI 在步骤 4.1 运行。
+
+先把所有文件加入暂存区，再确认没有任何机密会被提交：
+
+```bash
+git add -A
+git status --short                                                     # 没有已填写的 .env 文件，没有授权文件
+git grep --cached -n -i -E "licensekey|mt_license" -- ':!docs/TEMPLATE.md'
+# 每个结果都必须是代码，或值为空的设定，例如 "LicenseKey": "" 或 MT_LICENSE=
+```
+
+提交，然后从干净的 clone 执行测试，确保没有依赖未提交的文件：
+
+```bash
+git commit -m "Create the Skeleton Solution from Boilerplate v1.0"
+rm -rf /tmp/productname-clone && git clone -q "$PWD" /tmp/productname-clone
+(cd /tmp/productname-clone && dotnet test)
+```
+
+建立私有 GitHub repo，并在第一次 push **之前**设定 CI 需要的 secrets，让第一次运行就能通过：
+
+```bash
+gh repo create productname --private --source .
+gh secret set MT_LICENSE < ~/.config/masstransit/license.txt   # 测试会启动 MassTransit（Reference 12.10）
+```
+
+<Optional when="sonar">
+
+**SonarCloud。** 在 SonarCloud 中建立项目，然后：
+
+```bash
+gh secret set SONAR_TOKEN
+gh variable set SONAR_PROJECT_KEY --body "<project key>"
+gh variable set SONAR_ORGANIZATION_KEY --body "<organization key>"
+```
+
+</Optional>
+
+<Optional when="qodana">
+
+**Qodana。** 在 Qodana Cloud 中建立项目，然后：
+
+```bash
+gh secret set QODANA_TOKEN
+```
+
+</Optional>
+
+Push：
+
+```bash
+git push -u origin main
+```
+
+<DoneConditions step="commit" />

@@ -1,0 +1,10 @@
+---
+sidebar_label: "8.17 并发控制"
+---
+
+# 8.17 并发控制 \{#8-17-concurrency-control\}
+
+- 所有聚合根自动启用**乐观并发控制**（见 [15.1](../../code/15-infrastructure.mdx#15-1-applicationdbcontext-cs)）。PostgreSQL 使用每一列内建的系统栏位 `xmin` 作为版本号，不需新增栏位，也不影响 Domain。
+- 两个请求同时修改同一个聚合时，后保存的一方会收到冲突，不会悄悄覆盖前一方的修改。`GlobalExceptionHandler` 把冲突转为 HTTP 409，错误代码为 `Concurrency.Conflict`，前端应提示使用者重新载入。
+- 适用范围：同一个请求内“读取后修改”期间的冲突。若需要侦测“使用者打开表单期间，资料已被他人修改”，须把版本号随 Response 返回、由 Command 带回预期版本再比对，这属于特定功能的需求，按项目需要加入。
+- 换用其他数据库时须调整：SQL Server 使用 `rowversion` 栏位。

@@ -1,0 +1,29 @@
+---
+sidebar_label: 3.1 本地服务与密钥
+---
+
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 3.1 启动本地服务并设置密钥
+
+```bash
+docker compose up -d
+docker compose ps
+```
+
+RabbitMQ 管理界面位于 [http://localhost:15672](http://localhost:15672)（guest / guest），Seq 位于 [http://localhost:5341](http://localhost:5341)。`docker-compose.yml` 和 `appsettings.Development.json` 中的本地凭据是默认值，不是密钥（[Reference 8.8](../reference/spec/08-design-rules/08-configuration-environments-and-secrets.mdx)）。
+
+真正的密钥放在 User Secrets 中，绝不放进 repo：
+
+```bash
+dotnet user-secrets set "MediatR:LicenseKey" "<key>" --project src/ProductName.Api
+dotnet user-secrets set "MediatR:LicenseKey" "<key>" --project src/ProductName.Worker  # @@worker
+
+# 步骤 0.5 取得的 Development Authority 与 Audience（不是机密，也可以写在 appsettings.Development.json）
+dotnet user-secrets set "Authentication:Authority" "https://<identity provider>" --project src/ProductName.Api
+dotnet user-secrets set "Authentication:Audience" "<audience>" --project src/ProductName.Api
+```
+
+MassTransit 授权来自步骤 0.3 export 的 `MT_LICENSE_PATH`。在执行 Api 的终端中确认：`echo $MT_LICENSE_PATH`。
+
+<DoneConditions step="local-services" />

@@ -1,0 +1,12 @@
+```text
+为本项目加入审计机制，依据文档第 7.3 节的设计，以及第二部分标为"可选：审计"的代码。前置条件：项目已按第 12 至 16 节建立完成。
+
+1. Domain：建立 13.14 IAuditable 与 13.15 AuditIgnoreAttribute。
+2. Application：建立 14.16 至 14.19；在 14.15 的 MediatR 设定中注册 OperationAuditPipelineBehavior，顺序为日志、操作审计、验证。
+3. Infrastructure：建立 15.9 至 15.14；按 15.8 注册 IAuditContext、IOperationAuditWriter、AuditTrailInterceptor，并把 AuditTrailInterceptor 加在 AddInterceptors 的最后。
+4. 建立迁移，名称为 AddAuditTables，只应包含 AuditTrails 与 OperationAudits 两个数据表；出现其他变更时停下来说明原因。
+5. 不要替任何现有实体加上 IAuditable，也不要替任何 Command 或 Query 加上 IAuditableRequest；审计范围由我另行决定。
+6. 列出部署时须在数据库执行的权限指令（见 8.11），不要自行执行。
+
+完成条件：dotnet build 零警告零错误；dotnet test 全部通过。
+```

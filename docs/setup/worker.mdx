@@ -1,0 +1,43 @@
+---
+sidebar_label: 2.5 Worker
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import Prompt17Worker from '../reference/_partials/prompt-17-worker.mdx';
+import DoneConditions from '@site/src/components/DoneConditions';
+import StepApplies from '@site/src/components/StepApplies';
+
+# 2.5 Worker
+
+<StepApplies step="worker" flag="worker" />
+
+The Worker hosts consumers and delivers the Outbox. It holds no business logic: every consumer turns a message into a Command. The code is in [Reference 17](../reference/code/17-worker-optional.mdx).
+
+<Tabs groupId="route" queryString>
+<TabItem value="script" label="Script" default>
+
+Done by the scaffold script in [step 1.2](./empty-solution.mdx). Check the result against the Done Conditions below.
+
+</TabItem>
+<TabItem value="ai" label="AI Agent">
+
+<Prompt17Worker />
+
+</TabItem>
+<TabItem value="manual" label="Manual">
+
+1. Copy the four settings files from [Reference 16.12](../reference/code/16-api.mdx#16-12-appsettings-files-4) and change them as [Reference 17.1](../reference/code/17-worker-optional.mdx#17-1-appsettings-files-4) lists: remove `Cors`, `OpenApi`, `Migrations`, `Authentication` and `RateLimiting`, set `Serilog:Properties:Application` to `ProductName.Worker`, and set the log path to `/var/log/productname/worker/log-.json`.
+2. Replace `Program.cs` with [Reference 17.2](../reference/code/17-worker-optional.mdx#17-2-program-cs).
+3. Check that `Properties/launchSettings.json` sets `DOTNET_ENVIRONMENT` to `Development`.
+
+Finish by creating this project's `GlobalUsings.cs` from [Reference 11.3](../reference/code/11-file-overview.mdx#11-3-globalusings-cs-per-project), then build:
+
+```bash
+dotnet build
+```
+
+</TabItem>
+</Tabs>
+
+<DoneConditions step="worker" />

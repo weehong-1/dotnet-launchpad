@@ -1,0 +1,56 @@
+---
+sidebar_label: "17. Worker (optional)"
+---
+
+import Prompt17Worker from '../_partials/prompt-17-worker.mdx';
+
+# 17. Worker (optional) \{#17-worker-optional\}
+
+<Optional when="worker" page>
+
+## 17.1 appsettings files (4) \{#17-1-appsettings-files-4\}
+
+The same four files as the Api, with the content of [16.12](./16-api.mdx#16-12-appsettings-files-4), minus the sections the Worker does not use:
+
+- Remove the `Cors`, `OpenApi`, `Migrations`, `Authentication` and `RateLimiting` sections (the Worker serves no HTTP endpoints and runs no migrations).
+- Keep `ConnectionStrings`, `MediatR` and `Serilog`.
+- Change `Serilog:Properties:Application` to `ProductName.Worker`.
+- Change the SIT and Production log path to `/var/log/<lowercase project name>/worker/log-.json`.
+- The environment name is set with `DOTNET_ENVIRONMENT`.
+
+## 17.2 Program.cs \{#17-2-program-cs\}
+
+```csharp
+using MassTransit;
+using ProductName.Application;
+using ProductName.Infrastructure;
+using Serilog;
+
+var builder = Host.CreateApplicationBuilder(args);
+
+// When running as a systemd service, report startup completion and handle stop signals correctly (see 12.7)
+builder.Services.AddSystemd();
+
+builder.Services.AddSerilog((services, logger) => logger
+    .ReadFrom.Configuration(builder.Configuration)
+    .ReadFrom.Services(services));
+
+builder.Services
+    .AddApplication(builder.Configuration)
+    .AddInfrastructure(
+        builder.Configuration,
+        bus => bus.AddConsumers(typeof(Program).Assembly));
+
+var host = builder.Build();
+
+await host.RunAsync();
+```
+
+- The Worker registers every Consumer in its own project automatically. Consumers live in `Consumers/{Feature}/` (see [8.15](../spec/08-design-rules/15-feature-slices-vertical-slice.mdx)) and hold no business logic: they turn the message into a Command and hand it to Application through MediatR's `ISender`.
+- Scheduled jobs go in the Worker as `BackgroundService` classes, added as the project needs; the template ships none. For cron expressions or persistent schedules, use Quartz.NET instead (the English guide uses it to poll its Outbox).
+
+## 17.3 AI coding agent prompt \{#17-3-ai-coding-agent-prompt\}
+
+<Prompt17Worker />
+
+</Optional>

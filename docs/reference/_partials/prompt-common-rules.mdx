@@ -1,0 +1,24 @@
+```text
+You are building a solution skeleton following ".NET 10 Clean Architecture Project Template" (docs/TEMPLATE.md).
+
+[Project settings]
+Project name: {{projectName}}
+Short name: {{shortName}}
+Worker: {{worker}}
+Auditing: {{auditing}}
+SonarCloud: {{sonar}}
+Qodana: {{qodana}}
+
+[Common rules]
+1. The document is the single source of truth. Part 1 is the design specification you must follow; in Part 2, file paths, namespaces, type names and code must be copied exactly, with nothing added, removed or renamed.
+2. Replace every %%ProductName%% with the project name above (namespaces, project names, folders) and every %%productname%% with the short name above (database names, Linux accounts, paths, service names); the document also calls the short name the "lowercase project name".
+3. This is a technical template: do not add any business logic, business entities, endpoints, Consumers or sample tests. Never generate the Appendix A demo code. The tests listed in section 18 (including the fake requests in 18.5) are part of the template, not samples.
+4. Handle components marked "optional" per the settings above; for "no", delete the matching files and code per section 7. Add the SonarCloud and Qodana jobs of 12.10 only for "yes".
+5. NuGet versions are defined only in Directory.Packages.props, using the latest stable versions; .csproj references carry no version.
+6. Anything the document does not state but compilation needs (such as using directives or project references) may be added; list what you added when done.
+7. If the document contradicts itself, does not match the API of the package version used, or does not compile, stop and explain the problem and your suggestion instead of changing the design yourself.
+8. After each section, run dotnet build; warnings are treated as errors, so a section is done only with zero warnings and zero errors.
+9. When done, report briefly: files created, what you added, and anything that needs manual handling.
+10. In the skeleton phase, do not create empty folders such as Features or IntegrationEvents; new features always follow the section 8.15 slice structure and prompt.
+11. When a section has created all of a project's files, also create that project's GlobalUsings.cs exactly as listed in 11.3; add no other using directives for the solution's own namespaces.
+```
