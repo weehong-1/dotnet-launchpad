@@ -5,26 +5,17 @@ sidebar_label: 2.3 Infrastructure
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import Prompt15Infrastructure from '../reference/_partials/prompt-15-infrastructure.mdx';
+import LayerFiles from '@site/src/components/LayerFiles';
 import DoneConditions from '@site/src/components/DoneConditions';
 
 # 2.3 Infrastructure
 
-Infrastructure 实现 Application 的抽象：EF Core、带 Outbox 的 MassTransit、当前用户、权限、弹性处理，以及可选的审计。代码见 [Reference 15](../reference/code/15-infrastructure.mdx)。
+Infrastructure 实现 Application 定义的抽象：数据库、message broker、当前用户和其他技术服务。在核心中它几乎是空的：`AddInfrastructure` 注册 `TimeProvider`、健康检查以及对外 HTTP 调用的弹性处理。[附加组件](./addons.mdx)会把它填满：PostgreSQL 加入 EF Core，消息加入 MassTransit，身份验证加入当前用户。代码见 [Reference 15](../reference/code/15-infrastructure.mdx)。
 
 <Tabs groupId="route" queryString>
-<TabItem value="script" label="脚本" default>
+<TabItem value="manual" label="手动" default>
 
-已由[步骤 1.2](./empty-solution.mdx) 的 scaffold 脚本完成。请对照下方的完成条件检查结果。
-
-</TabItem>
-<TabItem value="ai" label="AI Agent">
-
-<Prompt15Infrastructure />
-
-</TabItem>
-<TabItem value="manual" label="手动">
-
-按 [Reference 11](../reference/code/11-file-overview.mdx) 列出的路径，创建 [Reference 15.1 至 15.14](../reference/code/15-infrastructure.mdx) 中的每个文件，然后加入 framework 引用：
+Infrastructure 需要 ASP.NET Core 共享框架来使用 HTTP context accessor。把它加入项目文件：
 
 ```xml
 <!-- src/ProductName.Infrastructure/ProductName.Infrastructure.csproj -->
@@ -33,13 +24,23 @@ Infrastructure 实现 Application 的抽象：EF Core、带 Outbox 的 MassTrans
 </ItemGroup>
 ```
 
-为你的项目显示的 15.8 代码已包含正确的 Outbox 投递检查和审计注册。使用其他 broker 或数据库？请将 `UseNpgsql`、`UsePostgres` 和 `UsingRabbitMq` 连同对应的 package 一起更换。
+然后在 `src/ProductName.Infrastructure/` 中创建这些文件：
 
-最后按 [Reference 11.3](../reference/code/11-file-overview.mdx#11-3-globalusings-cs-per-project) 建立此项目的 `GlobalUsings.cs`，然后编译：
+<LayerFiles project="Infrastructure" />
 
 ```bash
 dotnet build
 ```
+
+</TabItem>
+<TabItem value="script" label="脚本">
+
+已由[步骤 1.2](./empty-solution.mdx) 的 scaffold 脚本完成。请对照下方的完成条件检查结果。
+
+</TabItem>
+<TabItem value="ai" label="AI Agent">
+
+<Prompt15Infrastructure />
 
 </TabItem>
 </Tabs>

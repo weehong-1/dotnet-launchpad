@@ -1,19 +1,84 @@
 ---
-sidebar_label: 4.1 设置 CI
+sidebar_label: F.1 部署文件与 CI
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import WhenOff from '@site/src/components/WhenOff';
+import PromptAddGolive from '../reference/_partials/prompt-add-golive.mdx';
+import AddOnSwitch from '@site/src/components/AddOnSwitch';
+import AddOnFiles from '@site/src/components/AddOnFiles';
+import FlagScope from '@site/src/components/FlagScope';
+import StepApplies from '@site/src/components/StepApplies';
 import DoneConditions from '@site/src/components/DoneConditions';
 
-# 4.1 设置 CI
+# F.1 加入部署文件与 CI
 
-步骤 3.3 的 push 已触发 `.github/workflows/ci.yml`（[Reference 12.10](../reference/code/12-solution-level.mdx#12-10-github-workflows-ci-yml)）。它会构建、运行所有测试（包括 Testcontainers 集成测试），并且只在测试通过时发布部署 artifact。
+<AddOnSwitch addon="golive" />
+<StepApplies step="ci" />
+
+上线把项目带到 SIT 和 Production 两个环境，每个环境都是位于 Nginx 之后的 Ubuntu VM，并有自己的后端服务（[Reference 7.7](../reference/spec/07-optional-components.mdx#7-7-go-live)、[8.21](../reference/spec/08-design-rules/21-deployment.mdx)）。最后再做：文件和步骤只包含项目其他附加组件需要的部分。
+
+这一步加入 `deploy/` 下的部署模板和 CI workflow。CI 在每次 push 时构建并运行所有测试，并且只在测试通过时发布部署 artifact。
+
+<WhenOff addon="auth">
+
+:::caution[没有身份验证]
+这个项目没有身份验证附加组件，所以在 SIT 和 Production 上每个 endpoint 都会是公开的。除非 Api 本来就要公开，否则请先加入[身份验证](./identity-provider.mdx)。
+:::
+
+</WhenOff>
+
+<Tabs groupId="route" queryString>
+<TabItem value="manual" label="手动" default>
+
+**1. 创建文件：**
+
+<AddOnFiles addon="golive" />
+
+**2. 在 push 之前设定 CI secrets**，让第一次运行就能通过：
+
+<FlagScope addon="golive">
 
 ```bash
+gh secret set MT_LICENSE < ~/.config/masstransit/license.txt   # @@messaging
+# @@sonar-begin
+gh secret set SONAR_TOKEN
+gh variable set SONAR_PROJECT_KEY --body "<project key>"
+gh variable set SONAR_ORGANIZATION_KEY --body "<organization key>"
+# @@sonar-end
+gh secret set QODANA_TOKEN   # @@qodana
+```
+
+</FlagScope>
+
+如果在步骤 0.2 中选择了 SonarCloud 和 Qodana，请先建立对应的项目。
+
+**3. Commit、push，并跟踪运行：**
+
+```bash
+git add -A && git commit -m "Add deployment files and CI" && git push
 gh run watch                        # 跟踪最新一次运行
-gh run list --workflow ci --limit 5
 gh run view <run-id>                # artifact productname-<sha> 列在底部
 ```
 
-`MT_LICENSE`、SonarCloud 与 Qodana 的 secrets 已在第一次 push 之前于[步骤 3.3](./commit.mdx) 设定。若某次运行因缺少 secret 而失败，补上后重新运行：`gh run rerun <run-id>`。
+若某次运行因缺少 secret 而失败，补上后重新运行：`gh run rerun <run-id>`。
+
+</TabItem>
+<TabItem value="script" label="脚本">
+
+scaffold 脚本只能把附加组件加入全新的空 repo。如果还没有任何功能，可以重新开始：在上方开启这个附加组件，然后在新文件夹中执行步骤 1.2 的指令。否则请走手动或 AI Agent 路径。
+
+</TabItem>
+<TabItem value="ai" label="AI Agent">
+
+在上方开启这个附加组件，把通用规则（[步骤 1.1](./repository.mdx)）中更新后的附加组件相关行复制到 agent 指令文件中，然后粘贴：
+
+<PromptAddGolive />
+
+然后按手动标签页所示设定 CI secrets 并 push。
+
+</TabItem>
+</Tabs>
 
 <DoneConditions step="ci" />

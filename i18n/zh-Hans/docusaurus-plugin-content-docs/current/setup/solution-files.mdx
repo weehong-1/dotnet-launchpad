@@ -4,12 +4,50 @@ sidebar_label: 1.3 Solution 级别文件
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
+import LayerFiles from '@site/src/components/LayerFiles';
+import PackageCommands from '@site/src/components/PackageCommands';
+import FlagScope from '@site/src/components/FlagScope';
+import SnippetPackageVersions from '../reference/_partials/snippet-package-versions.mdx';
 import DoneConditions from '@site/src/components/DoneConditions';
 
 # 1.3 加入 solution 级别文件
 
+这些文件位于 repo 根目录，适用于每个项目：
+
+- 共享的构建设定，把警告视为错误
+- 一份集中的 NuGet 版本清单
+- SDK 版本
+- 代码风格
+- 一个运行本地日志服务器 Seq 的 `docker-compose.yml`
+
+[Reference 12](../reference/code/12-solution-level.mdx) 逐一说明它们。
+
 <Tabs groupId="route" queryString>
-<TabItem value="script" label="脚本" default>
+<TabItem value="manual" label="手动" default>
+
+**1. 在 repo 根目录创建这些文件。** 将 `global.json` 设为步骤 0.3 中的 SDK 版本。
+
+<LayerFiles project="Solution" />
+
+**2. 填入 package 版本。** `Directory.Packages.props` 中的每个 `Version=""` 都要填入 nuget.org 上最新的稳定版本；ASP.NET Core、`Microsoft.Extensions` 和 EF Core 的 package 与 SDK 一样保持在 10.x。下面的循环会完成这件事，做法与 scaffold 脚本相同：
+
+<SnippetPackageVersions />
+
+**3. 引用每个项目需要的 package**，按照 [12.2 表格](../reference/code/12-solution-level.mdx#12-2-directory-packages-props)。使用集中式 package 管理时，这些命令不会在 `.csproj` 中加入版本：
+
+<FlagScope core>
+<PackageCommands />
+</FlagScope>
+
+**4. 检查：**
+
+```bash
+dotnet build
+docker compose config --quiet && echo "compose ok"
+```
+
+</TabItem>
+<TabItem value="script" label="脚本">
 
 已由[步骤 1.2](./empty-solution.mdx) 的 scaffold 脚本完成。请对照下方的完成条件检查结果。
 
@@ -17,22 +55,6 @@ import DoneConditions from '@site/src/components/DoneConditions';
 <TabItem value="ai" label="AI Agent">
 
 步骤 1.2 的提示词已创建这些文件。对照下方的完成条件检查它们。如果缺少内容，请让 agent 完成 `docs/TEMPLATE.md` 的第 12 节。
-
-</TabItem>
-<TabItem value="manual" label="手动">
-
-根据 [Reference 12](../reference/code/12-solution-level.mdx) 创建每个文件：
-
-1. `Directory.Build.props`、`Directory.Packages.props`、`global.json`、`.editorconfig`、`docker-compose.yml` 和 `BannedSymbols.txt`（12.1 至 12.6）。将 `global.json` 设为步骤 0.4 中的 SDK 版本。在 `Directory.Packages.props` 中填入最新的稳定版本。
-2. `deploy/systemd/`、`deploy/nginx/` 和 `deploy/env/`（12.7 至 12.9）。
-3. `.github/workflows/ci.yml`（12.10），如果在步骤 0.2 中选择了 SonarCloud 和 Qodana，再加上它们的 job。
-4. 按照 [12.2 表格](../reference/code/12-solution-level.mdx#12-2-directory-packages-props)为每个项目加入 NuGet package，不指定版本：`dotnet add src/ProductName.Domain package MediatR.Contracts`，依此类推。
-5. 步骤 1.2 的指令已删除模板范例、模板加入的带版本包引用，并把 Worker 的 `Program.cs` 换成最小版本。最小的 `Program.cs` 保留到步骤 2.4 与 2.5 再取代。
-
-```bash
-dotnet build
-docker compose config --quiet && echo "compose ok"
-```
 
 </TabItem>
 </Tabs>

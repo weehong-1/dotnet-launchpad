@@ -3,22 +3,16 @@
     "message": "一步一步建立 .NET 项目"
   },
   "home.description": {
-    "message": "新 .NET 10 Clean Architecture 后端的逐步 Setup Flow，附完整的 Boilerplate Reference。"
+    "message": "新 .NET 10 后端的逐步 Setup Flow：Clean Architecture、DDD 与 CQRS，之后再加入 PostgreSQL、消息与上线等附加组件。"
   },
   "home.heading": {
     "message": "一步一步建立新的 .NET 后端"
-  },
-  "home.lead": {
-    "message": "跟着 Setup Flow，从空文件夹走到部署完成的 Skeleton Solution：.NET 10 上的 Clean Architecture、Vertical Slice、DDD 与 CQRS。项目名称只需填一次，网站上的每条指令与每个文件都会使用它。"
   },
   "home.start": {
     "message": "开始 Setup Flow"
   },
   "home.reference": {
     "message": "浏览 Reference"
-  },
-  "home.status": {
-    "message": "Boilerplate v1.0 · Skeleton Solution 可以编译，测试通过（已用 scaffold 脚本验证）。VM 部署尚未验证。"
   },
   "home.statusLabel": {
     "message": "状态"
@@ -58,9 +52,6 @@
   },
   "projects.col.next": {
     "message": "下一步"
-  },
-  "projects.auditing": {
-    "message": "审计"
   },
   "projects.complete": {
     "message": "Setup 已完成"
@@ -447,5 +438,23 @@
   },
   "projects.notPersistent": {
     "message": "这个浏览器没有储存网站数据（隐私模式、被封锁或空间已满）：重新载入后项目与进度会消失。请导出 JSON 保存。"
+  },
+  "home.lead.v2": {
+    "message": "跟着 Setup Flow，从空文件夹走到可以运行的 Skeleton Solution：.NET 10 上的 Clean Architecture、DDD 与 CQRS，不必先准备数据库或消息代理。之后只加入项目需要的部分：PostgreSQL、以 RabbitMQ 与 MassTransit 收发消息、Worker、审计、登入，以及上线。项目名称只需填一次，网站上的每条指令与每个文件都会使用它。"
+  },
+  "home.status.v2": {
+    "message": "Boilerplate v2.0 · 核心 Skeleton Solution 与每一种附加组件组合都能零警告编译，核心测试不需要 Docker 就能通过（已用 scaffold 脚本验证）。VM 部署尚未验证。"
+  },
+  "home.addons": {
+    "message": "附加组件：Setup Flow 之后"
+  },
+  "home.addonsHint": {
+    "message": "每一个都是可选的，只加入项目需要的部分"
+  },
+  "projects.addons": {
+    "message": "附加组件"
+  },
+  "projects.coreOnly": {
+    "message": "无（只有核心）"
   }
 }

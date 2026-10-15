@@ -1,0 +1,96 @@
+---
+sidebar_label: A.1 加入 PostgreSQL
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import PromptAddPostgres from '../reference/_partials/prompt-add-postgres.mdx';
+import SnippetPackageVersions from '../reference/_partials/snippet-package-versions.mdx';
+import SnippetAddMigration from '../reference/_partials/snippet-add-migration.mdx';
+import AddOnSwitch from '@site/src/components/AddOnSwitch';
+import AddOnFiles from '@site/src/components/AddOnFiles';
+import PackageCommands from '@site/src/components/PackageCommands';
+import FlagScope from '@site/src/components/FlagScope';
+import StepApplies from '@site/src/components/StepApplies';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# A.1 加入 PostgreSQL
+
+<AddOnSwitch addon="postgres" />
+<StepApplies step="postgres" />
+
+这个附加组件为项目提供数据库：使用 PostgreSQL 的 EF Core（[Reference 7.4](../reference/spec/07-optional-components.mdx#7-4-postgresql)）。
+
+- `ApplicationDbContext` 既是 unit of work（`IUnitOfWork`），也是 Query 的读取端（`IApplicationDbContext`）。它在保存之前，先通过 MediatR 发布聚合的领域事件，让这些事件处理器所做的变更在同一个事务中提交。
+- `Repository<TAggregate, TId>` 是每个聚合的 repository 的基类：写入用例通过它加载和保存完整的聚合。
+- 强类型 ID 会自动获得值转换，`IHasTimestamps` 实体的时间会自动填入。
+- 每个聚合根都在 PostgreSQL 的 `xmin` 列上使用乐观并发，冲突会变成 409 响应。
+
+本地由 Docker 运行 PostgreSQL，整合测试则用 Testcontainers 启动自己的实例。
+
+<Tabs groupId="route" queryString>
+<TabItem value="manual" label="手动" default>
+
+**1. 创建新文件，并把高亮的行加入**现有文件：
+
+<AddOnFiles addon="postgres" />
+
+**2. 填入新 package 的版本并引用这些 package。** [步骤 1.3](./solution-files.mdx) 的版本循环只会填入空的 `Version=""` 行：
+
+<SnippetPackageVersions />
+
+<FlagScope addon="postgres">
+<PackageCommands addon="postgres" />
+</FlagScope>
+
+```bash
+dotnet build
+```
+
+**3. 安装 EF Core 工具并创建第一个 migration。** 它是空的：在功能加入表之前，还没有任何表。
+
+```bash
+dotnet new tool-manifest
+dotnet tool install dotnet-ef
+```
+
+<SnippetAddMigration />
+
+migration 名称使用 `InitialCreate`。
+
+**4. 运行。** 先启动 PostgreSQL，再启动 Api；在 Development 中，Api 会在启动时应用 migration：
+
+```bash
+docker compose up -d
+dotnet run --project src/ProductName.Api
+```
+
+证明在 Development 之外，没有真实设定时 Api 会拒绝启动：
+
+```bash
+ASPNETCORE_ENVIRONMENT=SIT dotnet run --project src/ProductName.Api --no-launch-profile
+# 预期：启动时失败，而不是连接到本地数据库
+```
+
+**5. 测试**（Docker 必须在运行）：
+
+```bash
+dotnet test
+```
+
+</TabItem>
+<TabItem value="script" label="脚本">
+
+scaffold 脚本只能把附加组件加入全新的空 repo。如果还没有任何功能，可以重新开始：在上方开启这个附加组件，然后在新文件夹中执行步骤 1.2 的指令。否则请走手动或 AI Agent 路径。
+
+</TabItem>
+<TabItem value="ai" label="AI Agent">
+
+在上方开启这个附加组件，把通用规则（[步骤 1.1](./repository.mdx)）中更新后的附加组件相关行复制到 agent 指令文件中，然后粘贴：
+
+<PromptAddPostgres />
+
+</TabItem>
+</Tabs>
+
+<DoneConditions step="postgres" />

@@ -11,6 +11,10 @@
     "message": "Setup Flow",
     "description": "Navbar item with label Setup Flow"
   },
+  "item.label.Add-ons": {
+    "message": "附加组件",
+    "description": "Navbar item with label Add-ons"
+  },
   "item.label.Reference": {
     "message": "Reference",
     "description": "Navbar item with label Reference"

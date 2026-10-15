@@ -7,16 +7,34 @@ import StepList from '@site/src/components/StepList';
 
 # Setup Flow
 
-Setup Flow 把一个新的后端从空文件夹带到在 SIT 和 Production 上运行的 Skeleton Solution，可以开始编写第一个 feature。按顺序完成各步骤；每个步骤最后都有**完成条件**，全部满足后才能继续。
+Setup Flow 把一个新的后端从空文件夹带到可以运行的 **Skeleton Solution**：一个按 Clean Architecture 布局的 .NET 10 solution，已备好领域驱动设计（DDD）和命令查询职责分离（CQRS）的基础构件，还没有任何业务功能。它不需要数据库、message broker 或 identity provider。其余一切都在之后以[附加组件](./addons.mdx)的形式加入。
+
+## 你将建立什么
+
+| 项目 | 层 | 内容 |
+| --- | --- | --- |
+| `Domain` | 洋葱的核心；不依赖任何东西 | DDD 基础构件：entity、aggregate root、domain event、强类型 ID、`Result` 和错误 |
+| `Application` | 依赖 Domain | CQRS：通过 MediatR 实现的 Command、Query 及其 handler，带日志和验证 pipeline |
+| `Infrastructure` | 实现 Application 的抽象 | 技术服务；在核心中除了时间、健康检查和 HTTP 弹性处理外是空的 |
+| `Api` | 入口；把所有部分串在一起 | Minimal API endpoint、错误处理、OpenAPI、使用 Serilog 和 Seq 记录日志 |
+| 四个测试项目 | | 强制执行分层规则的架构测试，以及单元测试和 Api 测试 |
+
+[Reference 3](../reference/spec/03-layers-and-dependency-direction.mdx) 说明各层以及依赖的方向。
 
 ## 使用方式
 
-1. **在[步骤 0.1](./project-settings.mdx) 开始一个项目。** 它的项目名称和简短名称会替换站点上所有命令和文件中的 `%%ProductName%%` 和 `%%productname%%`，Worker 和审计开关会隐藏项目不需要的内容。
-2. **为代码步骤选择一种路径。** 步骤 1.2 至 2.6 有三个标签页：**脚本**（步骤 1.2 的一条指令由 Reference 产生整个 Skeleton Solution）、**AI Agent**（把各节提示词粘贴到 Claude Code、Cursor 或 Copilot）和**手动**（自己建立文件）。三者最后都是同样的完成条件。
+1. **在[步骤 0.1](./project-settings.mdx) 为项目命名。** 它的项目名称和简短名称会替换站点上所有命令和文件中的 `%%ProductName%%` 和 `%%productname%%`。
+2. **按顺序完成各步骤。** 每个代码步骤有三个标签页：
+   - **手动**（默认）列出要运行的命令和要创建的每个文件，附上代码以及 Reference 中解释它的位置的链接。
+   - **脚本**在步骤 1.2 运行一条指令，创建整个 Skeleton Solution。
+   - **AI Agent** 提供给 Claude Code、Cursor 或 Copilot 的提示词。
+
+   三者最后都是同样的完成条件。
 3. **勾选完成条件。** 进度按当前项目保存在此浏览器中。[项目](/projects)页面显示每个项目及其下一步骤，并可导出备份。
+4. **然后从[附加组件](./addons.mdx)中加入项目需要的部分**：PostgreSQL、使用 RabbitMQ 和 MassTransit 的消息、Worker、审计、身份验证，以及在 SIT 和 Production 上线。
 
 :::info[已验证的范围]
-Boilerplate v1.0 已用步骤 1.2 的 scaffold 脚本在 .NET SDK 10.0.401 上验证，Worker 与审计全开、全关两种组合都试过：Skeleton Solution 零警告编译，第一个 migration 可以建立，设定 MassTransit 授权后测试全部通过。VM 上的运行（步骤 4.2 至 4.7）尚未验证。如果某个步骤失败，请先修正 Reference，让下一个项目从可运作的代码开始。
+Boilerplate v2.0 已用步骤 1.2 的 scaffold 脚本在 .NET SDK 10.0.402 上验证，单独的核心以及每种附加组件组合都试过。每种组合都零警告编译，并建立预期的 migration。核心测试无需 Docker 或授权即可通过，身份验证的测试也通过。PostgreSQL 和消息的测试需要 Docker，最后一次运行是在 v1.0。VM 上的运行（上线）尚未验证。如果某个步骤失败，请先修正 Reference，让下一个项目从可运作的代码开始。
 :::
 
 ## 步骤

@@ -1,0 +1,87 @@
+---
+sidebar_label: E.2 加入身份验证
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import PromptAddAuth from '../reference/_partials/prompt-add-auth.mdx';
+import SnippetPackageVersions from '../reference/_partials/snippet-package-versions.mdx';
+import AddOnSwitch from '@site/src/components/AddOnSwitch';
+import AddOnFiles from '@site/src/components/AddOnFiles';
+import PackageCommands from '@site/src/components/PackageCommands';
+import FlagScope from '@site/src/components/FlagScope';
+import StepApplies from '@site/src/components/StepApplies';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# E.2 加入身份验证
+
+<AddOnSwitch addon="auth" />
+<StepApplies step="auth" />
+
+这个附加组件让 Api 接受步骤 E.1 的身份提供者签发的 JWT access token（[Reference 8.16](../reference/spec/08-design-rules/16-authentication-and-authorization.mdx)）。
+
+- **默认所有地方都要求登录。** `/health`、OpenAPI 和 Scalar UI 明确设为公开；其他任何公开 endpoint 都必须写明 `.AllowAnonymous()`。
+- **权限**来自 token 中的一个 claim。endpoint 用 `.RequirePermission("orders.create")` 要求某个权限。
+- **`ICurrentUser`** 让 Application 取得已登录用户的 ID。
+
+<Tabs groupId="route" queryString>
+<TabItem value="manual" label="手动" default>
+
+**1. 创建新文件，并把高亮的行加入**现有文件：
+
+<AddOnFiles addon="auth" />
+
+**2. 填入新 package 的版本并引用该 package：**
+
+<SnippetPackageVersions />
+
+<FlagScope addon="auth">
+<PackageCommands addon="auth" />
+</FlagScope>
+
+```bash
+dotnet build
+dotnet test
+```
+
+**3. 设定 Development 的 Authority 和 Audience**，值来自步骤 E.1（它们不是机密：也可以放在 `appsettings.Development.json` 中）：
+
+```bash
+dotnet user-secrets set "Authentication:Authority" "https://<identity provider>" --project src/ProductName.Api
+dotnet user-secrets set "Authentication:Audience" "<audience>" --project src/ProductName.Api
+```
+
+**4. 检查。** 启动 Api，然后：
+
+```bash
+API=http://localhost:5000   # 使用 launchSettings.json 中的 URL
+curl -i $API/health         # 200，无需 token
+curl -i $API/openapi/v1.json
+curl -i $API/anything       # 401：默认所有 endpoint 都要求登录
+```
+
+接着证明真实的 token 会被接受，而不只是缺少 token 会被拒绝。按步骤 E.1 的方法取得 Api audience 的 access token，然后：
+
+```bash
+TOKEN=<access token>
+curl -i -H "Authorization: Bearer $TOKEN" $API/anything   # 404：已通过验证，只是路径不存在
+```
+
+如果这里返回 401，表示 `Authentication:Authority` 或 `Authentication:Audience` 与 token 不符，请先修正再继续。
+
+</TabItem>
+<TabItem value="script" label="脚本">
+
+scaffold 脚本只能把附加组件加入全新的空 repo。如果还没有任何功能，可以重新开始：在上方开启这个附加组件，然后在新文件夹中执行步骤 1.2 的指令。否则请走手动或 AI Agent 路径。
+
+</TabItem>
+<TabItem value="ai" label="AI Agent">
+
+在上方开启这个附加组件，把通用规则（[步骤 1.1](./repository.mdx)）中更新后的附加组件相关行复制到 agent 指令文件中，然后粘贴：
+
+<PromptAddAuth />
+
+</TabItem>
+</Tabs>
+
+<DoneConditions step="auth" />

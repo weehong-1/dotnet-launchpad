@@ -11,21 +11,41 @@
     "message": "1. 建立 solution",
     "description": "The label for category '1. Create the solution' in sidebar 'setup'"
   },
-  "sidebar.setup.category.2. Generate the layers": {
-    "message": "2. 逐层生成",
-    "description": "The label for category '2. Generate the layers' in sidebar 'setup'"
+  "sidebar.setup.category.2. Write the layers": {
+    "message": "2. 逐层撰写",
+    "description": "The label for category '2. Write the layers' in sidebar 'setup'"
   },
   "sidebar.setup.category.3. Run it locally": {
     "message": "3. 本地跑通",
     "description": "The label for category '3. Run it locally' in sidebar 'setup'"
   },
-  "sidebar.setup.category.4. Get ready to go live": {
-    "message": "4. 上线准备",
-    "description": "The label for category '4. Get ready to go live' in sidebar 'setup'"
+  "sidebar.setup.category.4. Hand over to feature work": {
+    "message": "4. 交棒",
+    "description": "The label for category '4. Hand over to feature work' in sidebar 'setup'"
   },
-  "sidebar.setup.category.5. Hand over to feature work": {
-    "message": "5. 交棒",
-    "description": "The label for category '5. Hand over to feature work' in sidebar 'setup'"
+  "sidebar.addons.category.A. PostgreSQL": {
+    "message": "A. PostgreSQL",
+    "description": "The label for category 'A. PostgreSQL' in sidebar 'addons'"
+  },
+  "sidebar.addons.category.B. Messaging": {
+    "message": "B. 消息",
+    "description": "The label for category 'B. Messaging' in sidebar 'addons'"
+  },
+  "sidebar.addons.category.C. Worker": {
+    "message": "C. Worker",
+    "description": "The label for category 'C. Worker' in sidebar 'addons'"
+  },
+  "sidebar.addons.category.D. Auditing": {
+    "message": "D. 审计",
+    "description": "The label for category 'D. Auditing' in sidebar 'addons'"
+  },
+  "sidebar.addons.category.E. Authentication": {
+    "message": "E. 身份验证",
+    "description": "The label for category 'E. Authentication' in sidebar 'addons'"
+  },
+  "sidebar.addons.category.F. Go live": {
+    "message": "F. 上线",
+    "description": "The label for category 'F. Go live' in sidebar 'addons'"
   },
   "sidebar.reference.category.Part 1: Architecture specification": {
     "message": "第一部分：架构规范",

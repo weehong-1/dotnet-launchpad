@@ -1,0 +1,53 @@
+---
+sidebar_label: 概览
+sidebar_position: 0
+---
+
+import AddOnSwitch from '@site/src/components/AddOnSwitch';
+import StepList from '@site/src/components/StepList';
+
+# 附加组件
+
+[Setup Flow](./index.mdx) 构建核心 Skeleton Solution：Clean Architecture、DDD 和 CQRS，不含数据库、broker 或登录。其余部分由附加组件在核心运行起来之后逐一加入。每个附加组件都是可选的：只加入项目需要的，并按下面的顺序进行。
+
+为当前项目开启某个附加组件，然后按它的步骤操作。之后站上的每个代码块都会包含它，它的步骤也开始计入你的进度。每个附加组件页面都会完整列出新文件，以及它修改的现有文件，并高亮显示改动的行。
+
+## A. PostgreSQL
+
+使用 PostgreSQL 的 EF Core。加入 `DbContext`（它同时也是 unit of work）、repository 基类和第一个 migration。保存变更时会在同一个事务中发布领域事件。大多数后端都需要它；消息和审计都建立在它之上。[Reference 7.4](../reference/spec/07-optional-components.mdx#7-4-postgresql)。
+
+<AddOnSwitch addon="postgres" href="/docs/setup/postgres" />
+
+## B. 消息（RabbitMQ 与 MassTransit）
+
+通过 RabbitMQ 和 MassTransit 传递集成事件。事件与业务数据在同一个事务中写入 Outbox 表，每个 Consumer 都有 Inbox，因此消息不会丢失，也不会被处理两次。MassTransit v9 需要商业许可证。[Reference 7.5](../reference/spec/07-optional-components.mdx#7-5-messaging) 与 [8.4](../reference/spec/08-design-rules/04-masstransit-async-messaging.mdx)。
+
+<AddOnSwitch addon="messaging" href="/docs/setup/licenses" />
+
+## C. Worker
+
+用于后台工作的第二个 host：它运行 Consumer 并投递 Outbox，让 Api 只负责响应请求。定时任务也放在这里。[Reference 7.1](../reference/spec/07-optional-components.mdx#7-1-worker)。
+
+<AddOnSwitch addon="worker" href="/docs/setup/worker" />
+
+## D. 审计
+
+从第一天起记录数据变更和操作的审计记录。从未记录的历史之后无法恢复，所以如果系统将来会需要它，请在第一个功能之前加入。[Reference 7.3](../reference/spec/07-optional-components.mdx#7-3-audit-records)。
+
+<AddOnSwitch addon="auditing" href="/docs/setup/auditing" />
+
+## E. 身份验证
+
+对任何 OpenID Connect 提供者进行 JWT Bearer 登录，并在 endpoint 上检查权限。之后每个 endpoint 默认都要求登录。[Reference 8.16](../reference/spec/08-design-rules/16-authentication-and-authorization.mdx)。
+
+<AddOnSwitch addon="auth" href="/docs/setup/identity-provider" />
+
+## F. 上线
+
+GitHub Actions 上的 CI，然后是位于 Nginx 之后、运行在 Ubuntu VM 上的 SIT 和 Production。最后再做：这些步骤会根据项目已有的其他附加组件调整。[Reference 7.7](../reference/spec/07-optional-components.mdx#7-7-go-live) 与 [8.21](../reference/spec/08-design-rules/21-deployment.mdx)。
+
+<AddOnSwitch addon="golive" href="/docs/setup/ci" />
+
+## 所有附加组件步骤
+
+<StepList track="addon" />

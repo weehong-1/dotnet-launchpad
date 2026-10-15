@@ -1,0 +1,66 @@
+---
+sidebar_label: D.1 加入审计
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import PromptAddAuditing from '../reference/_partials/prompt-add-auditing.mdx';
+import SnippetAddMigration from '../reference/_partials/snippet-add-migration.mdx';
+import AddOnSwitch from '@site/src/components/AddOnSwitch';
+import AddOnFiles from '@site/src/components/AddOnFiles';
+import StepApplies from '@site/src/components/StepApplies';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# D.1 加入审计
+
+<AddOnSwitch addon="auditing" />
+<StepApplies step="auditing" />
+
+审计从第一天起记录改了什么、谁做了什么（[Reference 7.3](../reference/spec/07-optional-components.mdx#7-3-audit-records)）。从未记录的历史之后无法恢复。它需要 PostgreSQL。
+
+- **数据变更审计**：EF Core interceptor 为每个标记了 `IAuditable` 的实体的每次变更写入一行 `AuditTrails`，包含旧值和新值。
+- **操作审计**：pipeline behavior 为每个标记了 `IAuditableRequest` 的 Command 或 Query 的每次执行写入一行 `OperationAudits`，失败的执行也包括在内。
+
+在 SIT 和 Production（上线）上，应用程序账号不能修改或删除审计记录。
+
+<Tabs groupId="route" queryString>
+<TabItem value="manual" label="手动" default>
+
+**1. 创建新文件，并把高亮的行加入**现有文件：
+
+<AddOnFiles addon="auditing" />
+
+```bash
+dotnet build
+```
+
+**2. 为审计表创建 migration：**
+
+<SnippetAddMigration />
+
+migration 名称使用 `AddAuditTables`。打开它：它只能包含 `AuditTrails` 和 `OperationAudits` 表。
+
+**3. 测试：**
+
+```bash
+dotnet test
+```
+
+**4. 在功能出现之前写下审计规则**：哪些类型的实体实现 `IAuditable`、哪些属性加上 `[AuditIgnore]`、哪些类型的 Command 或 Query 实现 `IAuditableRequest`。把规则写进 agent 指令文件，让每个 feature slice 都遵守。
+
+</TabItem>
+<TabItem value="script" label="脚本">
+
+scaffold 脚本只能把附加组件加入全新的空 repo。如果还没有任何功能，可以重新开始：在上方开启这个附加组件，然后在新文件夹中执行步骤 1.2 的指令。否则请走手动或 AI Agent 路径。
+
+</TabItem>
+<TabItem value="ai" label="AI Agent">
+
+在上方开启这个附加组件，把通用规则（[步骤 1.1](./repository.mdx)）中更新后的附加组件相关行复制到 agent 指令文件中，然后粘贴：
+
+<PromptAddAuditing />
+
+</TabItem>
+</Tabs>
+
+<DoneConditions step="auditing" />

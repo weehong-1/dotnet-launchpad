@@ -5,14 +5,32 @@ sidebar_label: 2.2 Application
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import Prompt14Application from '../reference/_partials/prompt-14-application.mdx';
+import LayerFiles from '@site/src/components/LayerFiles';
 import DoneConditions from '@site/src/components/DoneConditions';
 
 # 2.2 Application
 
-Application 包含 CQRS 消息接口、pipeline behavior（日志、操作审计、验证）以及由 Infrastructure 实现的抽象。代码见 [Reference 14](../reference/code/14-application.mdx)。
+Application 包含用例，按 CQRS 分为 **Command**（改变状态）和 **Query**（读取状态）。每一个都是只有一个 handler 的 MediatR 请求，每个 handler 都返回 `Result`。
+
+- 我们自己的 `ICommand`、`IQuery` 和 handler 接口包装了 MediatR，让每个用例都有相同的形状。
+- 两个 **pipeline behavior** 包在每个 handler 外面运行：先是日志，然后是使用 FluentValidation 的验证。验证只对 Command 运行。
+- `DependencyInjection.cs` 用一次调用注册 MediatR、这些 behavior 和每个 validator。
+
+现在不创建任何范例 Command 或 Query；功能会自行加入（[Reference 8.15](../reference/spec/08-design-rules/15-feature-slices-vertical-slice.mdx)）。代码见 [Reference 14](../reference/code/14-application.mdx)。
 
 <Tabs groupId="route" queryString>
-<TabItem value="script" label="脚本" default>
+<TabItem value="manual" label="手动" default>
+
+在 `src/ProductName.Application/` 中创建这些文件，最后再建立 `GlobalUsings.cs`：
+
+<LayerFiles project="Application" />
+
+```bash
+dotnet build
+```
+
+</TabItem>
+<TabItem value="script" label="脚本">
 
 已由[步骤 1.2](./empty-solution.mdx) 的 scaffold 脚本完成。请对照下方的完成条件检查结果。
 
@@ -20,17 +38,6 @@ Application 包含 CQRS 消息接口、pipeline behavior（日志、操作审计
 <TabItem value="ai" label="AI Agent">
 
 <Prompt14Application />
-
-</TabItem>
-<TabItem value="manual" label="手动">
-
-按 [Reference 11](../reference/code/11-file-overview.mdx) 列出的路径，创建 [Reference 14.1 至 14.19](../reference/code/14-application.mdx) 中的每个文件。14.16 至 14.19 仅在启用审计时创建；未启用时，为你的项目显示的 14.15 代码中已没有 `OperationAuditPipelineBehavior` 的注册。
-
-最后按 [Reference 11.3](../reference/code/11-file-overview.mdx#11-3-globalusings-cs-per-project) 建立此项目的 `GlobalUsings.cs`，然后编译：
-
-```bash
-dotnet build
-```
 
 </TabItem>
 </Tabs>
