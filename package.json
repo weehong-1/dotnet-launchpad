@@ -13,9 +13,9 @@
     "write-translations": "docusaurus write-translations",
     "write-heading-ids": "docusaurus write-heading-ids",
     "typecheck": "tsc",
-    "prebuild": "node scripts/build-template-md.mjs && node scripts/build-scaffold.mjs",
-    "prestart": "node scripts/build-template-md.mjs && node scripts/build-scaffold.mjs",
-    "generate": "node scripts/build-template-md.mjs && node scripts/build-scaffold.mjs"
+    "prebuild": "node scripts/check-i18n.mjs && node scripts/build-template-md.mjs && node scripts/build-scaffold.mjs",
+    "prestart": "node scripts/check-i18n.mjs && node scripts/build-template-md.mjs && node scripts/build-scaffold.mjs",
+    "generate": "node scripts/check-i18n.mjs && node scripts/build-template-md.mjs && node scripts/build-scaffold.mjs"
   },
   "dependencies": {
     "@docusaurus/core": "3.10.2",
