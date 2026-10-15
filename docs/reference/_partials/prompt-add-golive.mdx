@@ -1,0 +1,9 @@
+```text
+Add the Go live add-on to this project: the deployment files and CI of 12.7 to 12.10, following section 8.21. Set "Add-on Go live: yes" in the project settings first.
+
+1. Create the files of 12.7 to 12.10, replacing %%productname%% in file names and content with the short name and %%ProductName%% with the project name, and keeping only the lines for add-ons that are "yes" (the Worker's files only with the Worker add-on).
+2. Add the SonarCloud and Qodana jobs of 12.10 per the project settings.
+3. Do not change any code.
+
+Done when: every file of 12.7 to 12.10 that applies exists; dotnet build has zero warnings and zero errors.
+```

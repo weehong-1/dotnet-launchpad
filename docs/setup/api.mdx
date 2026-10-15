@@ -1,23 +1,36 @@
 ---
-sidebar_label: 2.4 Api and first migration
+sidebar_label: 2.4 Api
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import Prompt16Api from '../reference/_partials/prompt-16-api.mdx';
+import LayerFiles from '@site/src/components/LayerFiles';
 import DoneConditions from '@site/src/components/DoneConditions';
-import SnippetAddMigration from '../reference/_partials/snippet-add-migration.mdx';
 
-# 2.4 Api and the first migration
+# 2.4 Api
 
-The Api is the HTTP entry point: endpoints, authentication, permissions, rate limiting, error handling, OpenAPI and health checks. This step also creates the first migration. The code is in [Reference 16](../reference/code/16-api.mdx).
+The Api is the entry point. `Program.cs` wires the layers together (`AddApplication`, `AddInfrastructure`) and sets up what every HTTP API needs:
 
-:::note
-The prompt's runtime checks (b) to (d) need local services and secrets, so they are checked in steps 3.1 and 3.2. Here, check that it builds and that the migration is right.
-:::
+- **Endpoints** are Minimal API classes, one per use case, found automatically. Each one sends a Command or Query and turns the `Result` into a response.
+- **Error handling** turns failures into ProblemDetails responses.
+- **OpenAPI** with the Scalar UI, **rate limiting**, a `/health` endpoint, and request logging with Serilog to Seq.
+
+The code is in [Reference 16](../reference/code/16-api.mdx).
 
 <Tabs groupId="route" queryString>
-<TabItem value="script" label="Script" default>
+<TabItem value="manual" label="Manual" default>
+
+Create these files in `src/ProductName.Api/`, replacing the template's `Program.cs` and `appsettings` files. Check that `Properties/launchSettings.json` sets `ASPNETCORE_ENVIRONMENT` to `Development`.
+
+<LayerFiles project="Api" />
+
+```bash
+dotnet build
+```
+
+</TabItem>
+<TabItem value="script" label="Script">
 
 Done by the scaffold script in [step 1.2](./empty-solution.mdx). Check the result against the Done Conditions below.
 
@@ -26,18 +39,7 @@ Done by the scaffold script in [step 1.2](./empty-solution.mdx). Check the resul
 
 <Prompt16Api />
 
-</TabItem>
-<TabItem value="manual" label="Manual">
-
-1. Create each file of [Reference 16.1 to 16.11](../reference/code/16-api.mdx) at the paths listed in [Reference 11](../reference/code/11-file-overview.mdx).
-2. Create the four settings files of [Reference 16.12](../reference/code/16-api.mdx#16-12-appsettings-files-4).
-3. Replace `Program.cs` with [Reference 16.13](../reference/code/16-api.mdx#16-13-program-cs), and check that `Properties/launchSettings.json` sets `ASPNETCORE_ENVIRONMENT` to `Development`.
-4. Create this project's `GlobalUsings.cs` from [Reference 11.3](../reference/code/11-file-overview.mdx#11-3-globalusings-cs-per-project).
-5. Create the first migration (dotnet-ef was installed as a local tool in step 1.2):
-
-<SnippetAddMigration />
-
-Use `InitialCreate` as the migration name. Open the generated migration: it must contain only the MassTransit Outbox and Inbox tables, plus `AuditTrails` and `OperationAudits` with Auditing.
+The prompt's runtime check (b) needs Seq and secrets, so it is checked in step 3.1. Here, check that it builds.
 
 </TabItem>
 </Tabs>

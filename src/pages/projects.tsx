@@ -2,7 +2,7 @@ import React, {useEffect, useRef, useState, type ReactNode} from 'react';
 import Layout from '@theme/Layout';
 import Link from '@docusaurus/Link';
 import Translate, {translate} from '@docusaurus/Translate';
-import {useProjects, type ExportFile, type Project, type Progress} from '@site/src/lib/project';
+import {ADDONS, useProjects, type ExportFile, type Project, type Progress} from '@site/src/lib/project';
 import {useLocale} from '@site/src/lib/i18n';
 import {applies, checksFor, pick, STEPS, type Step} from '@site/src/data/steps';
 import styles from './projects.module.css';
@@ -114,7 +114,8 @@ function ProjectsTable(): ReactNode {
                         {isActive && <span className="tag tag-accent"><Translate id="projects.active">Active</Translate></span>}
                       </div>
                       <div className={`${styles.meta} text-muted`}>
-                        <code>{p.shortName}</code> · Worker {p.worker ? '✓' : '✗'} · {translate({id: 'projects.auditing', message: 'Auditing'})} {p.auditing ? '✓' : '✗'}
+                        <code>{p.shortName}</code> · {translate({id: 'projects.addons', message: 'Add-ons'})}:{' '}
+                        {ADDONS.filter((a) => p[a.id]).map((a) => pick(a.label, locale)).join(', ') || translate({id: 'projects.coreOnly', message: 'none (core only)'})}
                       </div>
                     </td>
                     <td>

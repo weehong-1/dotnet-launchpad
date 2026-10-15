@@ -4,6 +4,10 @@ sidebar_label: "8.21 Deployment"
 
 # 8.21 Deployment \{#8-21-deployment\}
 
+:::note[Add-on]
+These rules come with the Go live add-on ([7.7](../07-optional-components.mdx#7-7-go-live)). Steps for the database, broker or Worker apply only when the project has those add-ons.
+:::
+
 **Publishing**
 
 Publish self contained for linux-x64. The executable includes the .NET runtime, so the VM needs no .NET installed and each application pins its own runtime version. See [12.10](../../code/12-solution-level.mdx#12-10-github-workflows-ci-yml) for CI.

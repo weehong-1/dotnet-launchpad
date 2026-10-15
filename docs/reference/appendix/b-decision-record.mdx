@@ -8,6 +8,7 @@ Alternatives marked "English guide" are the approach the English guide actually 
 
 | Decision | Choice | Reason | Main alternatives |
 | --- | --- | --- | --- |
+| Core and add-ons | A core Skeleton Solution with no database, broker or sign in; PostgreSQL, Messaging, Worker, Auditing, Authentication and Go live are add-ons marked in one Boilerplate (v2.0, see `docs/adr/0003-core-setup-and-add-ons.md`) | The core is quick to set up and understand; each project adds only what it needs, in a fixed order | Everything always in (v1.0); separate Boilerplate per add-on, rejected because code would be duplicated |
 | Presentation naming | Named by host as `Api` and `Worker`, not Presentation | The presentation layer has several entry points, and host names tell them apart; matches mainstream practice | A separate Presentation class library |
 | Endpoint style | Minimal API, auto registered `IEndpoint` | Endpoints map one to one to feature slices, with no Controller base class | Controllers plus Asp.Versioning (English guide) |
 | CQRS pipeline | MediatR wrapped in our own interfaces | Mature pipeline behaviors; own interfaces force Result and allow replacement later | Custom dispatcher, source generated Mediator |

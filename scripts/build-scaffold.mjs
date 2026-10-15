@@ -230,7 +230,7 @@ for (const [flag, byProject] of Object.entries(addonPackages)) {
 }
 
 // ---------------------------------------------------------------- guards across both languages
-// Every marker names a known flag, everywhere code blocks are written (Reference, partials, Setup Flow).
+// Every marker in a code block names a known flag, wherever code blocks are written (Reference, partials, Setup Flow).
 function walk(dir, ext) {
   return readdirSync(dir).flatMap((n) => {
     const p = join(dir, n);
@@ -239,7 +239,8 @@ function walk(dir, ext) {
 }
 const docRoots = [join(root, 'docs'), join(root, 'i18n/zh-Hans/docusaurus-plugin-content-docs/current')];
 for (const file of docRoots.flatMap((d) => walk(d, ['.md', '.mdx']))) {
-  for (const m of readFileSync(file, 'utf8').matchAll(ANY_MARKER)) {
+  const fenced = [...readFileSync(file, 'utf8').matchAll(/^```[^\n]*\n([\s\S]*?)^```/gm)].map((m) => m[1]).join('\n');
+  for (const m of fenced.matchAll(ANY_MARKER)) {
     const flag = m[1].replace(/-(begin|end)$/, '');
     if (!FLAGS.includes(flag)) fail(`${relative(root, file)}: unknown flag @@${m[1]} (known: ${FLAGS.join(', ')})`);
   }

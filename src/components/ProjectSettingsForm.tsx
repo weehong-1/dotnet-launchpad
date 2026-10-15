@@ -10,7 +10,6 @@ import {
   type Project,
 } from '@site/src/lib/project';
 import {useStrings} from '@site/src/lib/i18n';
-import CheckRow from './CheckRow';
 import styles from './styles.module.css';
 
 export default function ProjectSettingsForm(): ReactNode {
@@ -45,11 +44,11 @@ export default function ProjectSettingsForm(): ReactNode {
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!nameOk || !shortOk) return;
-    // Save only this form's fields on top of the latest stored project, so Project Decisions
-    // changed meanwhile (for example in another tab) are kept.
+    // Save only this form's fields on top of the latest stored project, so Project Decisions and
+    // add-ons changed meanwhile (for example in another tab) are kept.
     const latest = projects.find((p) => p.id === draft.id);
-    const {projectName, shortName, worker, auditing} = draft;
-    const ok = saveProject(latest ? {...latest, projectName, shortName, worker, auditing} : draft);
+    const {projectName, shortName} = draft;
+    const ok = saveProject(latest ? {...latest, projectName, shortName} : draft);
     setSaved(ok ? 'stored' : 'session');
   };
 
@@ -97,13 +96,6 @@ export default function ProjectSettingsForm(): ReactNode {
           <small className={shortError ? styles.fieldError : undefined}>{shortError ? t.invalidShortName : t.shortNameHelp}</small>
         </label>
       </div>
-
-      <CheckRow checked={draft.worker} onChange={(worker) => update({worker})}>
-        <strong>{t.worker}</strong> · {t.workerHelp}
-      </CheckRow>
-      <CheckRow checked={draft.auditing} onChange={(auditing) => update({auditing})}>
-        <strong>{t.auditing}</strong> · {t.auditingHelp}
-      </CheckRow>
 
       <div className={styles.formActions}>
         <button type="submit" className="btn btn-primary" disabled={!nameOk || !shortOk}>

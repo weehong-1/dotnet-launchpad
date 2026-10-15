@@ -1,10 +1,9 @@
 ```text
-Run section 18 of the document (Tests). Prerequisite: section 16 is done (and section 17 when the Worker is chosen).
+Run section 18 of the document (Tests). Prerequisite: section 16 is done (and section 17 with the Worker add-on).
 
-1. Create the files of 18.1 to 18.5 at the paths listed in section 11, with the document's content. Test projects use xUnit v3.
-2. Without a Worker, remove the Worker constant from LayerTests and from HaveDependencyOnAny.
-3. Create the GlobalUsings.cs of the four test projects per 11.3.
-4. Create no tests other than those in 18.1 to 18.5.
+1. Create the files of 18.1 to 18.5 at the paths listed in section 11, with the document's content, keeping only the add-on lines for add-ons that are "yes". Test projects use xUnit v3.
+2. Create the GlobalUsings.cs of the four test projects per 11.3.
+3. Create no tests other than those in 18.1 to 18.5.
 
-Done when: dotnet test passes (Docker must be running for Testcontainers, and MT_LICENSE or MT_LICENSE_PATH must be set for MassTransit).
+Done when: dotnet test passes. The core tests need no Docker; with PostgreSQL, Docker must be running for Testcontainers, and with Messaging, MT_LICENSE or MT_LICENSE_PATH must be set for MassTransit.
 ```

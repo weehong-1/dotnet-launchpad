@@ -9,7 +9,7 @@ The system has four conceptual layers:
 1. **Domain**: core business rules; depends on no other layer.
 2. **Application**: orchestrates use cases; depends only on Domain.
 3. **Infrastructure**: implements the interfaces Application defines and handles technical details such as the database and external services.
-4. **Presentation**: entry points, namely the Api plus an optional Worker.
+4. **Presentation**: entry points, namely the Api plus the Worker add-on.
 
 Dependency rules:
 
@@ -24,7 +24,30 @@ The benefit: Domain and Application can be fully tested without a database, web 
 
 Clean Architecture decides **vertical** dependencies: which layer may reference which. Vertical Slice decides organisation **within each layer**: Application, Api, Worker and tests all use "feature, then use case" folders, keeping every file for one use case together, and the folder structures of the layers mirror each other. Domain is organised by aggregate and Infrastructure by technical concern. See [8.15](./08-design-rules/15-feature-slices-vertical-slice.mdx).
 
-**Request flow**
+**Request flow in the core**
+
+In the core Skeleton Solution a request only passes through the Api and Application: there is no database or broker yet.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Caller
+    participant A as Api (presentation)
+    participant App as Application
+    participant D as Domain
+    C->>A: HTTP request
+    A->>App: Send the Command or Query through MediatR
+    App->>App: Logging pipeline, then validation (Commands only)
+    Note over App: Invalid input: a failed Result, 400
+    App->>D: The handler calls aggregates and domain services
+    D-->>App: Result (domain events collected on the aggregate)
+    App-->>A: Result
+    A-->>C: 200 / 201, or ProblemDetails for a failure
+```
+
+The add-ons put more on this path: PostgreSQL stores the aggregates and publishes their domain events when saving, Messaging hands integration events to RabbitMQ through the Outbox, Authentication checks the token first, and Go live puts Nginx in front.
+
+**Request flow with every add-on**
 
 The two Mermaid sequence diagrams below show which layers a request passes through: each vertical line is a layer (or an external service), each arrow is one step, and the column an arrow points to is the layer where that step happens. The numbers on the arrows match the tables below the diagrams. The notes show where a request can be rejected. GitHub, GitLab, Azure DevOps, VS Code and Rider all render Mermaid.
 
@@ -53,7 +76,7 @@ sequenceDiagram
     A->>I: Read permissions via IPermissionProvider (ClaimsPermissionProvider)
     I-->>A: Permission granted, endpoint binds parameters
     A->>App: Send Command with ISender, enter logging pipeline
-    App->>App: Operation audit pipeline (optional)
+    App->>App: Operation audit pipeline (Auditing add-on)
     App->>App: Validation pipeline (FluentValidation)
     Note right of App: Validation fails: return early, ends as 400
     App->>App: Command handler starts the use case
@@ -90,7 +113,7 @@ sequenceDiagram
 | 6 | Infrastructure | `ClaimsPermissionProvider` reads permissions from the token (the Api calls it through Application's `IPermissionProvider` interface) | [14.13](../code/14-application.mdx#14-13-ipermissionprovider-cs), [15.7](../code/15-infrastructure.mdx#15-7-claimspermissionprovider-cs) |
 | 7 | Api | Endpoint binds parameters and sends the Command with `ISender` | `Endpoints/{Feature}/{UseCase}.cs`, [16.1](../code/16-api.mdx#16-1-iendpoint-cs), [16.2](../code/16-api.mdx#16-2-endpointextensions-cs) |
 | 8 | Application | Logging pipeline starts timing; every log entry carries `RequestName` | [14.8](../code/14-application.mdx#14-8-loggingpipelinebehavior-cs) |
-| 9 | Application | Operation audit pipeline (optional) waits for the outcome | [14.19](../code/14-application.mdx#14-19-operationauditpipelinebehavior-cs-optional-auditing) |
+| 9 | Application | Operation audit pipeline (Auditing add-on) waits for the outcome | [14.19](../code/14-application.mdx#14-19-operationauditpipelinebehavior-cs-optional-auditing) |
 | 10 | Application | Validation pipeline runs FluentValidation; on failure it returns a failed Result, which ends as 400 | [14.9](../code/14-application.mdx#14-9-validationpipelinebehavior-cs) |
 | 11 | Application | Command handler starts the use case | `Features/{Feature}/{UseCase}/` |
 | 12 | Infrastructure | Repository loads the aggregate with `ApplicationDbContext` (the handler calls it through Domain's repository interface) | [13.6](../code/13-domain.mdx#13-6-irepository-cs), [15.4](../code/15-infrastructure.mdx#15-4-repository-cs) |

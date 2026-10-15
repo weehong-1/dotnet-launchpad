@@ -280,7 +280,7 @@ WantedBy=multi-user.target
 
 <Optional when="worker">
 
-`deploy/systemd/productname-worker.service` (optional: Worker):
+`deploy/systemd/productname-worker.service` (add-on: Worker):
 
 ```ini
 [Unit]
@@ -377,7 +377,7 @@ MT_LICENSE=
 
 <Optional when="worker">
 
-`deploy/env/worker.env.example` (optional: Worker):
+`deploy/env/worker.env.example` (add-on: Worker):
 
 ```ini
 # Copy to /etc/productname/worker.env and fill in this environment's values; owner root, mode 600

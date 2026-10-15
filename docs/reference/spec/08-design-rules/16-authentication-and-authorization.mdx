@@ -4,6 +4,10 @@ sidebar_label: "8.16 Authentication and authorization"
 
 # 8.16 Authentication and authorization \{#8-16-authentication-and-authorization\}
 
+:::note[Add-on]
+These rules apply once the project has the Authentication add-on ([7.6](../07-optional-components.mdx#7-6-authentication)). Without it, every endpoint is public.
+:::
+
 **Authentication**
 
 - JWT Bearer against any OpenID Connect provider; there are only two settings, `Authentication:Authority` and `Authentication:Audience` (see [16.7](../../code/16-api.mdx#16-7-authextensions-cs)).

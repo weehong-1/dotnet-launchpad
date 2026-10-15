@@ -1,6 +1,6 @@
 import React, {type ReactNode} from 'react';
 import Link from '@docusaurus/Link';
-import {useProjects} from '@site/src/lib/project';
+import {ADDONS, useProjects} from '@site/src/lib/project';
 import {useStrings} from '@site/src/lib/i18n';
 import styles from './styles.module.css';
 
@@ -36,9 +36,7 @@ export default function ActiveProjectBar(): ReactNode {
     );
   }
 
-  const flag = (label: string, on: boolean) => (
-    <span className={on ? 'tag tag-accent' : 'tag tag-neutral'}>{label}: {on ? t.on : t.off}</span>
-  );
+  const addons = ADDONS.filter((a) => active[a.id]);
 
   return (
     <>
@@ -47,8 +45,9 @@ export default function ActiveProjectBar(): ReactNode {
         <span className={styles.barMain}>
           <strong>{t.project}: {active.projectName}</strong>
           <code>{active.shortName}</code>
-          {flag(t.worker, active.worker)}
-          {flag(t.auditing, active.auditing)}
+          <Link to="/docs/setup/addons" className={addons.length ? 'tag tag-accent' : 'tag tag-neutral'}>
+            {t.addonsTitle}: {addons.length ? addons.map((a) => t[a.id]).join(', ') : t.off}
+          </Link>
         </span>
         <span className={styles.barActions}>
           {projects.length > 1 && (

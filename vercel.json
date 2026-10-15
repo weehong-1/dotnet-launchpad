@@ -4,6 +4,8 @@
   "redirects": [
     {"source": "/TEMPLATE.zh-Hans.md", "destination": "/TEMPLATE.zh.md", "permanent": true},
     {"source": "/zh-Hans", "destination": "/zh", "permanent": true},
-    {"source": "/zh-Hans/:path*", "destination": "/zh/:path*", "permanent": true}
+    {"source": "/zh-Hans/:path*", "destination": "/zh/:path*", "permanent": true},
+    {"source": "/docs/setup/local-services", "destination": "/docs/setup/run-locally", "permanent": true},
+    {"source": "/zh/docs/setup/local-services", "destination": "/zh/docs/setup/run-locally", "permanent": true}
   ]
 }

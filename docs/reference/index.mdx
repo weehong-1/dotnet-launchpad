@@ -9,8 +9,8 @@ The Reference is the .NET 10 Clean Architecture template: the architecture speci
 
 | Item | Details |
 | --- | --- |
-| Boilerplate version | 1.0 |
-| Status | The Skeleton Solution builds with zero warnings and its tests pass (scaffold script, .NET SDK 10.0.401, Worker and Auditing both on and both off); the integration test needs a MassTransit license. Running on a VM is not yet verified. |
+| Boilerplate version | 2.0 |
+| Status | The core Skeleton Solution and every add-on combination build with zero warnings (scaffold script, .NET SDK 10.0.402). The core tests pass with no Docker or license, and the Authentication tests pass too. The PostgreSQL and Messaging integration tests need Docker and the MassTransit license, and were last run on v1.0. Running on a VM is not yet verified. |
 | Applies to | Every backend project built on .NET 10 |
 | Architecture | Clean Architecture, Vertical Slice, DDD, CQRS |
 
@@ -18,14 +18,21 @@ The template is only a technical skeleton. **It contains no business logic or bu
 
 ## Structure
 
-- **Part 1: Architecture specification** (sections 1 to 10): layering, naming, layer responsibilities, optional components and design rules.
+- **Part 1: Architecture specification** (sections 1 to 10): layering, naming, layer responsibilities, add-ons and design rules.
 - **Part 2: Boilerplate code** (sections 11 to 18): the files every project starts with. Each section ends with an AI coding agent prompt.
 - **Appendix A: Demo code**: a fictional `Sample` feature that shows how the pieces connect. It is not part of the template: never copy it into a project.
 - **Appendix B: Key decision record**: why the major technical choices were made, for when you want to change one.
 
 ## Personalised code
 
-With an active project (see the bar at the top of each page), every code block uses its Project Name and Short Name, and the parts for Optional Components it leaves out are removed or collapsed. Without one, the code shows the `%%ProductName%%` and `%%productname%%` placeholders and every optional part.
+With an active project (see the bar at the top of each page), every code block uses its Project Name and Short Name, and the parts for add-ons it does not include are removed or collapsed. Without one, the code shows the `%%ProductName%%` and `%%productname%%` placeholders and every add-on.
+
+## Version 2.0 highlights
+
+- **Core and add-ons.** The core Skeleton Solution is Clean Architecture, DDD and CQRS with no database, broker, license or sign in, and its tests need no Docker. PostgreSQL, Messaging, the Worker, Auditing, Authentication and Go live are add-ons, added after the core runs ([7](./spec/07-optional-components.mdx), [11.4](./code/11-file-overview.mdx#11-4-core-and-add-on-files)). Worker and Auditing were optional components in v1.0; PostgreSQL, Messaging, Authentication and the deployment files were always in.
+- The Boilerplate is still one set of files: add-on lines carry `@@` markers, so the Reference, the scaffold script and `TEMPLATE.md` cannot drift apart. The scaffold script builds the core by default and takes one flag per add-on (`--postgres`, `--messaging` and so on, or `--all` for the v1.0 equivalent).
+- `Program.cs` and `AddInfrastructure` keep the same shape in every combination; chained calls became one call per line so an add-on adds or removes whole lines.
+- Application.UnitTests references `Microsoft.Extensions.Logging` itself; v1.0 got it through EF Core (12.2).
 
 ## Version 1.0 highlights
 

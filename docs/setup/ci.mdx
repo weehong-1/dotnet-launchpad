@@ -1,19 +1,84 @@
 ---
-sidebar_label: 4.1 Set up CI
+sidebar_label: F.1 Deployment files and CI
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import WhenOff from '@site/src/components/WhenOff';
+import PromptAddGolive from '../reference/_partials/prompt-add-golive.mdx';
+import AddOnSwitch from '@site/src/components/AddOnSwitch';
+import AddOnFiles from '@site/src/components/AddOnFiles';
+import FlagScope from '@site/src/components/FlagScope';
+import StepApplies from '@site/src/components/StepApplies';
 import DoneConditions from '@site/src/components/DoneConditions';
 
-# 4.1 Set up CI
+# F.1 Add the deployment files and CI
 
-The push in step 3.3 already triggered `.github/workflows/ci.yml` ([Reference 12.10](../reference/code/12-solution-level.mdx#12-10-github-workflows-ci-yml)). It builds, runs every test (including the Testcontainers integration tests), and publishes the deployment artifact only when the tests pass.
+<AddOnSwitch addon="golive" />
+<StepApplies step="ci" />
+
+Go live takes the project to a SIT and a Production environment, each an Ubuntu VM behind Nginx with its own backing services ([Reference 7.7](../reference/spec/07-optional-components.mdx#7-7-go-live), [8.21](../reference/spec/08-design-rules/21-deployment.mdx)). Do it last: the files and steps include only what the project's other add-ons need.
+
+This step adds the deployment templates under `deploy/` and the CI workflow. CI builds and runs every test on each push, and publishes the deployment artifact only when the tests pass.
+
+<WhenOff addon="auth">
+
+:::caution[No authentication]
+This project has no Authentication add-on, so every endpoint will be public on SIT and Production. Add [Authentication](./identity-provider.mdx) first unless the Api is meant to be public.
+:::
+
+</WhenOff>
+
+<Tabs groupId="route" queryString>
+<TabItem value="manual" label="Manual" default>
+
+**1. Create the files:**
+
+<AddOnFiles addon="golive" />
+
+**2. Set the CI secrets** before pushing, so the first run can pass:
+
+<FlagScope addon="golive">
 
 ```bash
+gh secret set MT_LICENSE < ~/.config/masstransit/license.txt   # @@messaging
+# @@sonar-begin
+gh secret set SONAR_TOKEN
+gh variable set SONAR_PROJECT_KEY --body "<project key>"
+gh variable set SONAR_ORGANIZATION_KEY --body "<organization key>"
+# @@sonar-end
+gh secret set QODANA_TOKEN   # @@qodana
+```
+
+</FlagScope>
+
+Create the SonarCloud and Qodana projects first if you chose them in step 0.2.
+
+**3. Commit, push and watch the run:**
+
+```bash
+git add -A && git commit -m "Add deployment files and CI" && git push
 gh run watch                        # follow the latest run
-gh run list --workflow ci --limit 5
 gh run view <run-id>                # the artifact productname-<sha> is listed at the bottom
 ```
 
-The `MT_LICENSE`, SonarCloud and Qodana secrets were set in [step 3.3](./commit.mdx) before the first push. If a run failed because one was missing, set it and re-run: `gh run rerun <run-id>`.
+If a run failed because a secret was missing, set it and re-run: `gh run rerun <run-id>`.
+
+</TabItem>
+<TabItem value="script" label="Script">
+
+The scaffold script adds add-ons only to a new, empty repository. If no feature exists yet, you can start over: switch this add-on on above, then run the step 1.2 command in a fresh folder. Otherwise use the Manual or AI Agent route.
+
+</TabItem>
+<TabItem value="ai" label="AI Agent">
+
+Switch this add-on on above and copy the updated add-on lines of the common rules ([step 1.1](./repository.mdx)) into the agent instruction file, then paste:
+
+<PromptAddGolive />
+
+Then set the CI secrets and push as the Manual tab shows.
+
+</TabItem>
+</Tabs>
 
 <DoneConditions step="ci" />

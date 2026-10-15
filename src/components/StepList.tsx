@@ -3,16 +3,16 @@ import clsx from 'clsx';
 import Link from '@docusaurus/Link';
 import {useProjects} from '@site/src/lib/project';
 import {useLocale} from '@site/src/lib/i18n';
-import {PHASES, pick, statusLabel, stepStatus} from '@site/src/data/steps';
+import {PHASES, pick, statusLabel, stepStatus, type Phase} from '@site/src/data/steps';
 import styles from './styles.module.css';
 
-/** The whole Setup Flow with the active project's progress per step. */
-export default function StepList(): ReactNode {
+/** The core Setup Flow (or the add-ons) with the active project's progress per step. */
+export default function StepList({track = 'core'}: {track?: Phase['track']}): ReactNode {
   const {active, progress} = useProjects();
   const locale = useLocale();
   return (
     <div className={styles.phases}>
-      {PHASES.map((phase) => (
+      {PHASES.filter((p) => p.track === track).map((phase) => (
         <div key={phase.id} className={styles.phaseRow}>
           <h3>
             {phase.num}. {pick(phase.title, locale)}

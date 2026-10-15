@@ -4,8 +4,12 @@ You are building a solution skeleton following ".NET 10 Clean Architecture Proje
 [Project settings]
 Project name: {{projectName}}
 Short name: {{shortName}}
-Worker: {{worker}}
-Auditing: {{auditing}}
+Add-on PostgreSQL: {{postgres}}
+Add-on Messaging: {{messaging}}
+Add-on Worker: {{worker}}
+Add-on Auditing: {{auditing}}
+Add-on Authentication: {{auth}}
+Add-on Go live: {{golive}}
 SonarCloud: {{sonar}}
 Qodana: {{qodana}}
 
@@ -13,7 +17,7 @@ Qodana: {{qodana}}
 1. The document is the single source of truth. Part 1 is the design specification you must follow; in Part 2, file paths, namespaces, type names and code must be copied exactly, with nothing added, removed or renamed.
 2. Replace every %%ProductName%% with the project name above (namespaces, project names, folders) and every %%productname%% with the short name above (database names, Linux accounts, paths, service names); the document also calls the short name the "lowercase project name".
 3. This is a technical template: do not add any business logic, business entities, endpoints, Consumers or sample tests. Never generate the Appendix A demo code. The tests listed in section 18 (including the fake requests in 18.5) are part of the template, not samples.
-4. Handle components marked "optional" per the settings above; for "no", delete the matching files and code per section 7. Add the SonarCloud and Qodana jobs of 12.10 only for "yes".
+4. Everything not marked is the core and is always built. Sections, files and lines marked "(add-on: X)" belong to add-on X (section 7): include them only when X is "yes" above; lines marked "(without X, use this line instead)" are used when X is "no". The SonarCloud and Qodana jobs of 12.10 are added only when Go live and that setting are both "yes".
 5. NuGet versions are defined only in Directory.Packages.props, using the latest stable versions; .csproj references carry no version.
 6. Anything the document does not state but compilation needs (such as using directives or project references) may be added; list what you added when done.
 7. If the document contradicts itself, does not match the API of the package version used, or does not compile, stop and explain the problem and your suggestion instead of changing the design yourself.

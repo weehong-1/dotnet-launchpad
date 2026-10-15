@@ -10,9 +10,9 @@ import {useProjects} from '@site/src/lib/project';
 import {STEPS, statusLabel, stepStatus} from '@site/src/data/steps';
 import styles from './styles.module.css';
 
-// Ejected from the classic theme: labels like "2.4 Api" or "A. Demo code" put the number in its own
+// Ejected from the classic theme: labels like "2.4 Api", "B.2 Add Messaging" or "A. Demo code" put the number in its own
 // column, and Setup Flow steps show the active project's status on the right.
-const NUMBERED = /^((?:\d+\.)*\d+\.?|[A-Z]\.)\s+(.+)$/;
+const NUMBERED = /^((?:\d+\.)*\d+\.?|[A-Z](?:\.\d+)*\.?)\s+(.+)$/;
 const STEP_HREF = /\/docs\/setup\/([^/?#]+)\/?$/;
 
 export default function DocSidebarItemLink({item, onItemClick, activePath, level, index, ...props}: Props): ReactNode {

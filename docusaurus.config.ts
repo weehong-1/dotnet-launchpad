@@ -4,7 +4,7 @@ import type * as Preset from '@docusaurus/preset-classic';
 
 const config: Config = {
   title: '.NET Launchpad',
-  tagline: 'Step by step from an empty folder to a deployed .NET 10 Clean Architecture skeleton',
+  tagline: 'Step by step from an empty folder to a .NET 10 Clean Architecture, DDD and CQRS skeleton, then the add-ons it needs',
   favicon: 'img/favicon.svg',
 
   future: {
@@ -82,6 +82,7 @@ const config: Config = {
       },
       items: [
         {type: 'docSidebar', sidebarId: 'setup', position: 'left', label: 'Setup Flow'},
+        {type: 'docSidebar', sidebarId: 'addons', position: 'left', label: 'Add-ons'},
         {type: 'docSidebar', sidebarId: 'reference', position: 'left', label: 'Reference'},
         {to: '/projects', label: 'Projects', position: 'left'},
         {type: 'search', position: 'right'},

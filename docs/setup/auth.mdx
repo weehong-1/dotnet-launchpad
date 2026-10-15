@@ -1,0 +1,87 @@
+---
+sidebar_label: E.2 Add authentication
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import PromptAddAuth from '../reference/_partials/prompt-add-auth.mdx';
+import SnippetPackageVersions from '../reference/_partials/snippet-package-versions.mdx';
+import AddOnSwitch from '@site/src/components/AddOnSwitch';
+import AddOnFiles from '@site/src/components/AddOnFiles';
+import PackageCommands from '@site/src/components/PackageCommands';
+import FlagScope from '@site/src/components/FlagScope';
+import StepApplies from '@site/src/components/StepApplies';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# E.2 Add authentication
+
+<AddOnSwitch addon="auth" />
+<StepApplies step="auth" />
+
+This add-on makes the Api accept JWT access tokens from the identity provider of step E.1 ([Reference 8.16](../reference/spec/08-design-rules/16-authentication-and-authorization.mdx)).
+
+- **Sign in is required everywhere by default.** `/health`, OpenAPI and the Scalar UI are explicitly public; any other public endpoint must say `.AllowAnonymous()`.
+- **Permissions** come from a token claim. An endpoint asks for one with `.RequirePermission("orders.create")`.
+- **`ICurrentUser`** gives Application the signed-in user's ID.
+
+<Tabs groupId="route" queryString>
+<TabItem value="manual" label="Manual" default>
+
+**1. Create the new files and add the highlighted lines** to the existing ones:
+
+<AddOnFiles addon="auth" />
+
+**2. Fill in the new package version and reference the package:**
+
+<SnippetPackageVersions />
+
+<FlagScope addon="auth">
+<PackageCommands addon="auth" />
+</FlagScope>
+
+```bash
+dotnet build
+dotnet test
+```
+
+**3. Set the Development Authority and Audience** from step E.1 (not secret: `appsettings.Development.json` works too):
+
+```bash
+dotnet user-secrets set "Authentication:Authority" "https://<identity provider>" --project src/ProductName.Api
+dotnet user-secrets set "Authentication:Audience" "<audience>" --project src/ProductName.Api
+```
+
+**4. Check it.** Start the Api, then:
+
+```bash
+API=http://localhost:5000   # use the URL from launchSettings.json
+curl -i $API/health         # 200, no token needed
+curl -i $API/openapi/v1.json
+curl -i $API/anything       # 401: every endpoint requires sign in by default
+```
+
+Then prove that a real token is accepted, not just that a missing one is rejected. Get an access token for the Api's audience the way step E.1 showed, then:
+
+```bash
+TOKEN=<access token>
+curl -i -H "Authorization: Bearer $TOKEN" $API/anything   # 404: authenticated, and the path does not exist
+```
+
+A 401 here means `Authentication:Authority` or `Authentication:Audience` does not match the token; fix it before going further.
+
+</TabItem>
+<TabItem value="script" label="Script">
+
+The scaffold script adds add-ons only to a new, empty repository. If no feature exists yet, you can start over: switch this add-on on above, then run the step 1.2 command in a fresh folder. Otherwise use the Manual or AI Agent route.
+
+</TabItem>
+<TabItem value="ai" label="AI Agent">
+
+Switch this add-on on above and copy the updated add-on lines of the common rules ([step 1.1](./repository.mdx)) into the agent instruction file, then paste:
+
+<PromptAddAuth />
+
+</TabItem>
+</Tabs>
+
+<DoneConditions step="auth" />

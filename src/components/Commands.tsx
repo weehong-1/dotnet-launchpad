@@ -1,12 +1,12 @@
 import React, {type ReactNode} from 'react';
 import CodeBlock from '@theme/CodeBlock';
 import Admonition from '@theme/Admonition';
-import {useProjects} from '@site/src/lib/project';
+import {flagOn, useProjects, type Flag} from '@site/src/lib/project';
 import {useLocale, useStrings} from '@site/src/lib/i18n';
 
 type Env = 'SIT' | 'Production';
-/** `auditing: true` marks a block that exists only with Auditing; other blocks select their lines with @@ markers. */
-type Block = {title: string; language: string; code: string; note?: string; auditing?: boolean};
+/** `when` marks a block that exists only with that add-on; other blocks select their lines with @@ markers. */
+type Block = {title: string; language: string; code: string; note?: string; when?: Flag};
 
 const zh = (locale: string) => locale === 'zh-Hans';
 
@@ -32,8 +32,8 @@ function vmSetup(env: Env, locale: string): Block[] {
         `[ "$(uname -m)" = x86_64 ] && echo "x86_64 OK" || echo "STOP: ${z ? 'CI 只发布 linux-x64 产物，这台 VM 不是 x86-64' : 'CI publishes linux-x64 artifacts only; this VM is not x86-64'}"`,
         'sudo apt update',
         'sudo apt install -y ca-certificates libc6 libgcc-s1 libicu74 liblttng-ust1t64 libssl3t64 libstdc++6 libunwind8 zlib1g',
-        `# ${z ? '部署时用来连线数据库' : 'Used during deployment to reach the database'}`,
-        'sudo apt install -y postgresql-client',
+        `# ${z ? '部署时用来连线数据库' : 'Used during deployment to reach the database'}  # @@postgres`,
+        'sudo apt install -y postgresql-client  # @@postgres',
       ].join('\n'),
     },
     {
@@ -78,7 +78,7 @@ function vmSetup(env: Env, locale: string): Block[] {
         'sudo systemctl enable productname-api',
         'sudo systemctl enable productname-worker  # @@worker',
       ].join('\n'),
-      note: z ? '服务在首次部署建立符号链接之后才会启动（步骤 4.4 / 4.7）。' : 'The services start only after the first deployment creates the symbolic links (step 4.4 / 4.7).',
+      note: z ? '服务在首次部署建立符号链接之后才会启动（步骤 F.4 / F.7）。' : 'The services start only after the first deployment creates the symbolic links (step F.4 / F.7).',
     },
     {
       title: z ? '7. Nginx 与 HTTPS 证书' : '7. Nginx and the HTTPS certificate',
@@ -111,10 +111,10 @@ function vmSetup(env: Env, locale: string): Block[] {
       title: z ? `9. 从 VM 检查 ${env} 的后端服务` : `9. Check the ${env} backing services from the VM`,
       language: 'bash',
       code: [
-        `# ${z ? '数据库：会提示输入管理员密码，应印出 PostgreSQL 版本' : 'Database: prompts for the admin password and should print the PostgreSQL version'}`,
-        'psql "host=<db-host> port=5432 dbname=postgres user=<admin user> sslmode=require" -Atc "select version()"',
-        `# ${z ? 'Broker：AMQPS 端口必须能以 TLS 连上' : 'Broker: the AMQPS port must accept a TLS connection'}`,
-        'timeout 10 openssl s_client -connect <broker-host>:5671 -brief </dev/null 2>&1 | head -3',
+        `# ${z ? '数据库：会提示输入管理员密码，应印出 PostgreSQL 版本' : 'Database: prompts for the admin password and should print the PostgreSQL version'}  # @@postgres`,
+        'psql "host=<db-host> port=5432 dbname=postgres user=<admin user> sslmode=require" -Atc "select version()"  # @@postgres',
+        `# ${z ? 'Broker：AMQPS 端口必须能以 TLS 连上' : 'Broker: the AMQPS port must accept a TLS connection'}  # @@messaging`,
+        'timeout 10 openssl s_client -connect <broker-host>:5671 -brief </dev/null 2>&1 | head -3  # @@messaging',
         `# ${z ? 'Seq：应返回 healthy' : 'Seq: should answer healthy'}`,
         'curl -fsS "https://<seq-domain>/health"',
       ].join('\n'),
@@ -123,6 +123,7 @@ function vmSetup(env: Env, locale: string): Block[] {
     {
       title: z ? '10. 数据库帐号（以管理员帐号执行 psql）' : '10. Database accounts (psql as the admin user)',
       language: 'sql',
+      when: 'postgres',
       code: [
         `-- ${z ? `从 VM 连线：psql "host=<db-host> port=5432 dbname=postgres user=<管理员> sslmode=require"` : `From the VM: psql "host=<db-host> port=5432 dbname=postgres user=<admin user> sslmode=require"`}`,
         `-- ${z ? `${env} 数据库；密码以 \\password 输入，不会留在历史纪录中` : `${env} database; \\password prompts, so passwords stay out of history`}`,
@@ -191,7 +192,7 @@ function deploy(env: Env, locale: string, delivery: string | null): Block[] {
         'else',
         '  test -f "$STAGE/api/ProductName.Api" || OK=0',
         '  test -f "$STAGE/worker/ProductName.Worker" || OK=0  # @@worker',
-        '  test -f "$STAGE/migrations/efbundle" || OK=0',
+        '  test -f "$STAGE/migrations/efbundle" || OK=0  # @@postgres',
         '  [ "$OK" = 1 ] && { sudo rm -rf "$R" && sudo install -d -o productname -g productname "$R"; } || OK=0',
         '  [ "$OK" = 1 ] && sudo cp -a "$STAGE/api" "$R/api" || OK=0',
         '  [ "$OK" = 1 ] && sudo cp -a "$STAGE/worker" "$R/worker" || OK=0  # @@worker',
@@ -207,6 +208,7 @@ function deploy(env: Env, locale: string, delivery: string | null): Block[] {
     {
       title: z ? '4. 以 owner 帐号执行 migration bundle' : '4. Run the migration bundle with the owner account',
       language: 'bash',
+      when: 'postgres',
       code: [
         `# ${z ? '连接字串以不回显的方式读入，并经由环境变量传给 bundle：不会出现在 shell 历史或其他帐号可见的程序参数中' : 'The connection string is read without echo and passed through the environment: it never appears in shell history or in process arguments other accounts can see'}`,
         'chmod +x "$STAGE/migrations/efbundle"',
@@ -222,7 +224,7 @@ function deploy(env: Env, locale: string, delivery: string | null): Block[] {
     {
       title: z ? '5. 锁定审计表（每次部署都执行，可重复执行）' : '5. Lock the audit tables (every deployment; safe to repeat)',
       language: 'bash',
-      auditing: true,
+      when: 'auditing',
       code: [
         `# ${z ? '以 owner 帐号连线（psql 会提示输入密码）。ON_ERROR_STOP 让任何错误都使 psql 失败；最后的检查确认应用帐号已无法修改审计表' : 'Connect as the owner (psql prompts for the password). ON_ERROR_STOP makes any error fail psql; the final check proves the application account can no longer change the audit tables'}`,
         'LOCKED=""',
@@ -243,9 +245,13 @@ function deploy(env: Env, locale: string, delivery: string | null): Block[] {
       title: z ? '6. 切换符号链接并重新启动' : '6. Switch the symbolic links and restart',
       language: 'bash',
       code: [
-        `# ${z ? '只有第 4 步（以及启用审计时的第 5 步）对这个版本成功时才切换' : 'Switch only when block 4 (and block 5 with auditing) succeeded for this version'}`,
+        `# ${z ? '只有第 4 步（以及启用审计时的第 5 步）对这个版本成功时才切换' : 'Switch only when block 4 (and block 5 with auditing) succeeded for this version'}  # @@postgres`,
+        `# ${z ? '只有第 3 步对这个版本成功时才切换' : 'Switch only when block 3 succeeded for this version'}  # @@!postgres`,
         'if [ "${MIGRATED:-}" = "$VERSION" ] && [ "${LOCKED:-}" = "$VERSION" ]; then  # @@auditing',
+        '# @@postgres-begin',
         'if [ "${MIGRATED:-}" = "$VERSION" ]; then  # @@!auditing',
+        '# @@postgres-end',
+        'if [ "${PREPARED:-}" = "$VERSION" ]; then  # @@!postgres',
         '  sudo ln -sfn "$R/api" /opt/productname/api',
         '  sudo ln -sfn "$R/worker" /opt/productname/worker  # @@worker',
         '  sudo systemctl restart productname-api',
@@ -261,8 +267,8 @@ function deploy(env: Env, locale: string, delivery: string | null): Block[] {
       code: [
         `API_DOMAIN=api.example.com   # ${z ? `改成 ${env} 的 Api 域名` : `change to the ${env} Api domain`}`,
         'curl -fsS "https://$API_DOMAIN/health"',
-        `TOKEN=<access token>   # ${z ? `${env} 身份提供者为 Api audience 签发的 token` : `issued for the Api audience by the ${env} identity provider`}`,
-        `curl -s -o /dev/null -w '%{http_code}\\n' -H "Authorization: Bearer $TOKEN" "https://$API_DOMAIN/anything"   # ${z ? '404 = token 被接受；401 = Authority/Audience 设定不符' : '404 = token accepted; 401 = Authority/Audience mismatch'}`,
+        `TOKEN=<access token>   # ${z ? `${env} 身份提供者为 Api audience 签发的 token` : `issued for the Api audience by the ${env} identity provider`}  # @@auth`,
+        `curl -s -o /dev/null -w '%{http_code}\\n' -H "Authorization: Bearer $TOKEN" "https://$API_DOMAIN/anything"   # ${z ? '404 = token 被接受；401 = Authority/Audience 设定不符' : '404 = token accepted; 401 = Authority/Audience mismatch'}  # @@auth`,
         'sudo journalctl -u productname-api -n 50 --no-pager',
         'sudo journalctl -u productname-worker -n 50 --no-pager  # @@worker',
       ].join('\n'),
@@ -291,6 +297,7 @@ function backingServices(env: Env, locale: string): Block[] {
     {
       title: z ? '1. 托管 PostgreSQL' : '1. Managed PostgreSQL',
       language: 'text',
+      when: 'postgres',
       code: [
         z ? `在云端供应商（例如 DigitalOcean Managed Databases、Azure Database for PostgreSQL、Amazon RDS）建立 ${env} 专用的数据库：` : `In your cloud provider (for example DigitalOcean Managed Databases, Azure Database for PostgreSQL or Amazon RDS), create a database cluster for ${env} only:`,
         z ? '- 引擎：PostgreSQL 17（与本地 docker-compose.yml 相同）' : '- Engine: PostgreSQL 17 (the same as the local docker-compose.yml)',
@@ -304,6 +311,7 @@ function backingServices(env: Env, locale: string): Block[] {
     {
       title: z ? '2. 托管 RabbitMQ' : '2. Managed RabbitMQ',
       language: 'text',
+      when: 'messaging',
       code: [
         z ? `在 RabbitMQ 托管服务（例如 CloudAMQP、Amazon MQ for RabbitMQ）建立 ${env} 专用的实例，版本 RabbitMQ 3.13 或 4.x。` : `In a hosted RabbitMQ service (for example CloudAMQP or Amazon MQ for RabbitMQ), create an instance for ${env} only, RabbitMQ 3.13 or 4.x.`,
         z ? '复制它的 AMQPS URL，格式为 amqps://<user>:<password>@<host>/<vhost>，稍后填入 ConnectionStrings__MessageBroker。' : 'Copy its AMQPS URL, shaped amqps://<user>:<password>@<host>/<vhost>; it goes into ConnectionStrings__MessageBroker later.',
@@ -347,11 +355,12 @@ function backingServices(env: Env, locale: string): Block[] {
   ];
 }
 
-function Blocks({blocks, auditing}: {blocks: Block[]; auditing: boolean}): ReactNode {
+function Blocks({blocks}: {blocks: Block[]}): ReactNode {
+  const {active} = useProjects();
   return (
     <>
       {blocks
-        .filter((b) => auditing || !b.auditing)
+        .filter((b) => !b.when || flagOn(active, b.when))
         .map((b) => (
           <div key={b.title}>
             <h3>{b.title}</h3>
@@ -364,14 +373,13 @@ function Blocks({blocks, auditing}: {blocks: Block[]; auditing: boolean}): React
 }
 
 export function VmSetup({env}: {env: Env}): ReactNode {
-  const {active} = useProjects();
   const locale = useLocale();
-  return <Blocks blocks={vmSetup(env, locale)} auditing={!active || active.auditing} />;
+  return <Blocks blocks={vmSetup(env, locale)} />;
 }
 
 export function BackingServices({env}: {env: Env}): ReactNode {
   const locale = useLocale();
-  return <Blocks blocks={backingServices(env, locale)} auditing />;
+  return <Blocks blocks={backingServices(env, locale)} />;
 }
 
 export function Deploy({env}: {env: Env}): ReactNode {
@@ -383,7 +391,7 @@ export function Deploy({env}: {env: Env}): ReactNode {
       {active && (active.delivery === 'tailscale' || active.delivery === 'other') && (
         <Admonition type="caution">{t.needsOwnWork}</Admonition>
       )}
-      <Blocks blocks={deploy(env, locale, active?.delivery ?? null)} auditing={!active || active.auditing} />
+      <Blocks blocks={deploy(env, locale, active?.delivery ?? null)} />
     </>
   );
 }

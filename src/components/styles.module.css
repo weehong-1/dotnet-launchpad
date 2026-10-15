@@ -364,3 +364,71 @@
   color: var(--color-accent-800);
   font-size: 14px;
 }
+
+/* Boilerplate file lists (LayerFiles, AddOnFiles) */
+.fileList {
+  margin: var(--space-4) 0;
+}
+
+.fileList h3 {
+  margin: var(--space-6) 0 var(--space-2);
+}
+
+.fileBlock {
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.fileBlock:first-of-type {
+  border-top: 1px solid var(--color-divider);
+}
+
+.fileBlock > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) 0;
+  cursor: pointer;
+}
+
+.fileBlock > summary code {
+  overflow-wrap: anywhere;
+}
+
+.fileBlock[open] > summary {
+  margin-bottom: var(--space-2);
+}
+
+.fileRef {
+  margin-left: auto;
+  font-size: 0.875rem;
+}
+
+.fileAdded {
+  color: var(--color-accent-700);
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+/* AddOnSwitch */
+.addonSwitch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin: var(--space-4) 0;
+  padding: var(--space-3) var(--space-4);
+  border: 2px solid var(--color-divider);
+}
+
+.addonOn {
+  border-color: var(--color-accent);
+}
+
+.addonActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin-left: auto;
+}

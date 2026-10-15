@@ -6,8 +6,8 @@ import SnippetEverydayCommands from '../../_partials/snippet-everyday-commands.m
 
 # 8.10 Local development \{#8-10-local-development\}
 
-- The root `docker-compose.yml` starts PostgreSQL, RabbitMQ (with the management UI) and Seq.
-- Developers only run `docker compose up -d`, then start the Api and Worker.
+- The root `docker-compose.yml` starts Seq, plus PostgreSQL with that add-on and RabbitMQ (with the management UI) with the Messaging add-on.
+- Developers only run `docker compose up -d`, then start the Api (and the Worker).
 - Default connection strings match the Docker Compose settings, so local development needs no extra configuration.
 
 **Everyday commands**

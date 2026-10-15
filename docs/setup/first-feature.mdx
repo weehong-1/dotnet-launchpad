@@ -1,14 +1,29 @@
 ---
-sidebar_label: 5.1 Ready for feature work
+sidebar_label: 4.1 Ready for feature work
 ---
 
 import PromptFeatureSlice from '../reference/_partials/prompt-feature-slice.mdx';
-import Optional from '@site/src/components/Optional';
+import AddOnSwitch from '@site/src/components/AddOnSwitch';
 import DoneConditions from '@site/src/components/DoneConditions';
 
-# 5.1 Ready for feature work
+# 4.1 Ready for feature work
 
-The Setup Flow ends here: the Skeleton Solution is deployed, and no business feature exists yet. From now on every use case is a feature slice ([Reference 8.15](../reference/spec/08-design-rules/15-feature-slices-vertical-slice.mdx)). This step only prepares the hand over; building features is ordinary project work, not part of the setup.
+The Setup Flow ends here: the core Skeleton Solution runs, and no business feature exists yet.
+
+## First, the add-ons
+
+Most backends need some of the [Add-ons](./addons.mdx) before the first feature: a database to store aggregates, messaging to hand work to the background, sign in. Add them now, while no feature depends on the core's shape. Go live usually comes last.
+
+<AddOnSwitch addon="postgres" href="/docs/setup/postgres" />
+<AddOnSwitch addon="messaging" href="/docs/setup/licenses" />
+<AddOnSwitch addon="worker" href="/docs/setup/worker" />
+<AddOnSwitch addon="auditing" href="/docs/setup/auditing" />
+<AddOnSwitch addon="auth" href="/docs/setup/identity-provider" />
+<AddOnSwitch addon="golive" href="/docs/setup/ci" />
+
+## Then, features
+
+From now on every use case is a feature slice ([Reference 8.15](../reference/spec/08-design-rules/15-feature-slices-vertical-slice.mdx)): a Command or Query with its handler and validator, an endpoint, and tests, all in one folder per use case. Building features is ordinary project work, not part of the setup.
 
 When you write the first use case, fill in the angle brackets and give this prompt to the agent, once per use case:
 
@@ -16,12 +31,6 @@ When you write the first use case, fill in the angle brackets and give this prom
 
 Keep it where you will find it: add it below the common rules in the agent instruction file (step 1.1), or bookmark this page.
 
-To see how the pieces connect end to end, read the [Appendix A demo](../reference/appendix/a-demo-code.mdx). It is a reading aid only: never copy it into the project.
-
-<Optional when="auditing">
-
-Decide the audit rule now, before features arrive ([Reference 7.3](../reference/spec/07-optional-components.mdx#7-3-audit-records)): which kinds of entities will implement `IAuditable`, which properties carry `[AuditIgnore]`, and which kinds of Commands or Queries implement `IAuditableRequest`. Write it down in the project instruction file so every feature slice follows it.
-
-</Optional>
+To see how the pieces connect end to end, read the [Appendix A demo](../reference/appendix/a-demo-code.mdx). It assumes the PostgreSQL, Messaging and Authentication add-ons, and is a reading aid only: never copy it into the project.
 
 <DoneConditions step="first-feature" />

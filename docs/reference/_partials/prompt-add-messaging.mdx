@@ -1,0 +1,10 @@
+```text
+Add the Messaging add-on (RabbitMQ and MassTransit) to this project, following sections 7.5 and 8.4 and the code in Part 2 marked "(add-on: Messaging)". Prerequisite: the PostgreSQL add-on is in and its tests pass. Set "Add-on Messaging: yes" in the project settings first.
+
+1. Packages: add the Messaging rows of the 12.2 add-on table, with their versions in Directory.Packages.props.
+2. Create the new files: 14.7 IEventBus.cs in Application and 15.5 EventBus.cs in Infrastructure.
+3. Add the lines marked Messaging to the existing files: ApplicationDbContext.cs (15.1), Infrastructure DependencyInjection.cs (15.8, including the AddMessaging method and the configureConsumers parameter), the appsettings files (16.12), docker-compose.yml (12.5), the integration test factory (18.3) and every GlobalUsings.cs (11.3). Without the Worker add-on the Api delivers the Outbox, so leave out the lines marked Worker.
+4. Create a migration named AddMessaging with the 8.11 command. It must contain only the MassTransit Outbox and Inbox tables; if any other change appears, stop and explain why.
+
+Done when: dotnet build has zero warnings and zero errors; after docker compose up -d, the Api starts with no MassTransit errors in the log; dotnet test passes with Docker running and MT_LICENSE or MT_LICENSE_PATH set.
+```
