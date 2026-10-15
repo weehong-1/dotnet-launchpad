@@ -1,0 +1,10 @@
+```text
+为本项目加入 Worker 附加组件，依据文档第 7.1 节与第 17 节。前置条件：消息附加组件已加入，且测试全部通过。先在项目设定中设为“附加组件 Worker：要”。
+
+1. 照 11.2 的做法建立 Worker 项目：dotnet new worker，加入解决方案的 src 下，引用 Application 与 Infrastructure，删除模板的 Worker.cs，加入 12.2 表格中 Worker 的套件，并执行 dotnet user-secrets init。
+2. 按第 17 节（提示词 17.3）建立 Worker 的文件，并按 11.3 建立它的 GlobalUsings.cs。
+3. 在现有文件中加入标为 Worker 的行：Infrastructure 的 DependencyInjection.cs（15.8：Api 不再投递 Outbox）与 LayerTests.cs（18.1）。有上线附加组件时，也加入 Worker 的 systemd 服务、环境变量范本与 CI 发布步骤（12.7、12.9、12.10）。
+4. 不要建立任何 Consumer 或 BackgroundService 范例。
+
+完成条件：dotnet build 零警告零错误；dotnet test 全部通过；执行 docker compose up -d 后，以 Development 启动 Worker，能连上 RabbitMQ，日志中没有错误。
+```

@@ -6,8 +6,8 @@ import SnippetEverydayCommands from '../../_partials/snippet-everyday-commands.m
 
 # 8.10 本地开发环境 \{#8-10-local-development\}
 
-- 根目录的 `docker-compose.yml` 启动 PostgreSQL、RabbitMQ（含管理界面）、Seq。
-- 开发者只需执行 `docker compose up -d`，再启动 Api 与 Worker 即可。
+- 根目录的 `docker-compose.yml` 启动 Seq；有 PostgreSQL 附加组件时启动 PostgreSQL，有消息附加组件时启动 RabbitMQ（含管理界面）。
+- 开发者只需执行 `docker compose up -d`，再启动 Api（以及 Worker）即可。
 - 连接字符串的预设值与 Docker Compose 的设定对应，本地开发不需要额外设定。
 
 **常用指令**

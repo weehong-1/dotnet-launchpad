@@ -9,7 +9,7 @@ sidebar_label: "3. 分层与依赖方向"
 1. **Domain（领域层）**：核心业务规则，不依赖任何其他层。
 2. **Application（应用层）**：用例编排，只依赖 Domain。
 3. **Infrastructure（基础设施层）**：实现 Application 定义的接口，负责数据库、外部服务等技术细节。
-4. **Presentation（表现层）**：系统入口，包括 Api，以及按需加入的 Worker。
+4. **Presentation（表现层）**：系统入口，包括 Api，以及 Worker 附加组件。
 
 依赖规则：
 
@@ -24,7 +24,30 @@ sidebar_label: "3. 分层与依赖方向"
 
 Clean Architecture 决定**垂直方向**的依赖：哪一层可以引用哪一层。Vertical Slice 决定**每一层之内**的组织方式：Application、Api、Worker 与测试都以“功能 → 用例”分资料夹，一个用例的所有相关文件放在一起，各层的资料夹结构互相对应。Domain 按聚合组织，Infrastructure 按技术关注点组织。详见 [8.15](./08-design-rules/15-feature-slices-vertical-slice.mdx)。
 
-**请求处理流程**
+**核心中的请求处理流程**
+
+在核心 Skeleton Solution 中，请求只经过 Api 与 Application：还没有数据库或消息中间件。
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Caller（外部）
+    participant A as Api（表现层）
+    participant App as Application
+    participant D as Domain
+    C->>A: HTTP 请求
+    A->>App: 经 MediatR 发送 Command 或 Query
+    App->>App: 日志管线，接着验证管线（仅 Command）
+    Note over App: 输入无效：返回失败的 Result，400
+    App->>D: Handler 呼叫聚合与领域服务
+    D-->>App: Result（领域事件收集在聚合上）
+    App-->>A: Result
+    A-->>C: 200 / 201，失败时返回 ProblemDetails
+```
+
+附加组件会在这条路径上加入更多步骤：PostgreSQL 储存聚合，并在保存时发布其领域事件；消息经由 Outbox 把整合事件交给 RabbitMQ；身份验证先检查令牌；上线在前面加上 Nginx。
+
+**加入所有附加组件时的请求处理流程**
 
 以下两张图以 Mermaid 时序图显示一个请求经过哪些层：每一条直线是一层（或一个外部服务），每个箭头是一个步骤，箭头指向的那一栏就是该步骤发生的层；箭头上的编号对应图下的表格。黄色注记标出请求在哪一步被拒绝。GitHub、GitLab、Azure DevOps、VS Code 与 Rider 都能直接显示 Mermaid。
 
@@ -53,7 +76,7 @@ sequenceDiagram
     A->>I: 经 IPermissionProvider 读取权限（ClaimsPermissionProvider）
     I-->>A: 权限符合，端点接收参数
     A->>App: 以 ISender 发送 Command，进入日志管线
-    App->>App: 操作审计管线（可选）
+    App->>App: 操作审计管线（审计附加组件）
     App->>App: 验证管线（FluentValidation）
     Note right of App: 验证失败：直接返回，最后成为 400
     App->>App: Command Handler 开始处理用例
@@ -90,7 +113,7 @@ sequenceDiagram
 | 6 | Infrastructure | `ClaimsPermissionProvider` 从令牌读取权限（Api 经由 Application 的 `IPermissionProvider` 介面呼叫） | [14.13](../code/14-application.mdx#14-13-ipermissionprovider-cs)、[15.7](../code/15-infrastructure.mdx#15-7-claimspermissionprovider-cs) |
 | 7 | Api | 端点接收参数，以 `ISender` 发送 Command | `Endpoints/{功能}/{用例}.cs`，[16.1](../code/16-api.mdx#16-1-iendpoint-cs)、[16.2](../code/16-api.mdx#16-2-endpointextensions-cs) |
 | 8 | Application | 日志管线开始计时，所有日志带上 `RequestName` | [14.8](../code/14-application.mdx#14-8-loggingpipelinebehavior-cs) |
-| 9 | Application | 操作审计管线（可选）等待执行结果 | [14.19](../code/14-application.mdx#14-19-operationauditpipelinebehavior-cs-optional-auditing) |
+| 9 | Application | 操作审计管线（审计附加组件）等待执行结果 | [14.19](../code/14-application.mdx#14-19-operationauditpipelinebehavior-cs-optional-auditing) |
 | 10 | Application | 验证管线执行 FluentValidation；失败时直接返回失败的 Result，最后成为 400 | [14.9](../code/14-application.mdx#14-9-validationpipelinebehavior-cs) |
 | 11 | Application | Command Handler 开始处理用例 | `Features/{功能}/{用例}/` |
 | 12 | Infrastructure | 仓储以 `ApplicationDbContext` 读取聚合（Handler 经由 Domain 的仓储介面呼叫） | [13.6](../code/13-domain.mdx#13-6-irepository-cs)、[15.4](../code/15-infrastructure.mdx#15-4-repository-cs) |

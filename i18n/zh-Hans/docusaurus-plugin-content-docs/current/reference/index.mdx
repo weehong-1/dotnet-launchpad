@@ -9,8 +9,8 @@ Reference 就是 .NET 10 Clean Architecture 项目模板本身：架构规范与
 
 | 项目 | 内容 |
 | --- | --- |
-| Boilerplate 版本 | 1.0 |
-| 状态 | Skeleton Solution 零警告编译，测试通过（scaffold 脚本，.NET SDK 10.0.401，Worker 与审计全开及全关两种组合）；整合测试需要 MassTransit 授权。VM 上的运行尚未验证。 |
+| Boilerplate 版本 | 2.0 |
+| 状态 | 核心 Skeleton Solution 与所有附加组件组合都零警告编译（scaffold 脚本，.NET SDK 10.0.402）。核心测试不需要 Docker 或授权即可通过，身份验证的测试也通过。PostgreSQL 与消息的整合测试需要 Docker 与 MassTransit 授权，最近一次是在 1.0 版执行。VM 上的运行尚未验证。 |
 | 适用 | 所有以 .NET 10 开发的后端项目 |
 | 架构 | Clean Architecture、Vertical Slice、DDD、CQRS |
 
@@ -18,14 +18,21 @@ Reference 就是 .NET 10 Clean Architecture 项目模板本身：架构规范与
 
 ## 结构
 
-- **第一部分：架构规范**（第 1 至 10 节）：分层、命名、各层职责、可选组件与设计规范。
+- **第一部分：架构规范**（第 1 至 10 节）：分层、命名、各层职责、附加组件与设计规范。
 - **第二部分：Boilerplate 代码**（第 11 至 18 节）：每个项目的起始文件。每一节末尾附 AI Coding Agent 提示词。
 - **附录 A：演示代码**：用一个虚构的 `Sample` 功能说明各部分如何串起来。它不属于模板，不要复制进项目。
 - **附录 B：关键决策纪录**：重要技术选择的理由，日后想调整时参考。
 
 ## 个人化代码
 
-有当前项目时（见每页顶端的项目列），所有代码块都会使用它的项目名称与简短名称，没选用的可选组件内容会被删除或折叠。没有当前项目时，代码显示 `%%ProductName%%`、`%%productname%%` 占位名称与所有可选内容。
+有当前项目时（见每页顶端的项目列），所有代码块都会使用它的项目名称与简短名称，项目未包含的附加组件内容会被删除或折叠。没有当前项目时，代码显示 `%%ProductName%%`、`%%productname%%` 占位名称与所有附加组件。
+
+## 2.0 版重点
+
+- **核心与附加组件。** 核心 Skeleton Solution 包含 Clean Architecture、DDD 与 CQRS，没有数据库、消息中间件、授权或登录，测试也不需要 Docker。PostgreSQL、消息、Worker、审计、身份验证与上线都是附加组件，在核心跑起来之后再加入（[7](./spec/07-optional-components.mdx)、[11.4](./code/11-file-overview.mdx#11-4-core-and-add-on-files)）。1.0 版中 Worker 与审计是可选组件；PostgreSQL、消息、身份验证与部署文件则一律包含。
+- Boilerplate 仍是同一套文件：附加组件的行带有 `@@` 标记，因此 Reference、scaffold 脚本与 `TEMPLATE.md` 不会彼此脱节。scaffold 脚本默认建立核心，每个附加组件各有一个旗标（`--postgres`、`--messaging` 等，或用 `--all` 得到相当于 1.0 版的内容）。
+- `Program.cs` 与 `AddInfrastructure` 在任何组合下都维持相同结构；链式呼叫改为一行一个呼叫，让附加组件以整行为单位加入或删除。
+- Application.UnitTests 自行引用 `Microsoft.Extensions.Logging`；1.0 版是经由 EF Core 间接取得（12.2）。
 
 ## 1.0 版重点
 

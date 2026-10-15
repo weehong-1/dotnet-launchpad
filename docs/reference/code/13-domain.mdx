@@ -113,7 +113,7 @@ public interface IRepository<TAggregate, in TId>
 }
 ```
 
-Each aggregate's repository interface inherits this and adds only its own query methods.
+Each aggregate's repository interface inherits this and adds only its own query methods. The implementations come with the PostgreSQL add-on ([15.4](./15-infrastructure.mdx#15-4-repository-cs)).
 
 ## 13.7 IHasTimestamps.cs \{#13-7-ihastimestamps-cs\}
 
@@ -127,7 +127,7 @@ public interface IHasTimestamps
 }
 ```
 
-Filled in automatically by an Infrastructure interceptor; business code never sets them.
+Filled in automatically by an Infrastructure interceptor (PostgreSQL add-on, [15.3](./15-infrastructure.mdx#15-3-timestampsinterceptor-cs)); business code never sets them.
 
 ## 13.8 ErrorType.cs \{#13-8-errortype-cs\}
 

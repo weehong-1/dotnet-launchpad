@@ -1,7 +1,7 @@
 ```text
-执行文档第 17 节（Worker）。只在选择 Worker 时执行。前置条件：第 16 节已完成。
+执行文档第 17 节（Worker）。只在有 Worker 附加组件时执行，它需要消息与 PostgreSQL。前置条件：第 16 节已完成。
 
-1. 建立 17.1 的四个设定档：以 16.12 的四个档案为基础，删除 Cors、OpenApi、Migrations、Authentication、RateLimiting 区块；Serilog:Properties:Application 改为 <项目名称>.Worker；SIT 与 Production 的日志文件路径改为 /var/log/<项目名称小写>/worker/log-.json；其余照抄。
+1. 建立 17.1 的四个设定档：以有 PostgreSQL 与消息时 16.12 的四个档案为基础，删除 Cors、OpenApi、Migrations、Authentication、RateLimiting 区块；Serilog:Properties:Application 改为 <项目名称>.Worker；SIT 与 Production 的日志文件路径改为 /var/log/<项目名称小写>/worker/log-.json；其余照抄。
 2. 确认四个设定档都会复制到输出目录。
 3. 以 17.2 的内容完全取代 Program.cs。
 4. 确认 Properties/launchSettings.json 的 DOTNET_ENVIRONMENT 为 Development。

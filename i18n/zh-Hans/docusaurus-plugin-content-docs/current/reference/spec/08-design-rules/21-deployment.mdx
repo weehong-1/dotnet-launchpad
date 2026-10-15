@@ -4,6 +4,10 @@ sidebar_label: "8.21 部署"
 
 # 8.21 部署 \{#8-21-deployment\}
 
+:::note[附加组件]
+这些规则随上线附加组件而来（[7.7](../07-optional-components.mdx#7-7-go-live)）。数据库、消息中间件或 Worker 相关的步骤，只在项目有对应附加组件时适用。
+:::
+
 **发布方式**
 
 以 self-contained 方式发布为 linux-x64，执行档已包含 .NET 执行环境，VM 不需另外安装 .NET，每个应用锁定自己的执行环境版本。CI 流程见 [12.10](../../code/12-solution-level.mdx#12-10-github-workflows-ci-yml)。

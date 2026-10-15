@@ -1,10 +1,10 @@
 ```text
 执行文档第 15 节（Infrastructure）。前置条件：第 14 节已完成。
 
-1. 按第 11 节列出的路径建立 15.1 至 15.14 的文件，内容照文档。未选择 Worker 时，删除 15.8 中关闭投递服务（DisableDeliveryService）的判断，由 Api 自行投递 Outbox。15.9 至 15.14 只在选择审计时建立；未选择审计时，删除 15.8 中标有"审计（可选）"的注册与 AddInterceptors 中的 AuditTrailInterceptor。
+1. 建立 15.8 DependencyInjection.cs，附加组件的行只保留设定为“要”的附加组件；再加上这些附加组件标为“（附加组件：X）”的文件（15.1 至 15.4 PostgreSQL；15.5 消息；15.6 与 15.7 身份验证；15.9 至 15.14 审计）。核心的 AddInfrastructure 只注册 TimeProvider、HTTP context accessor、健康检查与 HTTP 弹性处理。
 2. 在 ProductName.Infrastructure.csproj 加入 Microsoft.AspNetCore.App 框架引用。
-3. 若消息中间件或数据库不是 RabbitMQ 与 PostgreSQL，先停下来确认要改用的套件，再修改 UseNpgsql、UsePostgres、UsingRabbitMq 三处。
-4. 不要建立任何业务实体配置、Repository 实现或迁移（第一个迁移在第 16 节建立）；15.11 的审计配置属于模板本身，选择审计时就要建立。
+3. 有 PostgreSQL 或消息时：若数据库或消息中间件不是 PostgreSQL 或 RabbitMQ，先停下来确认要改用的套件，再修改 UseNpgsql、UsePostgres、UsingRabbitMq 三处。
+4. 不要建立任何业务实体配置、Repository 实现或迁移（有 PostgreSQL 时，第一个迁移在第 16 节建立）；15.11 的审计配置属于模板本身，有审计时就要建立。
 
 完成条件：dotnet build 成功。
 ```

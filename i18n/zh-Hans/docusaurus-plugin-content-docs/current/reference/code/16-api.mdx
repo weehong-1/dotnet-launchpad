@@ -71,7 +71,9 @@ public static class ResultExtensions
 }
 ```
 
-## 16.4 MigrationExtensions.cs \{#16-4-migrationextensions-cs\}
+<Optional when="postgres">
+
+## 16.4 MigrationExtensions.cs（附加组件：PostgreSQL） \{#16-4-migrationextensions-cs\}
 
 ```csharp
 using Microsoft.EntityFrameworkCore;
@@ -89,6 +91,8 @@ internal static class MigrationExtensions
     }
 }
 ```
+
+</Optional>
 
 ## 16.5 CustomResults.cs \{#16-5-customresults-cs\}
 
@@ -199,11 +203,13 @@ internal sealed class GlobalExceptionHandler(
 }
 ```
 
-- 并发冲突返回 409 并以 Warning 记录，因为这是多人同时操作时可预期的情况，不是程序错误。
+- 并发冲突（PostgreSQL 附加组件）返回 409 并以 Warning 记录，因为这是多人同时操作时可预期的情况，不是程序错误。
 - 领域异常与其他未预期的异常一律返回 500，不对外透露内部细节；领域异常另在日志中记录错误代码。
 - 业务失败走 Result，不会进到这里。
 
-## 16.7 AuthExtensions.cs \{#16-7-authextensions-cs\}
+<Optional when="auth">
+
+## 16.7 AuthExtensions.cs（附加组件：身份验证） \{#16-7-authextensions-cs\}
 
 ```csharp
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -242,7 +248,11 @@ internal static class AuthExtensions
 - 只使用标准的 JWT Bearer 验证，适用于任何 OpenID Connect 提供方；提供方的差异只在设定值。
 - `Authority` 必须是 HTTPS 网址；设定留空时所有需要登入的请求都会被拒绝，不会意外开放。
 
-## 16.8 PermissionRequirement.cs \{#16-8-permissionrequirement-cs\}
+</Optional>
+
+<Optional when="auth">
+
+## 16.8 PermissionRequirement.cs（附加组件：身份验证） \{#16-8-permissionrequirement-cs\}
 
 ```csharp
 using Microsoft.AspNetCore.Authorization;
@@ -255,7 +265,11 @@ internal sealed class PermissionRequirement(string permission) : IAuthorizationR
 }
 ```
 
-## 16.9 PermissionAuthorizationHandler.cs \{#16-9-permissionauthorizationhandler-cs\}
+</Optional>
+
+<Optional when="auth">
+
+## 16.9 PermissionAuthorizationHandler.cs（附加组件：身份验证） \{#16-9-permissionauthorizationhandler-cs\}
 
 ```csharp
 using Microsoft.AspNetCore.Authorization;
@@ -280,7 +294,11 @@ internal sealed class PermissionAuthorizationHandler(IPermissionProvider permiss
 }
 ```
 
-## 16.10 PermissionEndpointExtensions.cs \{#16-10-permissionendpointextensions-cs\}
+</Optional>
+
+<Optional when="auth">
+
+## 16.10 PermissionEndpointExtensions.cs（附加组件：身份验证） \{#16-10-permissionendpointextensions-cs\}
 
 ```csharp
 using ProductName.Api.Authorization;
@@ -298,6 +316,8 @@ public static class PermissionEndpointExtensions
 ```
 
 端点写法：`app.MapPost(...).RequirePermission(XxxPermissions.Create);`，不需要预先注册政策。
+
+</Optional>
 
 ## 16.11 RateLimitingExtensions.cs \{#16-11-ratelimitingextensions-cs\}
 
@@ -401,6 +421,7 @@ internal static class RateLimitingExtensions
 ```
 
 - 所有功能预设关闭，连接字符串留空。任何环境漏设连接字符串，应用会在启动时直接失败，不会连错数据库。
+- `ConnectionStrings` 与 `Migrations` 随 PostgreSQL 附加组件而来（`MessageBroker` 随消息而来），`Authentication` 随身份验证附加组件而来。
 - `Authentication` 的 `Authority` 与 `Audience` 按环境以 User Secrets 或环境变量提供（见 [8.16](../spec/08-design-rules/16-authentication-and-authorization.mdx)）；`RateLimiting` 为限流预设值（见 [8.18](../spec/08-design-rules/18-rate-limiting.mdx)）。
 - 不定义 `Serilog:WriteTo`，由各环境档自行定义（原因见 [8.8](../spec/08-design-rules/08-configuration-environments-and-secrets.mdx)）。
 - `Enrich` 与 `Properties` 让每条日志都带上机器名称、环境名称与应用名称（见 [8.9](../spec/08-design-rules/09-logging-rules.mdx)）。
@@ -631,12 +652,13 @@ public partial class Program { }
 ```
 
 - OpenAPI 文档与 Scalar 界面由设定 `OpenApi:Enabled` 控制（Development 与 SIT 开启），界面位于 `/scalar`。
-- 启动时迁移由设定 `Migrations:ApplyOnStartup` 控制，只在 Development 开启。
+- 启动时迁移（PostgreSQL 附加组件）由设定 `Migrations:ApplyOnStartup` 控制，只在 Development 开启。
 - 健康检查位于 `/health`，供负载平衡器或监控服务探测。
-- 请求日志每个请求记录一条，包含路径、状态码、耗时、`UserId` 与 `ClientIp`（见 [8.9](../spec/08-design-rules/09-logging-rules.mdx)）。
+- 请求日志每个请求记录一条，包含路径、状态码、耗时、`ClientIp`，有身份验证附加组件时还有 `UserId`（见 [8.9](../spec/08-design-rules/09-logging-rules.mdx)）。
 - 转发标头预设只信任本机的代理。Nginx 与 Api 在同一台 VM 时不需额外设定；Nginx 在其他主机时，须把它的 IP 加入 `KnownProxies`，否则取得的 IP 会是 Nginx 的。
-- 身份认证与授权见 [16.7](#16-7-authextensions-cs) 至 [16.10](#16-10-permissionendpointextensions-cs)：预设所有端点都须登入，健康检查与 OpenAPI 明确标记为公开。
+- 没有身份验证附加组件时，所有端点都是公开的。加入后，见 [16.7](#16-7-authextensions-cs) 至 [16.10](#16-10-permissionendpointextensions-cs)：预设所有端点都须登入，健康检查与 OpenAPI 明确标记为公开。
 - 限流放在认证之后，才能以使用者计数；健康检查不受限流影响（见 [8.18](../spec/08-design-rules/18-rate-limiting.mdx)）。
+- 每个项目的 `Program.cs` 都是同一个文件；每个附加组件只加入它需要的行，在其 Setup Flow 页面中以标亮显示。
 - `AddSystemd()` 在非 systemd 环境（例如本机开发）自动不起作用。
 
 ## 16.14 AI Coding Agent 提示词 \{#16-14-ai-coding-agent-prompt\}

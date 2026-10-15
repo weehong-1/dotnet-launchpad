@@ -8,6 +8,7 @@ sidebar_label: "附录 B：关键决策纪录"
 
 | 决策 | 选择 | 理由 | 主要替代方案 |
 | --- | --- | --- | --- |
+| 核心与附加组件 | 核心 Skeleton Solution 不含数据库、消息中间件或登录；PostgreSQL、消息、Worker、审计、身份验证与上线是附加组件，标记在同一套 Boilerplate 中（2.0 版，见 `docs/adr/0003-core-setup-and-add-ons.md`） | 核心建立快、容易理解；每个项目只按固定顺序加入需要的部分 | 一律全部包含（1.0 版）；每个附加组件各一套 Boilerplate，因代码会重复而否决 |
 | 表现层命名 | 按宿主命名为 `Api`、`Worker`，不叫 Presentation | 表现层有多个入口，按宿主命名才能区分；与业界主流一致 | 独立的 Presentation 类库 |
 | 端点风格 | Minimal API，`IEndpoint` 自动注册 | 端点与功能切片一一对应，不需 Controller 基类 | Controllers 加 Asp.Versioning（英文 guide） |
 | CQRS 管线 | MediatR，外包一层自建接口 | 管线行为成熟；自建接口强制返回 Result，日后可替换 | 自写 dispatcher、source generator 版 Mediator |

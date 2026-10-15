@@ -113,7 +113,7 @@ public interface IRepository<TAggregate, in TId>
 }
 ```
 
-每个聚合的仓储接口继承它，只需补充该聚合特有的查询方法。
+每个聚合的仓储接口继承它，只需补充该聚合特有的查询方法。实现随 PostgreSQL 附加组件而来（[15.4](./15-infrastructure.mdx#15-4-repository-cs)）。
 
 ## 13.7 IHasTimestamps.cs \{#13-7-ihastimestamps-cs\}
 
@@ -127,7 +127,7 @@ public interface IHasTimestamps
 }
 ```
 
-由 Infrastructure 的拦截器自动填写，业务代码不需要手动设置。
+由 Infrastructure 的拦截器自动填写（PostgreSQL 附加组件，[15.3](./15-infrastructure.mdx#15-3-timestampsinterceptor-cs)），业务代码不需要手动设置。
 
 ## 13.8 ErrorType.cs \{#13-8-errortype-cs\}
 
@@ -294,7 +294,7 @@ public readonly record struct XxxId(Guid Value) : IStronglyTypedId
 
 <Optional when="auditing">
 
-## 13.14 IAuditable.cs（可选：审计） \{#13-14-iauditable-cs-optional-auditing\}
+## 13.14 IAuditable.cs（附加组件：审计） \{#13-14-iauditable-cs-optional-auditing\}
 
 ```csharp
 namespace ProductName.Domain.Abstractions;
@@ -307,7 +307,7 @@ public interface IAuditable { }
 
 <Optional when="auditing">
 
-## 13.15 AuditIgnoreAttribute.cs（可选：审计） \{#13-15-auditignoreattribute-cs-optional-auditing\}
+## 13.15 AuditIgnoreAttribute.cs（附加组件：审计） \{#13-15-auditignoreattribute-cs-optional-auditing\}
 
 ```csharp
 namespace ProductName.Domain.Abstractions;

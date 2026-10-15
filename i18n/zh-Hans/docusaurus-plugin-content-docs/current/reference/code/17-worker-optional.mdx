@@ -1,10 +1,12 @@
 ---
-sidebar_label: "17. Worker（可选）"
+sidebar_label: "17. Worker（附加组件）"
 ---
 
 import Prompt17Worker from '../_partials/prompt-17-worker.mdx';
 
-# 17. Worker（可选） \{#17-worker-optional\}
+# 17. Worker（附加组件） \{#17-worker-optional\}
+
+Worker 附加组件需要消息附加组件：它托管 Consumer 并投递 Outbox（[7.1](../spec/07-optional-components.mdx#7-1-worker)）。
 
 <Optional when="worker" page>
 
@@ -12,7 +14,7 @@ import Prompt17Worker from '../_partials/prompt-17-worker.mdx';
 
 与 Api 相同的四个档案，内容照 [16.12](./16-api.mdx#16-12-appsettings-files-4)，但删除 Worker 用不到的区块：
 
-- 删除 `Cors`、`OpenApi`、`Migrations`、`Authentication`、`RateLimiting` 区块（Worker 不提供 HTTP 端点，也不执行迁移）。
+- 删除 `Cors`、`OpenApi`、`Migrations`、`Authentication`（身份验证附加组件）、`RateLimiting` 区块（Worker 不提供 HTTP 端点，也不执行迁移）。
 - 保留 `ConnectionStrings`、`MediatR`、`Serilog`。
 - `Serilog:Properties:Application` 改为 `ProductName.Worker`。
 - SIT 与 Production 的日志文件路径改为 `/var/log/<项目名称小写>/worker/log-.json`。

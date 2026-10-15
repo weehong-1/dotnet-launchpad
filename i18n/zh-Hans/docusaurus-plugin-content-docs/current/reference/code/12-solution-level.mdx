@@ -101,19 +101,37 @@ import Prompt12Solution from '../_partials/prompt-12-solution.mdx';
 
 **各项目引用关系**
 
+核心 Skeleton Solution：
+
 | 项目 | 项目引用 | NuGet 包 |
 | --- | --- | --- |
 | Domain | 无 | `MediatR.Contracts` |
-| Application | Domain | `MediatR`、`FluentValidation`、`FluentValidation.DependencyInjectionExtensions`、`Microsoft.EntityFrameworkCore`、`Microsoft.Extensions.Configuration.Abstractions` |
-| Infrastructure | Application | `Npgsql.EntityFrameworkCore.PostgreSQL`、`Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore`、`MassTransit`、`MassTransit.EntityFrameworkCore`、`MassTransit.RabbitMQ`、`Microsoft.Extensions.Http.Resilience`；另加 `Microsoft.AspNetCore.App` 框架引用 |
-| Api | Application、Infrastructure | `Microsoft.AspNetCore.OpenApi`、`Scalar.AspNetCore`、`Microsoft.AspNetCore.Authentication.JwtBearer`、`Microsoft.Extensions.Hosting.Systemd`、`Serilog.AspNetCore`、`Serilog.Sinks.Seq`、`Serilog.Sinks.File`、`Serilog.Sinks.Async`、`Serilog.Enrichers.Environment`、`Microsoft.EntityFrameworkCore.Design` |
+| Application | Domain | `MediatR`、`FluentValidation`、`FluentValidation.DependencyInjectionExtensions`、`Microsoft.Extensions.Configuration.Abstractions` |
+| Infrastructure | Application | `Microsoft.Extensions.Http.Resilience`；另加 `Microsoft.AspNetCore.App` 框架引用 |
+| Api | Application、Infrastructure | `Microsoft.AspNetCore.OpenApi`、`Scalar.AspNetCore`、`Microsoft.Extensions.Hosting.Systemd`、`Serilog.AspNetCore`、`Serilog.Sinks.Seq`、`Serilog.Sinks.File`、`Serilog.Sinks.Async`、`Serilog.Enrichers.Environment` |
 | Worker | Application、Infrastructure | `Microsoft.Extensions.Hosting.Systemd`、`Serilog.Extensions.Hosting`、`Serilog.Settings.Configuration`、`Serilog.Sinks.Console`、`Serilog.Sinks.Seq`、`Serilog.Formatting.Compact`、`Serilog.Sinks.File`、`Serilog.Sinks.Async`、`Serilog.Enrichers.Environment` |
 | Domain.UnitTests | Domain | `xunit` 系列 |
 | Application.UnitTests | Application | `xunit` 系列、`NSubstitute`、`Microsoft.Extensions.TimeProvider.Testing`、`Microsoft.Extensions.Logging` |
 | Architecture.Tests | 全部 src 项目 | `xunit` 系列、`NetArchTest.Rules` |
-| Api.IntegrationTests | Api、Infrastructure | `xunit` 系列、`Microsoft.AspNetCore.Mvc.Testing`、`Testcontainers.PostgreSql`、`Testcontainers.RabbitMq` |
+| Api.IntegrationTests | Api、Infrastructure | `xunit` 系列、`Microsoft.AspNetCore.Mvc.Testing` |
 
-`xunit` 系列指 `xunit.v3` 与 `Microsoft.Testing.Extensions.CodeCoverage`。测试以 Microsoft.Testing.Platform 执行（在 `global.json` 中选定，见 [12.3](#12-3-global-json)），因此不使用 VSTest 的 `Microsoft.NET.Test.Sdk`、`xunit.runner.visualstudio`、`coverlet.collector`。xUnit v3 的测试项目须在 `.csproj` 设定 `<OutputType>Exe</OutputType>`。Application 引用 `Microsoft.Extensions.Configuration.Abstractions`，因为 `AddApplication` 读取 `IConfiguration`（14.15）。`Microsoft.CodeAnalysis.BannedApiAnalyzers` 以 `GlobalPackageReference` 自动套用到所有项目，不需个别引用。Api 与 Worker 都需在 `.csproj` 中设定 `<UserSecretsId>`，以使用 User Secrets（见 [8.8](../spec/08-design-rules/08-configuration-environments-and-secrets.mdx)）。
+Worker 项目只在有 Worker 附加组件时存在（[7.1](../spec/07-optional-components.mdx#7-1-worker)）。
+
+**附加组件的套件**
+
+每个附加组件会在上方的项目中加入以下套件（见第 [7](../spec/07-optional-components.mdx) 节）：
+
+| 附加组件 | 项目 | NuGet 包 |
+| --- | --- | --- |
+| PostgreSQL | Application | `Microsoft.EntityFrameworkCore` |
+| PostgreSQL | Infrastructure | `Npgsql.EntityFrameworkCore.PostgreSQL`、`Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore` |
+| PostgreSQL | Api | `Microsoft.EntityFrameworkCore.Design` |
+| PostgreSQL | Api.IntegrationTests | `Testcontainers.PostgreSql` |
+| 消息 | Infrastructure | `MassTransit`、`MassTransit.EntityFrameworkCore`、`MassTransit.RabbitMQ` |
+| 消息 | Api.IntegrationTests | `Testcontainers.RabbitMq` |
+| 身份验证 | Api | `Microsoft.AspNetCore.Authentication.JwtBearer` |
+
+`xunit` 系列指 `xunit.v3` 与 `Microsoft.Testing.Extensions.CodeCoverage`。测试以 Microsoft.Testing.Platform 执行（在 `global.json` 中选定，见 [12.3](#12-3-global-json)），因此不使用 VSTest 的 `Microsoft.NET.Test.Sdk`、`xunit.runner.visualstudio`、`coverlet.collector`。xUnit v3 的测试项目须在 `.csproj` 设定 `<OutputType>Exe</OutputType>`。Application 引用 `Microsoft.Extensions.Configuration.Abstractions`，因为 `AddApplication` 读取 `IConfiguration`（14.15）。Application.UnitTests 引用 `Microsoft.Extensions.Logging`，因为 [18.5](./18-tests.mdx#18-5-validationpipelinebehaviortests-cs-application-unittests) 在真实的 DI 容器中执行真实的管线。`Microsoft.CodeAnalysis.BannedApiAnalyzers` 以 `GlobalPackageReference` 自动套用到所有项目，不需个别引用。Api 与 Worker 都需在 `.csproj` 中设定 `<UserSecretsId>`，以使用 User Secrets（见 [8.8](../spec/08-design-rules/08-configuration-environments-and-secrets.mdx)）。
 
 **版本参考**
 
@@ -215,7 +233,7 @@ volumes:
 # @@postgres-end
 ```
 
-**只供本地开发使用**，帐号密码均为预设值，因此所有端口只发布在 `127.0.0.1`，网络上的其他机器无法连线。启动后：RabbitMQ 管理界面在 `http://localhost:15672`（帐号密码 guest），Seq 在 `http://localhost:5341`。
+**只供本地开发使用**，帐号密码均为预设值，因此所有端口只发布在 `127.0.0.1`，网络上的其他机器无法连线。核心 Skeleton Solution 只需要 Seq，位于 `http://localhost:5341`。PostgreSQL 附加组件加入 `postgres` 服务，消息附加组件加入 `rabbitmq`，其管理界面在 `http://localhost:15672`（帐号密码 guest）。
 
 ## 12.6 BannedSymbols.txt \{#12-6-bannedsymbols-txt\}
 
@@ -227,7 +245,9 @@ P:System.DateTimeOffset.Now;使用 TimeProvider.GetUtcNow()（见 8.20）
 
 由 `Microsoft.CodeAnalysis.BannedApiAnalyzers` 读取，使用清单中的 API 会产生警告，配合“警告视为错误”直接导致建置失败。日后发现其他应禁用的 API，加入此清单即可。
 
-## 12.7 deploy/systemd 服务文件 \{#12-7-deploy-systemd-service-files\}
+<Optional when="golive">
+
+## 12.7 deploy/systemd 服务文件（附加组件：上线） \{#12-7-deploy-systemd-service-files\}
 
 `deploy/systemd/productname-api.service`：
 
@@ -260,7 +280,7 @@ WantedBy=multi-user.target
 
 <Optional when="worker">
 
-`deploy/systemd/productname-worker.service`（可选：Worker）：
+`deploy/systemd/productname-worker.service`（附加组件：Worker）：
 
 ```ini
 [Unit]
@@ -295,7 +315,7 @@ WantedBy=multi-user.target
 - 环境名称与机密都放在 `EnvironmentFile` 中，服务文件在各环境完全相同。
 - `Restart=always` 让服务异常结束时自动重启；`ProtectSystem` 等设定限制服务能写入的位置。
 
-## 12.8 deploy/nginx/productname-api.conf \{#12-8-deploy-nginx-productname-api-conf\}
+## 12.8 deploy/nginx/productname-api.conf（附加组件：上线） \{#12-8-deploy-nginx-productname-api-conf\}
 
 ```nginx
 server {
@@ -334,7 +354,7 @@ server {
 - `X-Forwarded-For` 与 `X-Forwarded-Proto` 让 Api 取得真实的客户端 IP 与通讯协定（见 [16.13](./16-api.mdx#16-13-program-cs) 的转发标头设定）。
 - `client_max_body_size` 为上传大小上限，按项目需要调整。
 
-## 12.9 deploy/env 环境变量范本 \{#12-9-deploy-env-environment-variable-templates\}
+## 12.9 deploy/env 环境变量范本（附加组件：上线） \{#12-9-deploy-env-environment-variable-templates\}
 
 `deploy/env/api.env.example`：
 
@@ -357,7 +377,7 @@ MT_LICENSE=
 
 <Optional when="worker">
 
-`deploy/env/worker.env.example`（可选：Worker）：
+`deploy/env/worker.env.example`（附加组件：Worker）：
 
 ```ini
 # 复制到 /etc/productname/worker.env，填入该环境的值；拥有者 root，权限 600
@@ -375,9 +395,9 @@ MT_LICENSE=
 
 - 范本只列出须按环境提供的设定，不含任何实际值，可以提交到版本控制；填好值的 `.env` 文件**绝不**提交。
 - SIT 的 VM 把环境名称改为 `SIT`（大小写须一致，见 [8.8](../spec/08-design-rules/08-configuration-environments-and-secrets.mdx)）。
-- 连接字符串使用应用帐号，不使用数据库拥有者帐号（见 [8.11](../spec/08-design-rules/11-database-migrations.mdx)）。
+- 连接字符串使用应用帐号，不使用数据库拥有者帐号（见 [8.11](../spec/08-design-rules/11-database-migrations.mdx)）。每个附加组件带来自己的行：连接字符串随 PostgreSQL 与消息而来，`MT_LICENSE` 随消息而来，`Authentication__*` 随身份验证而来。
 
-## 12.10 .github/workflows/ci.yml \{#12-10-github-workflows-ci-yml\}
+## 12.10 .github/workflows/ci.yml（附加组件：上线） \{#12-10-github-workflows-ci-yml\}
 
 ```yaml
 name: ci
@@ -425,10 +445,9 @@ jobs:
 ```
 
 - 以 GitHub Actions 为例；使用其他 CI 平台时，按相同步骤改写。
-- 每次推送与合并请求都会建置并执行全部测试（包括以 Testcontainers 执行的整合测试）；只有测试通过才产生部署产物。
-- 产物包含 Api、Worker 与迁移程序，部署步骤见 [8.21](../spec/08-design-rules/21-deployment.mdx)。
-- 未选择 Worker 的项目，删除发布 Worker 的步骤。
-- 第一次 push 之前先设定 `MT_LICENSE` secret：整合测试会启动 MassTransit，没有授权就无法执行（`gh secret set MT_LICENSE < license.txt`）。
+- 每次推送与合并请求都会建置并执行全部测试（有 PostgreSQL 附加组件时，包括以 Testcontainers 执行的整合测试）；只有测试通过才产生部署产物。
+- 产物包含 Api、Worker（Worker 附加组件）与迁移程序（PostgreSQL 附加组件），部署步骤见 [8.21](../spec/08-design-rules/21-deployment.mdx)。
+- 有消息附加组件时，第一次 push 之前先设定 `MT_LICENSE` secret：整合测试会启动 MassTransit，没有授权就无法执行（`gh secret set MT_LICENSE < license.txt`）。
 
 <Optional when="sonar,qodana">
 
@@ -525,9 +544,11 @@ profile:
 | --- | --- | --- |
 | Secret | `SONAR_TOKEN` | SonarCloud 认证令牌 |
 | Secret | `QODANA_TOKEN` | Qodana Cloud 认证令牌 |
-| Secret | `MT_LICENSE` | MassTransit v9 授权内容；测试会启动 bus，所有执行测试的 job 都需要它 |
+| Secret | `MT_LICENSE` | 仅消息附加组件。MassTransit v9 授权内容；测试会启动 bus，所有执行测试的 job 都需要它 |
 | Variable | `SONAR_PROJECT_KEY` | SonarCloud 项目键 |
 | Variable | `SONAR_ORGANIZATION_KEY` | SonarCloud 组织键 |
+
+</Optional>
 
 </Optional>
 

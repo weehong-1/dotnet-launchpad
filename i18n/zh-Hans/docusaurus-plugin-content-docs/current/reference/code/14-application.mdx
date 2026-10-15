@@ -76,7 +76,9 @@ public interface IDomainEventHandler<in TDomainEvent> : INotificationHandler<TDo
     where TDomainEvent : IDomainEvent { }
 ```
 
-## 14.7 IEventBus.cs \{#14-7-ieventbus-cs\}
+<Optional when="messaging">
+
+## 14.7 IEventBus.cs（附加组件：消息） \{#14-7-ieventbus-cs\}
 
 ```csharp
 namespace ProductName.Application.Abstractions.Messaging;
@@ -89,6 +91,8 @@ public interface IEventBus
 ```
 
 Application 通过这个接口发布整合事件，不直接引用 MassTransit。实现见 [15.5](./15-infrastructure.mdx#15-5-eventbus-cs)。
+
+</Optional>
 
 ## 14.8 LoggingPipelineBehavior.cs \{#14-8-loggingpipelinebehavior-cs\}
 
@@ -190,7 +194,9 @@ internal sealed class ValidationPipelineBehavior<TRequest, TResponse>(
 - `TResponse.CreateFailure` 调用的是回应类型自己的静态工厂（[13.11](./13-domain.mdx#13-11-result-cs-and-iresultfactory-cs)），管线完全不用反射：签名写错会在编译时失败，而不是等到正式环境第一次验证失败时才出错。
 - 泛型约束同时决定这个管线套用在哪些请求上。不是 Command（`IBaseCommand`）的请求，或回应类型没有实现 `IResultFactory` 的请求，不满足泛型约束，依赖注入会**默默略过**这个行为；Query 就是这样略过验证的。由于略过时不会报错，[18.1](./18-tests.mdx#18-1-layertests-cs) 检查所有 Handler 都经由我们自己的 Handler 接口，[18.5](./18-tests.mdx#18-5-validationpipelinebehaviortests-cs-application-unittests) 检查 Command 会被验证、Query 不会。
 
-## 14.10 IApplicationDbContext.cs \{#14-10-iapplicationdbcontext-cs\}
+<Optional when="postgres">
+
+## 14.10 IApplicationDbContext.cs（附加组件：PostgreSQL） \{#14-10-iapplicationdbcontext-cs\}
 
 ```csharp
 using Microsoft.EntityFrameworkCore;
@@ -205,7 +211,11 @@ public interface IApplicationDbContext
 
 供 Query 直接以 `AsNoTracking` 读取。使用泛型 `Set<TEntity>()`，新增实体时不需要修改这个接口。
 
-## 14.11 IUnitOfWork.cs \{#14-11-iunitofwork-cs\}
+</Optional>
+
+<Optional when="postgres">
+
+## 14.11 IUnitOfWork.cs（附加组件：PostgreSQL） \{#14-11-iunitofwork-cs\}
 
 ```csharp
 namespace ProductName.Application.Abstractions.Data;
@@ -216,7 +226,11 @@ public interface IUnitOfWork
 }
 ```
 
-## 14.12 ICurrentUser.cs \{#14-12-icurrentuser-cs\}
+</Optional>
+
+<Optional when="auth">
+
+## 14.12 ICurrentUser.cs（附加组件：身份验证） \{#14-12-icurrentuser-cs\}
 
 ```csharp
 namespace ProductName.Application.Abstractions.Authentication;
@@ -228,7 +242,11 @@ public interface ICurrentUser
 }
 ```
 
-## 14.13 IPermissionProvider.cs \{#14-13-ipermissionprovider-cs\}
+</Optional>
+
+<Optional when="auth">
+
+## 14.13 IPermissionProvider.cs（附加组件：身份验证） \{#14-13-ipermissionprovider-cs\}
 
 ```csharp
 using System.Security.Claims;
@@ -242,6 +260,8 @@ public interface IPermissionProvider
 ```
 
 提供使用者拥有的权限（见 [8.16](../spec/08-design-rules/16-authentication-and-authorization.mdx)）。模板预设从令牌声明读取（[15.7](./15-infrastructure.mdx#15-7-claimspermissionprovider-cs)）；权限由系统自行管理时，替换实现即可，呼叫端不需修改。
+
+</Optional>
 
 ## 14.14 PagedList.cs \{#14-14-pagedlist-cs\}
 
@@ -291,7 +311,7 @@ public static class DependencyInjection
 
 <Optional when="auditing">
 
-## 14.16 IAuditContext.cs（可选：审计） \{#14-16-iauditcontext-cs-optional-auditing\}
+## 14.16 IAuditContext.cs（附加组件：审计） \{#14-16-iauditcontext-cs-optional-auditing\}
 
 ```csharp
 namespace ProductName.Application.Abstractions.Auditing;
@@ -312,7 +332,7 @@ public interface IAuditContext
 
 <Optional when="auditing">
 
-## 14.17 IAuditableRequest.cs（可选：审计） \{#14-17-iauditablerequest-cs-optional-auditing\}
+## 14.17 IAuditableRequest.cs（附加组件：审计） \{#14-17-iauditablerequest-cs-optional-auditing\}
 
 ```csharp
 namespace ProductName.Application.Abstractions.Auditing;
@@ -325,7 +345,7 @@ public interface IAuditableRequest { }
 
 <Optional when="auditing">
 
-## 14.18 IOperationAuditWriter.cs（可选：审计） \{#14-18-ioperationauditwriter-cs-optional-auditing\}
+## 14.18 IOperationAuditWriter.cs（附加组件：审计） \{#14-18-ioperationauditwriter-cs-optional-auditing\}
 
 ```csharp
 namespace ProductName.Application.Abstractions.Auditing;
@@ -349,7 +369,7 @@ public interface IOperationAuditWriter
 
 <Optional when="auditing">
 
-## 14.19 OperationAuditPipelineBehavior.cs（可选：审计） \{#14-19-operationauditpipelinebehavior-cs-optional-auditing\}
+## 14.19 OperationAuditPipelineBehavior.cs（附加组件：审计） \{#14-19-operationauditpipelinebehavior-cs-optional-auditing\}
 
 ```csharp
 using MediatR;

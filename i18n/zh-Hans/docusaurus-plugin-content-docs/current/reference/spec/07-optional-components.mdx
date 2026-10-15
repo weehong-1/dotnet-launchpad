@@ -1,21 +1,32 @@
 ---
-sidebar_label: "7. 可选组件"
+sidebar_label: "7. 附加组件"
 ---
 
 import PromptAddAuditing from '../_partials/prompt-add-auditing.mdx';
+import PromptAddPostgres from '../_partials/prompt-add-postgres.mdx';
+import PromptAddMessaging from '../_partials/prompt-add-messaging.mdx';
+import PromptAddWorker from '../_partials/prompt-add-worker.mdx';
+import PromptAddAuth from '../_partials/prompt-add-auth.mdx';
+import PromptAddGolive from '../_partials/prompt-add-golive.mdx';
 
-# 7. 可选组件 \{#7-optional-components\}
+# 7. 附加组件 \{#7-optional-components\}
 
-以下组件不是每个项目都需要，按项目需求启用。
+核心 Skeleton Solution 包含 Clean Architecture、DDD 与 CQRS，没有数据库、消息中间件或登录：它本身就能编译、运行与测试。其余一切都是**附加组件**，在核心跑起来之后、项目确实需要时才加入。第二部分中属于附加组件的文件与行都标为“（附加组件：X）”；[11.4](../code/11-file-overview.mdx#11-4-core-and-add-on-files) 列出了全部清单。
 
-| 组件 | 建议 | 需要时机 | 相依 |
+| 附加组件 | 需要先有 | 需要时机 | 章节 |
 | --- | --- | --- | --- |
-| Worker | 多数项目启用 | 有异步消息、定时任务或耗时作业 | 无；没有 Worker 时由 Api 投递 Outbox |
-| 审计纪录 | 建议预设启用 | 需要追查谁在何时改了什么 | 无 |
+| PostgreSQL | 无 | 系统需要储存资料；几乎所有后端都需要 | [7.4](#7-4-postgresql) |
+| 消息 | PostgreSQL | 向其他系统或 Worker 发送整合事件 | [7.5](#7-5-messaging)、[7.2](#7-2-outbox-and-the-worker) |
+| Worker | 消息 | Consumer、定时任务或耗时作业 | [7.1](#7-1-worker) |
+| 审计 | PostgreSQL | 需要追查谁在何时改了什么 | [7.3](#7-3-audit-records) |
+| 身份验证 | 无 | 用户或系统必须登录 | [7.6](#7-6-authentication) |
+| 上线 | 无 | 部署到 SIT 与 Production | [7.7](#7-7-go-live) |
+
+请按此顺序加入。每个附加组件都只是几个新文件，加上现有文件中几行标示出来的代码，因此最好在功能开始依赖核心结构之前加入。Setup Flow 的附加组件页面逐一说明每个附加组件；以下提示词则让 AI Coding Agent 完成同样的工作。
 
 ## 7.1 Worker \{#7-1-worker\}
 
-**何时启用**：项目有不由用户操作直接触发、需要在后台运行的工作，例如消费异步消息、执行定时任务、处理耗时的批次作业。有 Worker 时，Outbox 由 Worker 投递；没有 Worker 时，由 Api 自行投递（见 [7.2](#7-2-outbox-and-the-worker)）。
+**何时加入**：项目有不由用户操作直接触发、需要在后台运行的工作，例如消费异步消息、执行定时任务、处理耗时的批次作业。它需要消息附加组件。有 Worker 时，Outbox 由 Worker 投递；没有 Worker 时，由 Api 自行投递（见 [7.2](#7-2-outbox-and-the-worker)）。
 
 **为什么与 Api 分开**：
 
@@ -27,10 +38,15 @@ import PromptAddAuditing from '../_partials/prompt-add-auditing.mdx';
 
 - Api 收到需要耗时处理的请求时，只负责记录并发布消息，然后立即返回；实际处理交给 Worker。
 - Worker 本身不写业务逻辑。它和 Api 一样只是入口，最终都调用 Application 层的 Command。
+- 需要定时任务但不需要消息中间件的项目不在模板涵盖范围内：在 Api 中加入 `BackgroundService`，或先加入消息附加组件。
+
+**AI Coding Agent 提示词：加入 Worker**
+
+<PromptAddWorker />
 
 ## 7.2 Outbox 与 Worker 的关系 \{#7-2-outbox-and-the-worker\}
 
-Outbox 不是独立开关，它随 MassTransit 一起设定，所有项目都有。使用 MassTransit 内建的 EF Core Transactional Outbox，不自建：发布的消息与业务数据在同一个事务中写入 Outbox 表，再由投递服务送往消息中间件。详见 [8.4](./08-design-rules/04-masstransit-async-messaging.mdx)。
+Outbox 不是独立开关，它随消息附加组件而来，与 MassTransit 一起设定。使用 MassTransit 内建的 EF Core Transactional Outbox，不自建：发布的消息与业务数据在同一个事务中写入 Outbox 表，再由投递服务送往消息中间件。详见 [8.4](./08-design-rules/04-masstransit-async-messaging.mdx)。
 
 - **有 Worker**：Api 只写入 Outbox 并关闭投递服务，由 Worker 负责投递。
 - **没有 Worker**：由 Api 自行投递，删除 [15.8](../code/15-infrastructure.mdx#15-8-dependencyinjection-cs) 中关闭投递服务的判断即可。
@@ -39,7 +55,7 @@ Outbox 不是独立开关，它随 MassTransit 一起设定，所有项目都有
 
 ## 7.3 审计纪录 \{#7-3-audit-records\}
 
-**何时启用**：需要追查“谁在什么时间、从哪里、改了哪笔资料”的项目。多数正式的业务系统都需要，**建议预设启用**。
+**何时加入**：需要追查“谁在什么时间、从哪里、改了哪笔资料”的项目。多数正式的业务系统都需要，因此**应在第一个功能之前加入**。它需要 PostgreSQL 附加组件。
 
 **为什么在模板中就要有**：审计纪录只能从启用那一刻开始累积，上线后才补，之前的变更历史永远无法还原。模板只提供通用机制；**审计哪些资料由每个项目决定**，不含任何业务内容。
 
@@ -79,10 +95,52 @@ Outbox 不是独立开关，它随 MassTransit 一起设定，所有项目都有
 - 保留期限按项目适用的法规或合约决定，不在模板中预设；资料量大时按月分区，旧资料移到封存储存。
 - 审计纪录与应用日志完全分开：应用日志用于排查问题，可按期限删除；审计纪录是业务资料，须长期保存。
 
-不需要审计的项目，删除 `IAuditable`、`AuditIgnoreAttribute`、第 [14](../code/14-application.mdx) 节与第 [15](../code/15-infrastructure.mdx) 节中标为“可选：审计”的文件，以及 DI 中的相关注册。
+它的文件是第 [13](../code/13-domain.mdx) 至 [15](../code/15-infrastructure.mdx) 节中标为“（附加组件：审计）”的文件，以及 DI 中的相关注册。
 
-**AI Coding Agent 提示词：为既有项目加入审计**
+**AI Coding Agent 提示词：加入审计**
 
-建立骨架时选择“审计：要”，第 [13](../code/13-domain.mdx) 至 [16](../code/16-api.mdx) 节的提示词已包含审计。若项目当初没有选择审计、之后才要加入，使用以下提示词：
+建立骨架时设定“附加组件 审计：要”，第 [13](../code/13-domain.mdx) 至 [16](../code/16-api.mdx) 节的提示词已包含审计。要为既有项目加入审计，使用以下提示词：
 
 <PromptAddAuditing />
+
+## 7.4 PostgreSQL \{#7-4-postgresql\}
+
+**何时加入**：系统需要储存资料，几乎都是如此。最先加入：消息与审计都建立在它之上。
+
+**加入什么**：EF Core 与 Npgsql（[15.1](../code/15-infrastructure.mdx#15-1-applicationdbcontext-cs) 至 [15.4](../code/15-infrastructure.mdx#15-4-repository-cs)）；Application 中的 `IApplicationDbContext` 与 `IUnitOfWork`（[14.10](../code/14-application.mdx#14-10-iapplicationdbcontext-cs)、[14.11](../code/14-application.mdx#14-11-iunitofwork-cs)）；数据库迁移，在 Development 启动时套用，其他环境以 migration bundle 套用（[8.11](./08-design-rules/11-database-migrations.mdx)）；数据库健康检查；乐观并发控制（[8.17](./08-design-rules/17-concurrency-control.mdx)）；以及整合测试用的 PostgreSQL 容器。
+
+**加入前后的领域事件。** 在核心中聚合同样会触发领域事件，Domain 测试也会检查它们（`AssertDomainEventWasPublished`，[18.2](../code/18-tests.mdx#18-2-basetest-cs-domain-unittests)）。但在有工作单元之前，没有任何东西会派送它们：加入此附加组件后，`ApplicationDbContext.SaveChangesAsync` 会在写入前经 MediatR 发布它们，因此其 Handler 所做的变更会在同一个事务中提交（[15.1](../code/15-infrastructure.mdx#15-1-applicationdbcontext-cs)）。
+
+**AI Coding Agent 提示词：加入 PostgreSQL**
+
+<PromptAddPostgres />
+
+## 7.5 消息 \{#7-5-messaging\}
+
+**何时加入**：系统要通知其他系统或自己的 Worker 某件事已经发生。它需要 PostgreSQL，因为 Outbox 与 Inbox 是与业务资料位于同一个数据库的资料表。
+
+**加入什么**：MassTransit v9 与 RabbitMQ、EF Core Transactional Outbox，以及每个 Consumer 的 Inbox（[7.2](#7-2-outbox-and-the-worker)、[8.4](./08-design-rules/04-masstransit-async-messaging.mdx)）；Application 中的 `IEventBus`（[14.7](../code/14-application.mdx#14-7-ieventbus-cs)）；Docker Compose 与整合测试中的 RabbitMQ。MassTransit v9 需要授权（[8.5](./08-design-rules/05-third-party-licensing.mdx)、[8.8](./08-design-rules/08-configuration-environments-and-secrets.mdx)）。
+
+**AI Coding Agent 提示词：加入消息**
+
+<PromptAddMessaging />
+
+## 7.6 身份验证 \{#7-6-authentication\}
+
+**何时加入**：用户或其他系统必须登录。没有它时，所有端点都是公开的。
+
+**加入什么**：对接任一 OpenID Connect 提供方的 JWT Bearer 验证、要求所有地方都须登录的 fallback 策略、每个端点的权限检查、`ICurrentUser` 与 `IPermissionProvider`（[8.16](./08-design-rules/16-authentication-and-authorization.mdx)、[16.7](../code/16-api.mdx#16-7-authextensions-cs) 至 [16.10](../code/16-api.mdx#16-10-permissionendpointextensions-cs)）。
+
+**AI Coding Agent 提示词：加入身份验证**
+
+<PromptAddAuth />
+
+## 7.7 上线 \{#7-7-go-live\}
+
+**何时加入**：项目已准备好进入 SIT 与 Production。最后加入：它的文件只包含其他附加组件需要的内容。
+
+**加入什么**：`deploy/` 下的 systemd、Nginx 与环境变量范本，以及 CI 工作流程（[12.7](../code/12-solution-level.mdx#12-7-deploy-systemd-service-files) 至 [12.10](../code/12-solution-level.mdx#12-10-github-workflows-ci-yml)），还有 [8.21](./08-design-rules/21-deployment.mdx) 的部署流程。没有身份验证附加组件时，所有端点都会是公开的：请确认这是预期的结果。
+
+**AI Coding Agent 提示词：加入上线**
+
+<PromptAddGolive />

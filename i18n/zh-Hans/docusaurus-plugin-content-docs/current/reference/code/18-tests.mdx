@@ -265,11 +265,12 @@ public sealed class IntegrationTestWebAppFactory : WebApplicationFactory<Program
 }
 ```
 
-- 测试开始时启动 PostgreSQL 与 RabbitMQ 容器，并执行迁移；测试结束后释放容器。
+- 在核心 Skeleton Solution 中，factory 只以 `Testing` 环境启动 Api：没有容器，因此测试既不需要 Docker 也不需要授权。
+- PostgreSQL 附加组件在测试开始时启动 PostgreSQL 容器并执行迁移；消息附加组件再加入 RabbitMQ 容器。测试结束后释放容器。
 - 使用 xUnit v3：`IAsyncLifetime` 的方法回传 `ValueTask`，并继承 `IAsyncDisposable`，因此以覆写 `DisposeAsync` 释放容器。
 - Testcontainers 的建构函数直接传入映像名称；不带参数的旧写法已标记为过时，在“警告视为错误”下会导致建置失败。
 - 使用 `Testing` 环境，只载入基础档，OpenAPI 与启动时迁移都是关闭的；迁移改由此处自行执行。
-- 需要认证的端点，按项目的认证方案在此加入测试用的认证处理器。
+- 有身份验证附加组件时，需要认证的端点须按项目的认证方案，在此加入测试用的认证处理器。
 - 整合测试自行启动容器，CI 不需要另外提供数据库服务（英文 guide 在 CI 的 `services` 启动 PostgreSQL，本模板不需要）。
 
 ## 18.4 BaseIntegrationTest.cs 与 HealthCheckTests.cs（Api.IntegrationTests） \{#18-4-baseintegrationtest-cs-api-integrationtests\}
@@ -324,9 +325,9 @@ public sealed class HealthCheckTests(IntegrationTestWebAppFactory factory) : Bas
 }
 ```
 
-这个冒烟测试证明整合测试基底可以运作：容器启动、迁移执行、Api 启动，而且 `/health` 不带 token 也能回应。它需要 Docker 与 MassTransit 授权（`MT_LICENSE` 或 `MT_LICENSE_PATH`，见 [8.8](../spec/08-design-rules/08-configuration-environments-and-secrets.mdx)）。
+这个冒烟测试证明整合测试基底可以运作：Api 启动，而且 `/health` 能回应。有 PostgreSQL 附加组件时，它也证明容器能启动、迁移能执行，此时需要 Docker；有消息附加组件时，还需要 MassTransit 授权（`MT_LICENSE` 或 `MT_LICENSE_PATH`，见 [8.8](../spec/08-design-rules/08-configuration-environments-and-secrets.mdx)）。有身份验证附加组件时，`/health` 不带 token 仍能回应。
 
-整合测试类别继承 `BaseIntegrationTest`，可选择直接以 `Sender` 发送 Command 与 Query，或以 `HttpClient` 从 HTTP 端点测试完整流程，再以 `DbContext` 检查数据库结果。
+整合测试类别继承 `BaseIntegrationTest`，可选择直接以 `Sender` 发送 Command 与 Query，或以 `HttpClient` 从 HTTP 端点测试完整流程，再（PostgreSQL 附加组件）以 `DbContext` 检查数据库结果。
 
 ## 18.5 ValidationPipelineBehaviorTests.cs（Application.UnitTests） \{#18-5-validationpipelinebehaviortests-cs-application-unittests\}
 

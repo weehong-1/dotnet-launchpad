@@ -4,6 +4,10 @@ sidebar_label: "8.16 身份认证与授权"
 
 # 8.16 身份认证与授权 \{#8-16-authentication-and-authorization\}
 
+:::note[附加组件]
+项目加入身份验证附加组件后，这些规则才适用（[7.6](../07-optional-components.mdx#7-6-authentication)）。没有它时，所有端点都是公开的。
+:::
+
 **身份认证**
 
 - 使用 JWT Bearer，可对接任一 OpenID Connect 提供方；设定只有 `Authentication:Authority` 与 `Authentication:Audience` 两项（见 [16.7](../../code/16-api.mdx#16-7-authextensions-cs)）。

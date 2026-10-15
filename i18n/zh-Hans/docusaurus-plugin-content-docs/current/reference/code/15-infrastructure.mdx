@@ -6,7 +6,9 @@ import Prompt15Infrastructure from '../_partials/prompt-15-infrastructure.mdx';
 
 # 15. Infrastructure \{#15-infrastructure\}
 
-## 15.1 ApplicationDbContext.cs \{#15-1-applicationdbcontext-cs\}
+<Optional when="postgres">
+
+## 15.1 ApplicationDbContext.cs（附加组件：PostgreSQL） \{#15-1-applicationdbcontext-cs\}
 
 ```csharp
 using MassTransit; // @@messaging
@@ -88,19 +90,23 @@ public sealed class ApplicationDbContext(
 **事件流程**
 
 1. 聚合在方法中 `Raise` 领域事件。
-2. `SaveChangesAsync` 在写入数据库前，通过 MediatR 发布所有领域事件。
-3. 领域事件的 Handler 若需要通知外部或交给 Worker 处理，就通过 `IEventBus` 发布整合事件。
+2. `SaveChangesAsync` 在写入数据库前，通过 MediatR 发布所有领域事件，因此领域事件 Handler 的变更会在同一个事务中提交。
+3. 有消息附加组件时，领域事件的 Handler 若需要通知外部或交给 Worker 处理，就通过 `IEventBus` 发布整合事件。
 4. 启用 MassTransit 的 Bus Outbox 后，整合事件不会立刻送出，而是写入 Outbox 表，与业务数据在**同一个事务**中保存。
 5. 投递服务（有 Worker 时在 Worker 执行，没有时在 Api 执行）再从 Outbox 表读取并送往消息中间件，由 Consumer 接收处理。
 
 **其他说明**
 
 - `while` 循环用来处理事件 Handler 又触发新事件的情况。
-- 三个 `Add...Entity` 方法建立 MassTransit 所需的 Outbox 与 Inbox 表，不需要自己写 `OutboxMessage` 类。
+- 三个 `Add...Entity` 方法（消息附加组件）建立 MassTransit 所需的 Outbox 与 Inbox 表，不需要自己写 `OutboxMessage` 类。
 - 并发控制以影子属性 `Version` 设定，Domain 看不到这个属性；Npgsql 把设定为 row version 的 `uint` 对应到系统栏位 `xmin`，迁移不会新增栏位。换用其他数据库时须调整（见 [8.17](../spec/08-design-rules/17-concurrency-control.mdx)）。
 - 英文 guide 以 `SavedChangesAsync` 拦截器在写入**之后**发布领域事件。本模板改在写入之前发布，让事件 Handler 的变更与 Outbox 消息和业务资料一起提交。
 
-## 15.2 StronglyTypedIdConverter.cs \{#15-2-stronglytypedidconverter-cs\}
+</Optional>
+
+<Optional when="postgres">
+
+## 15.2 StronglyTypedIdConverter.cs（附加组件：PostgreSQL） \{#15-2-stronglytypedidconverter-cs\}
 
 ```csharp
 using System.Linq.Expressions;
@@ -130,7 +136,11 @@ internal sealed class StronglyTypedIdConverter<TId>()
 
 一个泛型转换器适用于所有强类型 ID。建构函数在第一次使用时编译成委托，之后每次转换都不再使用反射。
 
-## 15.3 TimestampsInterceptor.cs \{#15-3-timestampsinterceptor-cs\}
+</Optional>
+
+<Optional when="postgres">
+
+## 15.3 TimestampsInterceptor.cs（附加组件：PostgreSQL） \{#15-3-timestampsinterceptor-cs\}
 
 ```csharp
 using Microsoft.EntityFrameworkCore;
@@ -166,7 +176,11 @@ internal sealed class TimestampsInterceptor(TimeProvider timeProvider) : SaveCha
 
 时间使用 .NET 内建的 `TimeProvider`，测试时可替换为 `FakeTimeProvider`，不需要自建 `IDateTimeProvider`。
 
-## 15.4 Repository.cs \{#15-4-repository-cs\}
+</Optional>
+
+<Optional when="postgres">
+
+## 15.4 Repository.cs（附加组件：PostgreSQL） \{#15-4-repository-cs\}
 
 ```csharp
 namespace ProductName.Infrastructure.Database;
@@ -189,7 +203,11 @@ internal abstract class Repository<TAggregate, TId>(ApplicationDbContext db)
 
 各聚合的仓储继承这个基类，通用方法不必重复实现。
 
-## 15.5 EventBus.cs \{#15-5-eventbus-cs\}
+</Optional>
+
+<Optional when="messaging">
+
+## 15.5 EventBus.cs（附加组件：消息） \{#15-5-eventbus-cs\}
 
 ```csharp
 using MassTransit;
@@ -204,7 +222,11 @@ internal sealed class EventBus(IPublishEndpoint publishEndpoint) : IEventBus
 }
 ```
 
-## 15.6 CurrentUser.cs \{#15-6-currentuser-cs\}
+</Optional>
+
+<Optional when="auth">
+
+## 15.6 CurrentUser.cs（附加组件：身份验证） \{#15-6-currentuser-cs\}
 
 ```csharp
 using System.Security.Claims;
@@ -226,7 +248,11 @@ internal sealed class CurrentUser(IHttpContextAccessor httpContextAccessor) : IC
 
 在 Worker 中没有 HttpContext，`IsAuthenticated` 会是 `false`。
 
-## 15.7 ClaimsPermissionProvider.cs \{#15-7-claimspermissionprovider-cs\}
+</Optional>
+
+<Optional when="auth">
+
+## 15.7 ClaimsPermissionProvider.cs（附加组件：身份验证） \{#15-7-claimspermissionprovider-cs\}
 
 ```csharp
 using System.Security.Claims;
@@ -251,6 +277,8 @@ internal sealed class ClaimsPermissionProvider(IConfiguration configuration) : I
 ```
 
 从令牌中读取权限声明。多数 OpenID Connect 提供方可设定在令牌中放入权限；声明名称不同时，修改设定 `Authentication:PermissionClaimType`，不需改代码。
+
+</Optional>
 
 ## 15.8 DependencyInjection.cs \{#15-8-dependencyinjection-cs\}
 
@@ -351,17 +379,17 @@ public static class DependencyInjection
 
 **说明**
 
-- `configureConsumers` 参数让 Api 与 Worker 共用同一个注册方法：Api 不传，只把消息写入 Outbox 并关闭投递服务；Worker 传入自己的 Consumer，负责投递并托管所有 Consumer。没有 Worker 的项目，删除关闭投递服务的判断，由 Api 投递。
-- 健康检查：此处注册数据库检查；MassTransit 会自动注册消息中间件的健康检查。
+- 在核心 Skeleton Solution 中，此方法只注册每个项目都需要的内容：`TimeProvider`、HTTP context accessor、健康检查端点所需的服务，以及对外 HTTP 的韧性处理。`IConfiguration` 已经是参数，因此加入附加组件时 `Program.cs` 不需要改动。每个附加组件加入自己的行，在其 Setup Flow 页面中以标亮显示。
+- PostgreSQL 附加组件：EF Core 与 Npgsql、时间戳拦截器、`IApplicationDbContext` 与 `IUnitOfWork`，以及数据库健康检查。
+- 消息附加组件：`configureConsumers` 参数让 Api 与 Worker 共用同一个注册方法。Api 不传，只把消息写入 Outbox；Worker 传入自己的 Consumer，负责投递并托管所有 Consumer。没有 Worker 附加组件时，不加入关闭投递服务的判断，由 Api 投递。MassTransit 会自动注册消息中间件的健康检查。
 - `ConfigureHttpClientDefaults` 让之后注册的所有 HttpClient 自动具备逾时、重试与熔断（见 [8.19](../spec/08-design-rules/19-outbound-http-calls.mdx)）。
-- 权限来源预设为 `ClaimsPermissionProvider`；权限存在数据库的项目，在此替换为自己的实现（见 [8.16](../spec/08-design-rules/16-authentication-and-authorization.mdx)）。
-- 不需要审计的项目，删除标有“审计（可选）”的三行，以及 `AddInterceptors` 中的 `AuditTrailInterceptor`。
-- `AuditTrailInterceptor` 依赖每个请求的审计资讯，因此注册为 Scoped；`AddDbContext` 的设定在每个 Scope 中执行，可以正确取得。
+- 身份验证附加组件：权限来源预设为 `ClaimsPermissionProvider`；权限存在数据库的项目，在此替换为自己的实现（见 [8.16](../spec/08-design-rules/16-authentication-and-authorization.mdx)）。
+- 审计附加组件：标有“审计（可选）”的三行，以及 `AddInterceptors` 中的 `AuditTrailInterceptor`。`AuditTrailInterceptor` 依赖每个请求的审计资讯，因此注册为 Scoped；`AddDbContext` 的设定在每个 Scope 中执行，可以正确取得。
 - 之后新增的各聚合仓储实现也在这里注册。
 
 <Optional when="auditing">
 
-## 15.9 AuditTrail.cs（可选：审计） \{#15-9-audittrail-cs-optional-auditing\}
+## 15.9 AuditTrail.cs（附加组件：审计） \{#15-9-audittrail-cs-optional-auditing\}
 
 ```csharp
 namespace ProductName.Infrastructure.Auditing;
@@ -388,7 +416,7 @@ public sealed class AuditTrail
 
 <Optional when="auditing">
 
-## 15.10 OperationAudit.cs（可选：审计） \{#15-10-operationaudit-cs-optional-auditing\}
+## 15.10 OperationAudit.cs（附加组件：审计） \{#15-10-operationaudit-cs-optional-auditing\}
 
 ```csharp
 namespace ProductName.Infrastructure.Auditing;
@@ -412,7 +440,7 @@ public sealed class OperationAudit
 
 <Optional when="auditing">
 
-## 15.11 AuditConfigurations.cs（可选：审计） \{#15-11-auditconfigurations-cs-optional-auditing\}
+## 15.11 AuditConfigurations.cs（附加组件：审计） \{#15-11-auditconfigurations-cs-optional-auditing\}
 
 ```csharp
 using Microsoft.EntityFrameworkCore;
@@ -473,7 +501,7 @@ internal sealed class OperationAuditConfiguration : IEntityTypeConfiguration<Ope
 
 <Optional when="auditing">
 
-## 15.12 AuditContext.cs（可选：审计） \{#15-12-auditcontext-cs-optional-auditing\}
+## 15.12 AuditContext.cs（附加组件：审计） \{#15-12-auditcontext-cs-optional-auditing\}
 
 ```csharp
 using System.Diagnostics;
@@ -510,7 +538,7 @@ internal sealed class AuditContext(IHttpContextAccessor httpContextAccessor) : I
 
 <Optional when="auditing">
 
-## 15.13 AuditTrailInterceptor.cs（可选：审计） \{#15-13-audittrailinterceptor-cs-optional-auditing\}
+## 15.13 AuditTrailInterceptor.cs（附加组件：审计） \{#15-13-audittrailinterceptor-cs-optional-auditing\}
 
 ```csharp
 using System.Reflection;
@@ -637,7 +665,7 @@ internal sealed class AuditTrailInterceptor(IAuditContext auditContext, TimeProv
 
 <Optional when="auditing">
 
-## 15.14 OperationAuditWriter.cs（可选：审计） \{#15-14-operationauditwriter-cs-optional-auditing\}
+## 15.14 OperationAuditWriter.cs（附加组件：审计） \{#15-14-operationauditwriter-cs-optional-auditing\}
 
 ```csharp
 using MediatR;
