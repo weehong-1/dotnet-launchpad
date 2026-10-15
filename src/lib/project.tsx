@@ -1,4 +1,6 @@
 import reservedSegments from '@site/src/generated/reserved-name-segments.json';
+import addonData from '@site/src/data/addons.json';
+import {migrateProgress} from '@site/src/data/progress-migration';
 import React, {createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode} from 'react';
 
 export type Delivery = 'manual' | 'tailscale' | 'other';
@@ -7,8 +9,13 @@ export type Project = {
   id: string;
   projectName: string;
   shortName: string;
+  // Add-ons (src/data/addons.json): off for a new project, switched on from the Add-ons pages
+  postgres: boolean;
+  messaging: boolean;
   worker: boolean;
   auditing: boolean;
+  auth: boolean;
+  golive: boolean;
   apiVersioning: boolean | null;
   sonar: boolean;
   qodana: boolean;
@@ -22,7 +29,7 @@ export type Progress = Record<string, Record<string, string[]>>;
 
 export type ExportFile = {
   format: 'dotnet-project-setup';
-  version: 1;
+  version: 1 | 2;
   exportedAt: string;
   projects: Project[];
   progress: Progress;
@@ -65,8 +72,7 @@ function isProject(x: unknown): x is Project {
     isValidProjectName(p.projectName) &&
     typeof p.shortName === 'string' &&
     isValidShortName(p.shortName) &&
-    typeof p.worker === 'boolean' &&
-    typeof p.auditing === 'boolean' &&
+    ADDON_IDS.every((f) => typeof p[f] === 'boolean') &&
     (p.apiVersioning === null || typeof p.apiVersioning === 'boolean') &&
     typeof p.sonar === 'boolean' &&
     typeof p.qodana === 'boolean' &&
@@ -74,6 +80,28 @@ function isProject(x: unknown): x is Project {
     typeof p.createdAt === 'string' &&
     typeof p.updatedAt === 'string'
   );
+}
+
+/**
+ * Projects saved before add-ons existed (Boilerplate v1.0) had PostgreSQL, Messaging, Authentication
+ * and Go live built in: they get those add-ons on, keep their Worker and Auditing choice, and are
+ * marked so their Progress can be moved to the new steps once.
+ */
+function upgrade(x: unknown): {project: unknown; fromV1: boolean} {
+  if (typeof x !== 'object' || x === null) return {project: x, fromV1: false};
+  const p = x as Record<string, unknown>;
+  if (typeof p.postgres === 'boolean') return {project: x, fromV1: false};
+  const v1: Record<string, unknown> = {...p, postgres: true, messaging: true, auth: true, golive: true};
+  return {project: withRequirements(v1 as Project), fromV1: true};
+}
+
+/** Projects, or null when anything in them is malformed; `upgraded` lists the ids of v1 projects. */
+export function readProjects(x: unknown): {projects: Project[]; upgraded: string[]} | null {
+  if (!Array.isArray(x)) return null;
+  const read = x.map(upgrade);
+  const projects = validateProjects(read.map((r) => r.project));
+  if (!projects) return null;
+  return {projects, upgraded: projects.filter((_, i) => read[i].fromV1).map((p) => p.id)};
 }
 
 /** Projects and progress, or null when anything in them is malformed. */
@@ -132,8 +160,12 @@ export function newProject(): Project {
     id: `p-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
     projectName: '',
     shortName: '',
-    worker: true,
-    auditing: true,
+    postgres: false,
+    messaging: false,
+    worker: false,
+    auditing: false,
+    auth: false,
+    golive: false,
     apiVersioning: null,
     sonar: false,
     qodana: false,
@@ -173,9 +205,19 @@ export function ProjectProvider({children}: {children: ReactNode}): ReactNode {
   }, []);
 
   useEffect(() => {
-    setProjects(validateProjects(read<unknown>(KEYS.projects, [])) ?? []);
+    const stored = readProjects(read<unknown>(KEYS.projects, []));
+    const storedProgress = validateProgress(read<unknown>(KEYS.progress, {})) ?? {};
+    setProjects(stored?.projects ?? []);
     setActiveId(read<string | null>(KEYS.active, null));
-    setProgress(validateProgress(read<unknown>(KEYS.progress, {})) ?? {});
+    if (stored?.upgraded.length) {
+      // Saved before add-ons existed: write the upgraded projects and their moved Progress back once.
+      const migrated = migrateProgress(storedProgress, stored.upgraded);
+      write(KEYS.projects, stored.projects);
+      write(KEYS.progress, migrated);
+      setProgress(migrated);
+    } else {
+      setProgress(storedProgress);
+    }
     try {
       window.localStorage.setItem('dps.probe', '1');
       window.localStorage.removeItem('dps.probe');
@@ -188,7 +230,7 @@ export function ProjectProvider({children}: {children: ReactNode}): ReactNode {
   // Keep several open tabs in sync.
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (e.key === KEYS.projects) setProjects(validateProjects(read<unknown>(KEYS.projects, [])) ?? []);
+      if (e.key === KEYS.projects) setProjects(readProjects(read<unknown>(KEYS.projects, []))?.projects ?? []);
       if (e.key === KEYS.active) setActiveId(read(KEYS.active, null));
       if (e.key === KEYS.progress) setProgress(validateProgress(read<unknown>(KEYS.progress, {})) ?? {});
     };
@@ -250,7 +292,7 @@ export function ProjectProvider({children}: {children: ReactNode}): ReactNode {
   const exportFile = useCallback(
     (): ExportFile => ({
       format: 'dotnet-project-setup',
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
       projects,
       progress,
@@ -261,11 +303,13 @@ export function ProjectProvider({children}: {children: ReactNode}): ReactNode {
   const importFile = useCallback(
     (file: ExportFile): {count: number; persisted: boolean} => {
       // Validate everything before writing anything, so a bad file can never break stored data.
-      const incoming = file?.format === 'dotnet-project-setup' && file.version === 1 ? validateProjects(file.projects) : null;
-      const incomingProgress = validateProgress(file?.progress ?? {});
-      if (!incoming || !incomingProgress) {
+      const read = file?.format === 'dotnet-project-setup' && (file.version === 1 || file.version === 2) ? readProjects(file.projects) : null;
+      const rawProgress = validateProgress(file?.progress ?? {});
+      if (!read || !rawProgress) {
         throw new Error('Not a valid .NET Launchpad export file; nothing was imported.');
       }
+      const incoming = read.projects;
+      const incomingProgress = migrateProgress(rawProgress, read.upgraded);
       const byId = new Map(projects.map((p) => [p.id, p]));
       for (const p of incoming) byId.set(p.id, p);
       const projectsStored = persistProjects([...byId.values()]);
@@ -293,8 +337,39 @@ export function useProjects(): Store {
   return store;
 }
 
-/** Optional Components and Project Decisions that switch content on or off. */
-export type Flag = 'worker' | 'auditing' | 'sonar' | 'qodana';
+/** Add-ons and Project Decisions that switch content on or off. */
+export type AddOn = 'postgres' | 'messaging' | 'worker' | 'auditing' | 'auth' | 'golive';
+export type Flag = AddOn | 'sonar' | 'qodana';
+
+type AddOnDef = {id: AddOn; letter: string; cli: string; requires: AddOn[]; label: {en: string; zh: string}};
+export const ADDONS = addonData.addons as AddOnDef[];
+const ADDON_IDS = ADDONS.map((a) => a.id);
+export const FLAGS: Flag[] = [...ADDON_IDS, ...addonData.decisions.map((d) => d.id as Flag)];
+
+/** The add-ons an add-on needs, directly or through another (Worker needs Messaging and PostgreSQL). */
+export function requirementsOf(id: AddOn): AddOn[] {
+  const direct = ADDONS.find((a) => a.id === id)?.requires ?? [];
+  return [...new Set(direct.flatMap((r) => [r, ...requirementsOf(r)]))];
+}
+
+/** The add-ons that need this one, directly or through another. */
+export function dependentsOf(id: AddOn): AddOn[] {
+  return ADDONS.filter((a) => requirementsOf(a.id).includes(id)).map((a) => a.id);
+}
+
+/** Turns on everything the project's add-ons need. */
+export function withRequirements(project: Project): Project {
+  const next = {...project};
+  for (const a of ADDONS) if (next[a.id]) for (const r of requirementsOf(a.id)) next[r] = true;
+  return next;
+}
+
+/** Switches one add-on: on also turns on what it needs, off also turns off what needs it. */
+export function withAddOn(project: Project, id: AddOn, on: boolean): Project {
+  const next = {...project, [id]: on};
+  for (const other of on ? requirementsOf(id) : dependentsOf(id)) next[other] = on;
+  return next;
+}
 
 /** With no project, every optional part is shown so the Reference reads complete. */
 export function flagOn(project: Project | null, flag: Flag): boolean {

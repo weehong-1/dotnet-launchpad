@@ -218,30 +218,37 @@ public sealed class ResultTests
 ```csharp
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using ProductName.Infrastructure.Database;
-using Testcontainers.PostgreSql;
-using Testcontainers.RabbitMq;
+using Microsoft.EntityFrameworkCore; // @@postgres
+using Microsoft.Extensions.DependencyInjection; // @@postgres
+using ProductName.Infrastructure.Database; // @@postgres
+using Testcontainers.PostgreSql; // @@postgres
+using Testcontainers.RabbitMq; // @@messaging
 
 namespace ProductName.Api.IntegrationTests.Abstractions;
 
-public sealed class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsyncLifetime
+public sealed class IntegrationTestWebAppFactory : WebApplicationFactory<Program> // @@!postgres
+public sealed class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsyncLifetime // @@postgres
 {
+    // @@postgres-begin
     private readonly PostgreSqlContainer _database = new PostgreSqlBuilder("postgres:17").Build();
 
+    // @@postgres-end
+    // @@messaging-begin
     private readonly RabbitMqContainer _messageBroker = new RabbitMqBuilder("rabbitmq:4-management").Build();
 
+    // @@messaging-end
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
-        builder.UseSetting("ConnectionStrings:Database", _database.GetConnectionString());
-        builder.UseSetting("ConnectionStrings:MessageBroker", _messageBroker.GetConnectionString());
+        builder.UseSetting("ConnectionStrings:Database", _database.GetConnectionString()); // @@postgres
+        builder.UseSetting("ConnectionStrings:MessageBroker", _messageBroker.GetConnectionString()); // @@messaging
     }
+    // @@postgres-begin
 
     public async ValueTask InitializeAsync()
     {
-        await Task.WhenAll(_database.StartAsync(), _messageBroker.StartAsync());
+        await Task.WhenAll(_database.StartAsync(), _messageBroker.StartAsync()); // @@messaging
+        await _database.StartAsync(); // @@!messaging
 
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -251,9 +258,10 @@ public sealed class IntegrationTestWebAppFactory : WebApplicationFactory<Program
     public override async ValueTask DisposeAsync()
     {
         await _database.DisposeAsync();
-        await _messageBroker.DisposeAsync();
+        await _messageBroker.DisposeAsync(); // @@messaging
         await base.DisposeAsync();
     }
+    // @@postgres-end
 }
 ```
 
@@ -269,7 +277,7 @@ public sealed class IntegrationTestWebAppFactory : WebApplicationFactory<Program
 ```csharp
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
-using ProductName.Infrastructure.Database;
+using ProductName.Infrastructure.Database; // @@postgres
 
 namespace ProductName.Api.IntegrationTests.Abstractions;
 
@@ -281,12 +289,12 @@ public abstract class BaseIntegrationTest : IClassFixture<IntegrationTestWebAppF
     {
         _scope = factory.Services.CreateScope();
         Sender = _scope.ServiceProvider.GetRequiredService<ISender>();
-        DbContext = _scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        DbContext = _scope.ServiceProvider.GetRequiredService<ApplicationDbContext>(); // @@postgres
         HttpClient = factory.CreateClient();
     }
 
     protected ISender Sender { get; }
-    protected ApplicationDbContext DbContext { get; }
+    protected ApplicationDbContext DbContext { get; } // @@postgres
     protected HttpClient HttpClient { get; }
 
     public void Dispose()

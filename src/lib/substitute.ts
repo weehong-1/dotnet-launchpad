@@ -1,32 +1,49 @@
-import {flagOn, type Flag, type Project} from './project';
+import {FLAGS, flagOn, type Flag, type Project} from './project';
 
 /**
  * Content conventions in code blocks (see CONTEXT.md for the terms):
  * - `ProductName` / `productname` are replaced by the Project Name / Short Name.
  * - `%%ProductName%%` / `%%productname%%` stay literal (text that talks about the placeholder itself).
- * - `{{projectName}}`, `{{shortName}}`, `{{worker}}`, `{{auditing}}`, `{{sonar}}`, `{{qodana}}` are
- *   Project Settings values, used in the AI common rules.
+ * - `{{projectName}}`, `{{shortName}}` and `{{<flag>}}` (an add-on or Project Decision, such as
+ *   `{{postgres}}` or `{{sonar}}`) are Project Settings values, used in the AI common rules.
  * - A trailing comment `@@flag` keeps the line only when the flag is on; `@@!flag` only when off.
  *   A line holding only `@@flag-begin` / `@@flag-end` wraps a block the same way.
  */
 
-const MARKER = /^(.*?)\s*(?:\/\/|#|<!--|--)\s*@@(!?)(worker|auditing|sonar|qodana)(-begin|-end)?\s*(?:-->)?\s*$/;
+const MARKER = new RegExp(`^(.*?)\\s*(?:\\/\\/|#|<!--|--)\\s*@@(!?)(${FLAGS.join('|')})(-begin|-end)?\\s*(?:-->)?\\s*$`);
 
 type Cond = {negate: boolean; flag: Flag};
 
-function holds(project: Project | null, cond: Cond): boolean {
-  if (!project) return !cond.negate; // no project: show the "with" variant of every optional part
-  const on = flagOn(project, cond.flag);
+/** Which flags count as on: the active project's, or an explicit set (an add-on page's preview). */
+export type FlagSource = Project | null | ReadonlySet<Flag>;
+
+function isOn(source: FlagSource, flag: Flag): boolean | null {
+  if (source instanceof Set) return source.has(flag);
+  if (!source) return null;
+  return flagOn(source as Project, flag);
+}
+
+function holds(source: FlagSource, cond: Cond): boolean {
+  const on = isOn(source, cond.flag);
+  if (on === null) return !cond.negate; // no project: show the "with" variant of every optional part
   return cond.negate ? !on : on;
 }
 
-export function filterLines(text: string, project: Project | null): string {
+/**
+ * Keeps the lines that apply. `highlight` collects the 1-based output line numbers that exist only
+ * because that flag is on, so an add-on page can highlight what the add-on adds to a file.
+ */
+export function filterLines(text: string, source: FlagSource, highlight?: {flag: Flag; lines: number[]}): string {
   const out: string[] = [];
   const blocks: Cond[] = [];
+  const added = (conds: Cond[]) => !!highlight && conds.some((c) => !c.negate && c.flag === highlight.flag);
   for (const line of text.split('\n')) {
     const m = MARKER.exec(line);
     if (!m) {
-      if (blocks.every((c) => holds(project, c))) out.push(line);
+      if (blocks.every((c) => holds(source, c))) {
+        out.push(line);
+        if (added(blocks)) highlight!.lines.push(out.length);
+      }
       continue;
     }
     const cond: Cond = {negate: m[2] === '!', flag: m[3] as Flag};
@@ -38,7 +55,10 @@ export function filterLines(text: string, project: Project | null): string {
       blocks.pop();
       continue;
     }
-    if (blocks.every((c) => holds(project, c)) && holds(project, cond)) out.push(m[1]);
+    if (blocks.every((c) => holds(source, c)) && holds(source, cond)) {
+      out.push(m[1]);
+      if (added([...blocks, cond])) highlight!.lines.push(out.length);
+    }
   }
   return out.join('\n');
 }
@@ -65,13 +85,13 @@ function tokenValue(key: string, project: Project | null, locale: string): strin
   if (key === 'projectName') return project?.projectName || t.projectName;
   if (key === 'shortName') return project?.shortName || t.shortName;
   if (!project) return t.flag;
-  return project[key as Flag] ? t.yes : t.no;
+  return flagOn(project, key as Flag) ? t.yes : t.no;
 }
 
 // One pass over the text: an inserted value is never scanned again, so a Project Name that itself
 // contains "ProductName" or "productname" stays as typed.
 const PLACEHOLDERS = /%%ProductName%%|%%productname%%|ProductName|productname/g;
-const PLACEHOLDERS_AND_TOKENS = /%%ProductName%%|%%productname%%|ProductName|productname|\{\{(projectName|shortName|worker|auditing|sonar|qodana)\}\}/g;
+const PLACEHOLDERS_AND_TOKENS = new RegExp(`%%ProductName%%|%%productname%%|ProductName|productname|\\{\\{(projectName|shortName|${FLAGS.join('|')})\\}\\}`, 'g');
 
 function placeholderValue(match: string, project: Project | null): string {
   if (match === '%%ProductName%%') return 'ProductName';
@@ -84,8 +104,38 @@ export function replacePlaceholders(text: string, project: Project | null): stri
   return text.replace(PLACEHOLDERS, (m) => placeholderValue(m, project));
 }
 
+function fillIn(text: string, project: Project | null, locale: string): string {
+  return text.replace(PLACEHOLDERS_AND_TOKENS, (m, key?: string) => (key ? tokenValue(key, project, locale) : placeholderValue(m, project)));
+}
+
 export function renderCode(text: string, project: Project | null, locale: string): string {
-  return filterLines(text, project).replace(PLACEHOLDERS_AND_TOKENS, (m, key?: string) =>
-    key ? tokenValue(key, project, locale) : placeholderValue(m, project),
-  );
+  return fillIn(filterLines(text, project), project, locale);
+}
+
+/**
+ * Renders a Boilerplate file as it looks with exactly the given flags on, and the line numbers that
+ * the `highlight` flag adds (for a `{1,4-6}` highlight range on the code block).
+ */
+export function renderWithFlags(
+  text: string,
+  flags: ReadonlySet<Flag>,
+  project: Project | null,
+  locale: string,
+  highlight?: Flag,
+): {code: string; lines: number[]} {
+  const h = highlight ? {flag: highlight, lines: [] as number[]} : undefined;
+  const code = fillIn(filterLines(text, flags, h), project, locale);
+  return {code, lines: h?.lines ?? []};
+}
+
+/** `[1,2,3,7]` as `1-3,7`, the form Docusaurus code block metastrings take. */
+export function lineRanges(lines: number[]): string {
+  const parts: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    let j = i;
+    while (j + 1 < lines.length && lines[j + 1] === lines[j] + 1) j++;
+    parts.push(i === j ? `${lines[i]}` : `${lines[i]}-${lines[j]}`);
+    i = j;
+  }
+  return parts.join(',');
 }

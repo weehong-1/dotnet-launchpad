@@ -76,7 +76,9 @@ public interface IDomainEventHandler<in TDomainEvent> : INotificationHandler<TDo
     where TDomainEvent : IDomainEvent { }
 ```
 
-## 14.7 IEventBus.cs \{#14-7-ieventbus-cs\}
+<Optional when="messaging">
+
+## 14.7 IEventBus.cs (add-on: Messaging) \{#14-7-ieventbus-cs\}
 
 ```csharp
 namespace ProductName.Application.Abstractions.Messaging;
@@ -89,6 +91,8 @@ public interface IEventBus
 ```
 
 Application publishes integration events through this interface and never references MassTransit directly. The implementation is in [15.5](./15-infrastructure.mdx#15-5-eventbus-cs).
+
+</Optional>
 
 ## 14.8 LoggingPipelineBehavior.cs \{#14-8-loggingpipelinebehavior-cs\}
 
@@ -190,7 +194,9 @@ When validation fails, a failed Result is returned directly: the handler is neve
 - `TResponse.CreateFailure` calls the static factory of the exact response type ([13.11](./13-domain.mdx#13-11-result-cs-and-iresultfactory-cs)), so the pipeline uses no reflection: a wrong signature fails the build instead of the first failed validation in production.
 - The constraints also decide where this pipeline applies. A request that is not a Command (`IBaseCommand`), or whose response does not implement `IResultFactory`, fails the generic constraint and dependency injection **silently skips** the behavior. That is how Queries skip validation. Because a skip raises no error, [18.1](./18-tests.mdx#18-1-layertests-cs) checks that every handler goes through our own handler interfaces, and [18.5](./18-tests.mdx#18-5-validationpipelinebehaviortests-cs-application-unittests) checks that Commands are validated and Queries are not.
 
-## 14.10 IApplicationDbContext.cs \{#14-10-iapplicationdbcontext-cs\}
+<Optional when="postgres">
+
+## 14.10 IApplicationDbContext.cs (add-on: PostgreSQL) \{#14-10-iapplicationdbcontext-cs\}
 
 ```csharp
 using Microsoft.EntityFrameworkCore;
@@ -205,7 +211,11 @@ public interface IApplicationDbContext
 
 Lets Queries read directly with `AsNoTracking`. Because it uses the generic `Set<TEntity>()`, new entities never require changes to this interface.
 
-## 14.11 IUnitOfWork.cs \{#14-11-iunitofwork-cs\}
+</Optional>
+
+<Optional when="postgres">
+
+## 14.11 IUnitOfWork.cs (add-on: PostgreSQL) \{#14-11-iunitofwork-cs\}
 
 ```csharp
 namespace ProductName.Application.Abstractions.Data;
@@ -216,7 +226,11 @@ public interface IUnitOfWork
 }
 ```
 
-## 14.12 ICurrentUser.cs \{#14-12-icurrentuser-cs\}
+</Optional>
+
+<Optional when="auth">
+
+## 14.12 ICurrentUser.cs (add-on: Authentication) \{#14-12-icurrentuser-cs\}
 
 ```csharp
 namespace ProductName.Application.Abstractions.Authentication;
@@ -228,7 +242,11 @@ public interface ICurrentUser
 }
 ```
 
-## 14.13 IPermissionProvider.cs \{#14-13-ipermissionprovider-cs\}
+</Optional>
+
+<Optional when="auth">
+
+## 14.13 IPermissionProvider.cs (add-on: Authentication) \{#14-13-ipermissionprovider-cs\}
 
 ```csharp
 using System.Security.Claims;
@@ -242,6 +260,8 @@ public interface IPermissionProvider
 ```
 
 Supplies the user's permissions (see [8.16](../spec/08-design-rules/16-authentication-and-authorization.mdx)). By default the template reads them from token claims ([15.7](./15-infrastructure.mdx#15-7-claimspermissionprovider-cs)); when the system manages permissions itself, replace the implementation and callers stay unchanged.
+
+</Optional>
 
 ## 14.14 PagedList.cs \{#14-14-pagedlist-cs\}
 
@@ -291,7 +311,7 @@ Pipelines run in registration order: logging first, then operation audit, then v
 
 <Optional when="auditing">
 
-## 14.16 IAuditContext.cs (optional: auditing) \{#14-16-iauditcontext-cs-optional-auditing\}
+## 14.16 IAuditContext.cs (add-on: Auditing) \{#14-16-iauditcontext-cs-optional-auditing\}
 
 ```csharp
 namespace ProductName.Application.Abstractions.Auditing;
@@ -312,7 +332,7 @@ Supplies the information shared by audit records (see [7.3](../spec/07-optional-
 
 <Optional when="auditing">
 
-## 14.17 IAuditableRequest.cs (optional: auditing) \{#14-17-iauditablerequest-cs-optional-auditing\}
+## 14.17 IAuditableRequest.cs (add-on: Auditing) \{#14-17-iauditablerequest-cs-optional-auditing\}
 
 ```csharp
 namespace ProductName.Application.Abstractions.Auditing;
@@ -325,7 +345,7 @@ public interface IAuditableRequest { }
 
 <Optional when="auditing">
 
-## 14.18 IOperationAuditWriter.cs (optional: auditing) \{#14-18-ioperationauditwriter-cs-optional-auditing\}
+## 14.18 IOperationAuditWriter.cs (add-on: Auditing) \{#14-18-ioperationauditwriter-cs-optional-auditing\}
 
 ```csharp
 namespace ProductName.Application.Abstractions.Auditing;
@@ -349,7 +369,7 @@ public interface IOperationAuditWriter
 
 <Optional when="auditing">
 
-## 14.19 OperationAuditPipelineBehavior.cs (optional: auditing) \{#14-19-operationauditpipelinebehavior-cs-optional-auditing\}
+## 14.19 OperationAuditPipelineBehavior.cs (add-on: Auditing) \{#14-19-operationauditpipelinebehavior-cs-optional-auditing\}
 
 ```csharp
 using MediatR;

@@ -42,8 +42,8 @@ dotnet add $T.Api.IntegrationTests/${PROJECT}.Api.IntegrationTests.csproj refere
 
 # 其他
 dotnet new gitignore
-dotnet new tool-manifest --force
-dotnet tool install dotnet-ef
+dotnet new tool-manifest --force  # @@postgres
+dotnet tool install dotnet-ef  # @@postgres
 dotnet user-secrets init --project $S.Api/${PROJECT}.Api.csproj
 dotnet user-secrets init --project $S.Worker/${PROJECT}.Worker.csproj  # @@worker
 

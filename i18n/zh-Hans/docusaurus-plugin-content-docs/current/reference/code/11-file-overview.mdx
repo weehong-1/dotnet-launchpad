@@ -175,9 +175,9 @@ global using ProductName.Domain.Abstractions;
 global using ProductName.Application;
 global using ProductName.Application.Abstractions;
 global using ProductName.Application.Abstractions.Auditing;  // @@auditing
-global using ProductName.Application.Abstractions.Authentication;
+global using ProductName.Application.Abstractions.Authentication;  // @@auth
 global using ProductName.Application.Abstractions.Behaviors;
-global using ProductName.Application.Abstractions.Data;
+global using ProductName.Application.Abstractions.Data;  // @@postgres
 global using ProductName.Application.Abstractions.Messaging;
 global using ProductName.Domain.Abstractions;
 ```
@@ -188,38 +188,38 @@ global using ProductName.Domain.Abstractions;
 global using ProductName.Application;
 global using ProductName.Application.Abstractions;
 global using ProductName.Application.Abstractions.Auditing;  // @@auditing
-global using ProductName.Application.Abstractions.Authentication;
+global using ProductName.Application.Abstractions.Authentication;  // @@auth
 global using ProductName.Application.Abstractions.Behaviors;
-global using ProductName.Application.Abstractions.Data;
+global using ProductName.Application.Abstractions.Data;  // @@postgres
 global using ProductName.Application.Abstractions.Messaging;
 global using ProductName.Domain.Abstractions;
 global using ProductName.Infrastructure;
 global using ProductName.Infrastructure.Auditing;  // @@auditing
-global using ProductName.Infrastructure.Authentication;
-global using ProductName.Infrastructure.Database;
-global using ProductName.Infrastructure.Messaging;
+global using ProductName.Infrastructure.Authentication;  // @@auth
+global using ProductName.Infrastructure.Database;  // @@postgres
+global using ProductName.Infrastructure.Messaging;  // @@messaging
 ```
 
 `src/ProductName.Api/GlobalUsings.cs`：
 
 ```csharp
-global using ProductName.Api.Authorization;
+global using ProductName.Api.Authorization;  // @@auth
 global using ProductName.Api.Endpoints;
 global using ProductName.Api.Extensions;
 global using ProductName.Api.Infrastructure;
 global using ProductName.Application;
 global using ProductName.Application.Abstractions;
 global using ProductName.Application.Abstractions.Auditing;  // @@auditing
-global using ProductName.Application.Abstractions.Authentication;
+global using ProductName.Application.Abstractions.Authentication;  // @@auth
 global using ProductName.Application.Abstractions.Behaviors;
-global using ProductName.Application.Abstractions.Data;
+global using ProductName.Application.Abstractions.Data;  // @@postgres
 global using ProductName.Application.Abstractions.Messaging;
 global using ProductName.Domain.Abstractions;
 global using ProductName.Infrastructure;
 global using ProductName.Infrastructure.Auditing;  // @@auditing
-global using ProductName.Infrastructure.Authentication;
-global using ProductName.Infrastructure.Database;
-global using ProductName.Infrastructure.Messaging;
+global using ProductName.Infrastructure.Authentication;  // @@auth
+global using ProductName.Infrastructure.Database;  // @@postgres
+global using ProductName.Infrastructure.Messaging;  // @@messaging
 ```
 
 <Optional when="worker">
@@ -230,16 +230,16 @@ global using ProductName.Infrastructure.Messaging;
 global using ProductName.Application;
 global using ProductName.Application.Abstractions;
 global using ProductName.Application.Abstractions.Auditing;  // @@auditing
-global using ProductName.Application.Abstractions.Authentication;
+global using ProductName.Application.Abstractions.Authentication;  // @@auth
 global using ProductName.Application.Abstractions.Behaviors;
-global using ProductName.Application.Abstractions.Data;
+global using ProductName.Application.Abstractions.Data;  // @@postgres
 global using ProductName.Application.Abstractions.Messaging;
 global using ProductName.Domain.Abstractions;
 global using ProductName.Infrastructure;
 global using ProductName.Infrastructure.Auditing;  // @@auditing
-global using ProductName.Infrastructure.Authentication;
-global using ProductName.Infrastructure.Database;
-global using ProductName.Infrastructure.Messaging;
+global using ProductName.Infrastructure.Authentication;  // @@auth
+global using ProductName.Infrastructure.Database;  // @@postgres
+global using ProductName.Infrastructure.Messaging;  // @@messaging
 ```
 
 </Optional>
@@ -257,9 +257,9 @@ global using ProductName.Domain.UnitTests.Abstractions;
 global using ProductName.Application;
 global using ProductName.Application.Abstractions;
 global using ProductName.Application.Abstractions.Auditing;  // @@auditing
-global using ProductName.Application.Abstractions.Authentication;
+global using ProductName.Application.Abstractions.Authentication;  // @@auth
 global using ProductName.Application.Abstractions.Behaviors;
-global using ProductName.Application.Abstractions.Data;
+global using ProductName.Application.Abstractions.Data;  // @@postgres
 global using ProductName.Application.Abstractions.Messaging;
 global using ProductName.Application.UnitTests.Abstractions.Behaviors;
 global using ProductName.Domain.Abstractions;
@@ -268,30 +268,30 @@ global using ProductName.Domain.Abstractions;
 `tests/ProductName.Architecture.Tests/GlobalUsings.cs`：
 
 ```csharp
-global using ProductName.Api.Authorization;
+global using ProductName.Api.Authorization;  // @@auth
 global using ProductName.Api.Endpoints;
 global using ProductName.Api.Extensions;
 global using ProductName.Api.Infrastructure;
 global using ProductName.Application;
 global using ProductName.Application.Abstractions;
 global using ProductName.Application.Abstractions.Auditing;  // @@auditing
-global using ProductName.Application.Abstractions.Authentication;
+global using ProductName.Application.Abstractions.Authentication;  // @@auth
 global using ProductName.Application.Abstractions.Behaviors;
-global using ProductName.Application.Abstractions.Data;
+global using ProductName.Application.Abstractions.Data;  // @@postgres
 global using ProductName.Application.Abstractions.Messaging;
 global using ProductName.Architecture.Tests;
 global using ProductName.Domain.Abstractions;
 global using ProductName.Infrastructure;
 global using ProductName.Infrastructure.Auditing;  // @@auditing
-global using ProductName.Infrastructure.Authentication;
-global using ProductName.Infrastructure.Database;
-global using ProductName.Infrastructure.Messaging;
+global using ProductName.Infrastructure.Authentication;  // @@auth
+global using ProductName.Infrastructure.Database;  // @@postgres
+global using ProductName.Infrastructure.Messaging;  // @@messaging
 ```
 
 `tests/ProductName.Api.IntegrationTests/GlobalUsings.cs`：
 
 ```csharp
-global using ProductName.Api.Authorization;
+global using ProductName.Api.Authorization;  // @@auth
 global using ProductName.Api.Endpoints;
 global using ProductName.Api.Extensions;
 global using ProductName.Api.Infrastructure;
@@ -300,15 +300,15 @@ global using ProductName.Api.IntegrationTests.Abstractions;
 global using ProductName.Application;
 global using ProductName.Application.Abstractions;
 global using ProductName.Application.Abstractions.Auditing;  // @@auditing
-global using ProductName.Application.Abstractions.Authentication;
+global using ProductName.Application.Abstractions.Authentication;  // @@auth
 global using ProductName.Application.Abstractions.Behaviors;
-global using ProductName.Application.Abstractions.Data;
+global using ProductName.Application.Abstractions.Data;  // @@postgres
 global using ProductName.Application.Abstractions.Messaging;
 global using ProductName.Domain.Abstractions;
 global using ProductName.Infrastructure;
 global using ProductName.Infrastructure.Auditing;  // @@auditing
-global using ProductName.Infrastructure.Authentication;
-global using ProductName.Infrastructure.Database;
-global using ProductName.Infrastructure.Messaging;
+global using ProductName.Infrastructure.Authentication;  // @@auth
+global using ProductName.Infrastructure.Database;  // @@postgres
+global using ProductName.Infrastructure.Messaging;  // @@messaging
 ```
 

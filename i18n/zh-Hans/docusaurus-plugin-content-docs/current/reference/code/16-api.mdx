@@ -133,7 +133,7 @@ public static class CustomResults
 ```csharp
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore; // @@postgres
 
 namespace ProductName.Api.Infrastructure;
 
@@ -147,6 +147,7 @@ internal sealed class GlobalExceptionHandler(
         Exception exception,
         CancellationToken ct)
     {
+        // @@postgres-begin
         // 并发冲突：可预期的情况，返回 409 让前端提示重新载入（见 8.17）
         if (exception is DbUpdateConcurrencyException)
         {
@@ -160,6 +161,7 @@ internal sealed class GlobalExceptionHandler(
                 "The resource was modified by another request. Reload and try again.");
         }
 
+        // @@postgres-end
         if (exception is DomainException domainException)
             logger.LogError(exception, "Domain invariant violated: {ErrorCode}", domainException.Code);
         else
@@ -347,10 +349,13 @@ internal static class RateLimitingExtensions
 
 ```json
 {
+  // @@postgres-begin
   "ConnectionStrings": {
-    "Database": "",
-    "MessageBroker": ""
+    "Database": "", // @@messaging
+    "Database": "" // @@!messaging
+    "MessageBroker": "" // @@messaging
   },
+  // @@postgres-end
   "MediatR": {
     "LicenseKey": ""
   },
@@ -360,14 +365,18 @@ internal static class RateLimitingExtensions
   "OpenApi": {
     "Enabled": false
   },
+  // @@postgres-begin
   "Migrations": {
     "ApplyOnStartup": false
   },
+  // @@postgres-end
+  // @@auth-begin
   "Authentication": {
     "Authority": "",
     "Audience": "",
     "PermissionClaimType": "permissions"
   },
+  // @@auth-end
   "RateLimiting": {
     "PermitLimit": 100,
     "WindowSeconds": 60
@@ -377,9 +386,9 @@ internal static class RateLimitingExtensions
       "Default": "Information",
       "Override": {
         "Microsoft": "Warning",
-        "Microsoft.Hosting.Lifetime": "Information",
-        "Microsoft.EntityFrameworkCore.Database.Command": "Warning",
-        "MassTransit": "Warning"
+        "Microsoft.EntityFrameworkCore.Database.Command": "Warning", // @@postgres
+        "MassTransit": "Warning", // @@messaging
+        "Microsoft.Hosting.Lifetime": "Information"
       }
     },
     "Enrich": [ "FromLogContext", "WithMachineName", "WithEnvironmentName" ],
@@ -400,19 +409,24 @@ internal static class RateLimitingExtensions
 
 ```json
 {
+  // @@postgres-begin
   "ConnectionStrings": {
-    "Database": "Host=localhost;Port=5432;Database=productname;Username=postgres;Password=postgres",
-    "MessageBroker": "amqp://guest:guest@localhost:5672"
+    "Database": "Host=localhost;Port=5432;Database=productname;Username=postgres;Password=postgres", // @@messaging
+    "Database": "Host=localhost;Port=5432;Database=productname;Username=postgres;Password=postgres" // @@!messaging
+    "MessageBroker": "amqp://guest:guest@localhost:5672" // @@messaging
   },
+  // @@postgres-end
   "Cors": {
     "AllowedOrigins": []
   },
   "OpenApi": {
     "Enabled": true
   },
+  // @@postgres-begin
   "Migrations": {
     "ApplyOnStartup": true
   },
+  // @@postgres-end
   "Serilog": {
     "MinimumLevel": {
       "Default": "Debug"
@@ -536,7 +550,7 @@ internal static class RateLimitingExtensions
 ## 16.13 Program.cs \{#16-13-program-cs\}
 
 ```csharp
-using System.Security.Claims;
+using System.Security.Claims; // @@auth
 using Microsoft.AspNetCore.HttpOverrides;
 using ProductName.Api.Endpoints;
 using ProductName.Api.Extensions;
@@ -573,39 +587,40 @@ builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
     .AllowAnyHeader()
     .AllowAnyMethod()));
 
-builder.Services
-    .AddApiAuthentication(builder.Configuration)
-    .AddApiRateLimiting(builder.Configuration);
+builder.Services.AddApiAuthentication(builder.Configuration); // @@auth
+builder.Services.AddApiRateLimiting(builder.Configuration);
 
 var app = builder.Build();
 
 if (app.Configuration.GetValue<bool>("OpenApi:Enabled"))
 {
-    app.MapOpenApi().AllowAnonymous();
-    app.MapScalarApiReference().AllowAnonymous();
+    app.MapOpenApi(); // @@!auth
+    app.MapScalarApiReference(); // @@!auth
+    app.MapOpenApi().AllowAnonymous(); // @@auth
+    app.MapScalarApiReference().AllowAnonymous(); // @@auth
 }
 
-if (app.Configuration.GetValue<bool>("Migrations:ApplyOnStartup"))
-    await app.ApplyMigrationsAsync();
-
+if (app.Configuration.GetValue<bool>("Migrations:ApplyOnStartup")) // @@postgres
+    await app.ApplyMigrationsAsync(); // @@postgres
+ // @@postgres
 app.UseForwardedHeaders();
 
 // 放在异常处理之外：请求日志只记录最终状态码，异常本身由 GlobalExceptionHandler 记录一次
 app.UseSerilogRequestLogging(options =>
     options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
     {
-        diagnosticContext.Set("UserId", httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier));
+        diagnosticContext.Set("UserId", httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier)); // @@auth
         diagnosticContext.Set("ClientIp", httpContext.Connection.RemoteIpAddress?.ToString());
     });
 
 app.UseExceptionHandler();
 app.UseCors();
-app.UseAuthentication();
+app.UseAuthentication(); // @@auth
 app.UseRateLimiter();
-app.UseAuthorization();
+app.UseAuthorization(); // @@auth
 
 app.MapHealthChecks("/health")
-    .AllowAnonymous()
+    .AllowAnonymous() // @@auth
     .DisableRateLimiting();
 app.MapEndpoints();
 

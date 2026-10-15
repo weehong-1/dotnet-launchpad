@@ -71,7 +71,9 @@ public static class ResultExtensions
 }
 ```
 
-## 16.4 MigrationExtensions.cs \{#16-4-migrationextensions-cs\}
+<Optional when="postgres">
+
+## 16.4 MigrationExtensions.cs (add-on: PostgreSQL) \{#16-4-migrationextensions-cs\}
 
 ```csharp
 using Microsoft.EntityFrameworkCore;
@@ -89,6 +91,8 @@ internal static class MigrationExtensions
     }
 }
 ```
+
+</Optional>
 
 ## 16.5 CustomResults.cs \{#16-5-customresults-cs\}
 
@@ -133,7 +137,7 @@ Every error response uses the ProblemDetails format, so callers handle one shape
 ```csharp
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore; // @@postgres
 
 namespace ProductName.Api.Infrastructure;
 
@@ -147,6 +151,7 @@ internal sealed class GlobalExceptionHandler(
         Exception exception,
         CancellationToken ct)
     {
+        // @@postgres-begin
         // Concurrency conflict: expected, return 409 so the frontend prompts a reload (see 8.17)
         if (exception is DbUpdateConcurrencyException)
         {
@@ -160,6 +165,7 @@ internal sealed class GlobalExceptionHandler(
                 "The resource was modified by another request. Reload and try again.");
         }
 
+        // @@postgres-end
         if (exception is DomainException domainException)
             logger.LogError(exception, "Domain invariant violated: {ErrorCode}", domainException.Code);
         else
@@ -197,11 +203,13 @@ internal sealed class GlobalExceptionHandler(
 }
 ```
 
-- Concurrency conflicts return 409 and are logged as Warning, because they are expected when several people work at once, not a bug.
+- Concurrency conflicts (PostgreSQL add-on) return 409 and are logged as Warning, because they are expected when several people work at once, not a bug.
 - Domain exceptions and other unexpected exceptions return 500 without revealing internals; domain exceptions also log their error code.
 - Business failures travel as Result and never reach this handler.
 
-## 16.7 AuthExtensions.cs \{#16-7-authextensions-cs\}
+<Optional when="auth">
+
+## 16.7 AuthExtensions.cs (add-on: Authentication) \{#16-7-authextensions-cs\}
 
 ```csharp
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -240,7 +248,11 @@ internal static class AuthExtensions
 - Only standard JWT Bearer validation is used, which fits any OpenID Connect provider; providers differ only in settings.
 - `Authority` must be an HTTPS URL; when it is left empty, every request that requires sign in is rejected, so nothing is opened by accident.
 
-## 16.8 PermissionRequirement.cs \{#16-8-permissionrequirement-cs\}
+</Optional>
+
+<Optional when="auth">
+
+## 16.8 PermissionRequirement.cs (add-on: Authentication) \{#16-8-permissionrequirement-cs\}
 
 ```csharp
 using Microsoft.AspNetCore.Authorization;
@@ -253,7 +265,11 @@ internal sealed class PermissionRequirement(string permission) : IAuthorizationR
 }
 ```
 
-## 16.9 PermissionAuthorizationHandler.cs \{#16-9-permissionauthorizationhandler-cs\}
+</Optional>
+
+<Optional when="auth">
+
+## 16.9 PermissionAuthorizationHandler.cs (add-on: Authentication) \{#16-9-permissionauthorizationhandler-cs\}
 
 ```csharp
 using Microsoft.AspNetCore.Authorization;
@@ -278,7 +294,11 @@ internal sealed class PermissionAuthorizationHandler(IPermissionProvider permiss
 }
 ```
 
-## 16.10 PermissionEndpointExtensions.cs \{#16-10-permissionendpointextensions-cs\}
+</Optional>
+
+<Optional when="auth">
+
+## 16.10 PermissionEndpointExtensions.cs (add-on: Authentication) \{#16-10-permissionendpointextensions-cs\}
 
 ```csharp
 using ProductName.Api.Authorization;
@@ -296,6 +316,8 @@ public static class PermissionEndpointExtensions
 ```
 
 Endpoint usage: `app.MapPost(...).RequirePermission(XxxPermissions.Create);` with no policy registered in advance.
+
+</Optional>
 
 ## 16.11 RateLimitingExtensions.cs \{#16-11-ratelimitingextensions-cs\}
 
@@ -347,10 +369,13 @@ See [8.8](../spec/08-design-rules/08-configuration-environments-and-secrets.mdx)
 
 ```json
 {
+  // @@postgres-begin
   "ConnectionStrings": {
-    "Database": "",
-    "MessageBroker": ""
+    "Database": "", // @@messaging
+    "Database": "" // @@!messaging
+    "MessageBroker": "" // @@messaging
   },
+  // @@postgres-end
   "MediatR": {
     "LicenseKey": ""
   },
@@ -360,14 +385,18 @@ See [8.8](../spec/08-design-rules/08-configuration-environments-and-secrets.mdx)
   "OpenApi": {
     "Enabled": false
   },
+  // @@postgres-begin
   "Migrations": {
     "ApplyOnStartup": false
   },
+  // @@postgres-end
+  // @@auth-begin
   "Authentication": {
     "Authority": "",
     "Audience": "",
     "PermissionClaimType": "permissions"
   },
+  // @@auth-end
   "RateLimiting": {
     "PermitLimit": 100,
     "WindowSeconds": 60
@@ -377,9 +406,9 @@ See [8.8](../spec/08-design-rules/08-configuration-environments-and-secrets.mdx)
       "Default": "Information",
       "Override": {
         "Microsoft": "Warning",
-        "Microsoft.Hosting.Lifetime": "Information",
-        "Microsoft.EntityFrameworkCore.Database.Command": "Warning",
-        "MassTransit": "Warning"
+        "Microsoft.EntityFrameworkCore.Database.Command": "Warning", // @@postgres
+        "MassTransit": "Warning", // @@messaging
+        "Microsoft.Hosting.Lifetime": "Information"
       }
     },
     "Enrich": [ "FromLogContext", "WithMachineName", "WithEnvironmentName" ],
@@ -392,6 +421,7 @@ See [8.8](../spec/08-design-rules/08-configuration-environments-and-secrets.mdx)
 ```
 
 - Every feature is off by default and connection strings are empty. If any environment misses a connection string, the app fails at startup instead of connecting to the wrong database.
+- `ConnectionStrings` and `Migrations` come with the PostgreSQL add-on (`MessageBroker` with Messaging), and `Authentication` with the Authentication add-on.
 - `Authentication` `Authority` and `Audience` come from User Secrets or environment variables per environment (see [8.16](../spec/08-design-rules/16-authentication-and-authorization.mdx)); `RateLimiting` holds the rate limit defaults (see [8.18](../spec/08-design-rules/18-rate-limiting.mdx)).
 - `Serilog:WriteTo` is not defined here; each environment file defines it (see [8.8](../spec/08-design-rules/08-configuration-environments-and-secrets.mdx) for why).
 - `Enrich` and `Properties` add the machine name, environment name and application name to every log entry (see [8.9](../spec/08-design-rules/09-logging-rules.mdx)).
@@ -400,19 +430,24 @@ See [8.8](../spec/08-design-rules/08-configuration-environments-and-secrets.mdx)
 
 ```json
 {
+  // @@postgres-begin
   "ConnectionStrings": {
-    "Database": "Host=localhost;Port=5432;Database=productname;Username=postgres;Password=postgres",
-    "MessageBroker": "amqp://guest:guest@localhost:5672"
+    "Database": "Host=localhost;Port=5432;Database=productname;Username=postgres;Password=postgres", // @@messaging
+    "Database": "Host=localhost;Port=5432;Database=productname;Username=postgres;Password=postgres" // @@!messaging
+    "MessageBroker": "amqp://guest:guest@localhost:5672" // @@messaging
   },
+  // @@postgres-end
   "Cors": {
     "AllowedOrigins": []
   },
   "OpenApi": {
     "Enabled": true
   },
+  // @@postgres-begin
   "Migrations": {
     "ApplyOnStartup": true
   },
+  // @@postgres-end
   "Serilog": {
     "MinimumLevel": {
       "Default": "Debug"
@@ -536,7 +571,7 @@ See [8.8](../spec/08-design-rules/08-configuration-environments-and-secrets.mdx)
 ## 16.13 Program.cs \{#16-13-program-cs\}
 
 ```csharp
-using System.Security.Claims;
+using System.Security.Claims; // @@auth
 using Microsoft.AspNetCore.HttpOverrides;
 using ProductName.Api.Endpoints;
 using ProductName.Api.Extensions;
@@ -573,39 +608,40 @@ builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
     .AllowAnyHeader()
     .AllowAnyMethod()));
 
-builder.Services
-    .AddApiAuthentication(builder.Configuration)
-    .AddApiRateLimiting(builder.Configuration);
+builder.Services.AddApiAuthentication(builder.Configuration); // @@auth
+builder.Services.AddApiRateLimiting(builder.Configuration);
 
 var app = builder.Build();
 
 if (app.Configuration.GetValue<bool>("OpenApi:Enabled"))
 {
-    app.MapOpenApi().AllowAnonymous();
-    app.MapScalarApiReference().AllowAnonymous();
+    app.MapOpenApi(); // @@!auth
+    app.MapScalarApiReference(); // @@!auth
+    app.MapOpenApi().AllowAnonymous(); // @@auth
+    app.MapScalarApiReference().AllowAnonymous(); // @@auth
 }
 
-if (app.Configuration.GetValue<bool>("Migrations:ApplyOnStartup"))
-    await app.ApplyMigrationsAsync();
-
+if (app.Configuration.GetValue<bool>("Migrations:ApplyOnStartup")) // @@postgres
+    await app.ApplyMigrationsAsync(); // @@postgres
+ // @@postgres
 app.UseForwardedHeaders();
 
 // Outside exception handling: the request log records only the final status code, and GlobalExceptionHandler logs the exception once
 app.UseSerilogRequestLogging(options =>
     options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
     {
-        diagnosticContext.Set("UserId", httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier));
+        diagnosticContext.Set("UserId", httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier)); // @@auth
         diagnosticContext.Set("ClientIp", httpContext.Connection.RemoteIpAddress?.ToString());
     });
 
 app.UseExceptionHandler();
 app.UseCors();
-app.UseAuthentication();
+app.UseAuthentication(); // @@auth
 app.UseRateLimiter();
-app.UseAuthorization();
+app.UseAuthorization(); // @@auth
 
 app.MapHealthChecks("/health")
-    .AllowAnonymous()
+    .AllowAnonymous() // @@auth
     .DisableRateLimiting();
 app.MapEndpoints();
 
@@ -616,12 +652,13 @@ public partial class Program { }
 ```
 
 - The OpenAPI document and Scalar UI are controlled by `OpenApi:Enabled` (on in Development and SIT); the UI is at `/scalar`.
-- Startup migrations are controlled by `Migrations:ApplyOnStartup`, on only in Development.
+- Startup migrations (PostgreSQL add-on) are controlled by `Migrations:ApplyOnStartup`, on only in Development.
 - The health check is at `/health` for load balancers and monitoring.
-- The request log writes one entry per request with path, status code, duration, `UserId` and `ClientIp` (see [8.9](../spec/08-design-rules/09-logging-rules.mdx)).
+- The request log writes one entry per request with path, status code, duration, `ClientIp` and, with the Authentication add-on, `UserId` (see [8.9](../spec/08-design-rules/09-logging-rules.mdx)).
 - Forwarded headers trust only a local proxy by default. With Nginx on the same VM as the Api nothing more is needed; with Nginx on another host, add its IP to `KnownProxies`, or the IP you get will be Nginx's.
-- See [16.7](#16-7-authextensions-cs) to [16.10](#16-10-permissionendpointextensions-cs) for authentication and authorization: every endpoint requires sign in by default, and the health check and OpenAPI are explicitly public.
+- Without the Authentication add-on every endpoint is public. With it, see [16.7](#16-7-authextensions-cs) to [16.10](#16-10-permissionendpointextensions-cs): every endpoint requires sign in by default, and the health check and OpenAPI are explicitly public.
 - Rate limiting comes after authentication so it can count per user; the health check is exempt (see [8.18](../spec/08-design-rules/18-rate-limiting.mdx)).
+- `Program.cs` is the same file in every project; each add-on only adds the lines it needs, shown highlighted on its Setup Flow page.
 - `AddSystemd()` does nothing outside systemd (for example local development).
 
 ## 16.14 AI coding agent prompt \{#16-14-ai-coding-agent-prompt\}

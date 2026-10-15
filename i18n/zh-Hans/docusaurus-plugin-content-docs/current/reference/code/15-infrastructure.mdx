@@ -9,7 +9,7 @@ import Prompt15Infrastructure from '../_partials/prompt-15-infrastructure.mdx';
 ## 15.1 ApplicationDbContext.cs \{#15-1-applicationdbcontext-cs\}
 
 ```csharp
-using MassTransit;
+using MassTransit; // @@messaging
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
@@ -39,10 +39,10 @@ public sealed class ApplicationDbContext(
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
 
-        modelBuilder.AddInboxStateEntity();
-        modelBuilder.AddOutboxMessageEntity();
-        modelBuilder.AddOutboxStateEntity();
-
+        modelBuilder.AddInboxStateEntity(); // @@messaging
+        modelBuilder.AddOutboxMessageEntity(); // @@messaging
+        modelBuilder.AddOutboxStateEntity(); // @@messaging
+ // @@messaging
         // 所有聚合根启用乐观并发控制；PostgreSQL 以系统栏位 xmin 作为版本号，不新增栏位（见 8.17）
         var aggregateTypes = modelBuilder.Model
             .GetEntityTypes()
@@ -255,8 +255,8 @@ internal sealed class ClaimsPermissionProvider(IConfiguration configuration) : I
 ## 15.8 DependencyInjection.cs \{#15-8-dependencyinjection-cs\}
 
 ```csharp
-using MassTransit;
-using Microsoft.EntityFrameworkCore;
+using MassTransit; // @@messaging
+using Microsoft.EntityFrameworkCore; // @@postgres
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http.Resilience;
@@ -267,13 +267,15 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
-        IConfiguration configuration,
-        Action<IBusRegistrationConfigurator>? configureConsumers = null)
+        IConfiguration configuration) // @@!messaging
+        IConfiguration configuration, // @@messaging
+        Action<IBusRegistrationConfigurator>? configureConsumers = null) // @@messaging
     {
         services.AddSingleton(TimeProvider.System);
         services.AddHttpContextAccessor();
-        services.AddScoped<ICurrentUser, CurrentUser>();
-        services.AddScoped<IPermissionProvider, ClaimsPermissionProvider>();
+        services.AddScoped<ICurrentUser, CurrentUser>(); // @@auth
+        services.AddScoped<IPermissionProvider, ClaimsPermissionProvider>(); // @@auth
+        // @@postgres-begin
 
         // 审计（可选） // @@auditing
         services.AddScoped<IAuditContext, AuditContext>(); // @@auditing
@@ -292,18 +294,21 @@ public static class DependencyInjection
 
         services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<ApplicationDbContext>());
-        services.AddScoped<IEventBus, EventBus>();
+        // @@postgres-end
+        services.AddScoped<IEventBus, EventBus>(); // @@messaging
 
-        services.AddHealthChecks().AddDbContextCheck<ApplicationDbContext>();
+        services.AddHealthChecks(); // @@!postgres
+        services.AddHealthChecks().AddDbContextCheck<ApplicationDbContext>(); // @@postgres
 
         // 所有 HttpClient 统一套用标准韧性处理；非幂等方法不自动重试（见 8.19）
         services.ConfigureHttpClientDefaults(http => http.AddStandardResilienceHandler(options =>
             options.Retry.DisableForUnsafeHttpMethods()));
 
-        AddMessaging(services, configuration, configureConsumers);
-
+        AddMessaging(services, configuration, configureConsumers); // @@messaging
+ // @@messaging
         return services;
     }
+    // @@messaging-begin
 
     private static void AddMessaging(
         IServiceCollection services,
@@ -340,6 +345,7 @@ public static class DependencyInjection
             });
         });
     }
+    // @@messaging-end
 }
 ```
 

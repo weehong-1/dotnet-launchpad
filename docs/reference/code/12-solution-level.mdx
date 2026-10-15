@@ -43,24 +43,12 @@ Fill in the latest stable versions when creating the template.
     <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="" />
 
-    <!-- Database -->
-    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="" />
-    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="" />
-    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="" />
-
     <!-- Analyzers shared by all projects -->
     <GlobalPackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="" />
-
-    <!-- Messaging -->
-    <PackageVersion Include="MassTransit" Version="" />
-    <PackageVersion Include="MassTransit.EntityFrameworkCore" Version="" />
-    <PackageVersion Include="MassTransit.RabbitMQ" Version="" />
 
     <!-- Api -->
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="" />
     <PackageVersion Include="Scalar.AspNetCore" Version="" />
-    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="" />
 
     <!-- Hosting and resilience -->
     <PackageVersion Include="Microsoft.Extensions.Hosting.Systemd" Version="" />
@@ -82,29 +70,68 @@ Fill in the latest stable versions when creating the template.
     <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="" />
     <PackageVersion Include="NSubstitute" Version="" />
     <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="" />
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="" />
     <PackageVersion Include="NetArchTest.Rules" Version="" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="" />
-    <PackageVersion Include="Testcontainers.PostgreSql" Version="" />
-    <PackageVersion Include="Testcontainers.RabbitMq" Version="" />
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="" />  <!-- @@postgres -->
+    <PackageVersion Include="Testcontainers.RabbitMq" Version="" />  <!-- @@messaging -->
+
+    <!-- @@postgres-begin -->
+    <!-- PostgreSQL add-on -->
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="" />
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="" />
+
+    <!-- @@postgres-end -->
+    <!-- @@messaging-begin -->
+    <!-- Messaging add-on -->
+    <PackageVersion Include="MassTransit" Version="" />
+    <PackageVersion Include="MassTransit.EntityFrameworkCore" Version="" />
+    <PackageVersion Include="MassTransit.RabbitMQ" Version="" />
+
+    <!-- @@messaging-end -->
+    <!-- @@auth-begin -->
+    <!-- Authentication add-on -->
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="" />
+    <!-- @@auth-end -->
   </ItemGroup>
 </Project>
 ```
 
 **Project references**
 
+The core Skeleton Solution:
+
 | Project | Project references | NuGet packages |
 | --- | --- | --- |
 | Domain | None | `MediatR.Contracts` |
-| Application | Domain | `MediatR`, `FluentValidation`, `FluentValidation.DependencyInjectionExtensions`, `Microsoft.EntityFrameworkCore`, `Microsoft.Extensions.Configuration.Abstractions` |
-| Infrastructure | Application | `Npgsql.EntityFrameworkCore.PostgreSQL`, `Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore`, `MassTransit`, `MassTransit.EntityFrameworkCore`, `MassTransit.RabbitMQ`, `Microsoft.Extensions.Http.Resilience`; plus the `Microsoft.AspNetCore.App` framework reference |
-| Api | Application, Infrastructure | `Microsoft.AspNetCore.OpenApi`, `Scalar.AspNetCore`, `Microsoft.AspNetCore.Authentication.JwtBearer`, `Microsoft.Extensions.Hosting.Systemd`, `Serilog.AspNetCore`, `Serilog.Sinks.Seq`, `Serilog.Sinks.File`, `Serilog.Sinks.Async`, `Serilog.Enrichers.Environment`, `Microsoft.EntityFrameworkCore.Design` |
+| Application | Domain | `MediatR`, `FluentValidation`, `FluentValidation.DependencyInjectionExtensions`, `Microsoft.Extensions.Configuration.Abstractions` |
+| Infrastructure | Application | `Microsoft.Extensions.Http.Resilience`; plus the `Microsoft.AspNetCore.App` framework reference |
+| Api | Application, Infrastructure | `Microsoft.AspNetCore.OpenApi`, `Scalar.AspNetCore`, `Microsoft.Extensions.Hosting.Systemd`, `Serilog.AspNetCore`, `Serilog.Sinks.Seq`, `Serilog.Sinks.File`, `Serilog.Sinks.Async`, `Serilog.Enrichers.Environment` |
 | Worker | Application, Infrastructure | `Microsoft.Extensions.Hosting.Systemd`, `Serilog.Extensions.Hosting`, `Serilog.Settings.Configuration`, `Serilog.Sinks.Console`, `Serilog.Sinks.Seq`, `Serilog.Formatting.Compact`, `Serilog.Sinks.File`, `Serilog.Sinks.Async`, `Serilog.Enrichers.Environment` |
 | Domain.UnitTests | Domain | `xunit` set |
-| Application.UnitTests | Application | `xunit` set, `NSubstitute`, `Microsoft.Extensions.TimeProvider.Testing` |
+| Application.UnitTests | Application | `xunit` set, `NSubstitute`, `Microsoft.Extensions.TimeProvider.Testing`, `Microsoft.Extensions.Logging` |
 | Architecture.Tests | All src projects | `xunit` set, `NetArchTest.Rules` |
-| Api.IntegrationTests | Api, Infrastructure | `xunit` set, `Microsoft.AspNetCore.Mvc.Testing`, `Testcontainers.PostgreSql`, `Testcontainers.RabbitMq` |
+| Api.IntegrationTests | Api, Infrastructure | `xunit` set, `Microsoft.AspNetCore.Mvc.Testing` |
 
-The `xunit` set means `xunit.v3` and `Microsoft.Testing.Extensions.CodeCoverage`. Tests run on Microsoft.Testing.Platform (selected in `global.json`, see [12.3](#12-3-global-json)), so the VSTest packages `Microsoft.NET.Test.Sdk`, `xunit.runner.visualstudio` and `coverlet.collector` are not used. xUnit v3 test projects must set `<OutputType>Exe</OutputType>` in the `.csproj`. Application references `Microsoft.Extensions.Configuration.Abstractions` because `AddApplication` reads `IConfiguration` (14.15). `Microsoft.CodeAnalysis.BannedApiAnalyzers` applies to every project through `GlobalPackageReference`, so no project references it individually. The Api and the Worker both need `<UserSecretsId>` in their `.csproj` to use User Secrets (see [8.8](../spec/08-design-rules/08-configuration-environments-and-secrets.mdx)).
+The Worker project exists only with the Worker add-on ([7.1](../spec/07-optional-components.mdx#7-1-worker)).
+
+**Add-on packages**
+
+Each add-on adds these packages to the projects above (see [7](../spec/07-optional-components.mdx)):
+
+| Add-on | Project | NuGet packages |
+| --- | --- | --- |
+| PostgreSQL | Application | `Microsoft.EntityFrameworkCore` |
+| PostgreSQL | Infrastructure | `Npgsql.EntityFrameworkCore.PostgreSQL`, `Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore` |
+| PostgreSQL | Api | `Microsoft.EntityFrameworkCore.Design` |
+| PostgreSQL | Api.IntegrationTests | `Testcontainers.PostgreSql` |
+| Messaging | Infrastructure | `MassTransit`, `MassTransit.EntityFrameworkCore`, `MassTransit.RabbitMQ` |
+| Messaging | Api.IntegrationTests | `Testcontainers.RabbitMq` |
+| Authentication | Api | `Microsoft.AspNetCore.Authentication.JwtBearer` |
+
+The `xunit` set means `xunit.v3` and `Microsoft.Testing.Extensions.CodeCoverage`. Tests run on Microsoft.Testing.Platform (selected in `global.json`, see [12.3](#12-3-global-json)), so the VSTest packages `Microsoft.NET.Test.Sdk`, `xunit.runner.visualstudio` and `coverlet.collector` are not used. xUnit v3 test projects must set `<OutputType>Exe</OutputType>` in the `.csproj`. Application references `Microsoft.Extensions.Configuration.Abstractions` because `AddApplication` reads `IConfiguration` (14.15). Application.UnitTests references `Microsoft.Extensions.Logging` because [18.5](./18-tests.mdx#18-5-validationpipelinebehaviortests-cs-application-unittests) runs the real pipeline in a real DI container. `Microsoft.CodeAnalysis.BannedApiAnalyzers` applies to every project through `GlobalPackageReference`, so no project references it individually. The Api and the Worker both need `<UserSecretsId>` in their `.csproj` to use User Secrets (see [8.8](../spec/08-design-rules/08-configuration-environments-and-secrets.mdx)).
 
 **Version reference**
 
@@ -171,6 +198,7 @@ Only the basics are listed here; add or remove rules to suit the team. The last 
 
 ```yaml
 services:
+  # @@postgres-begin
   postgres:
     image: postgres:17
     environment:
@@ -182,12 +210,15 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
 
+  # @@postgres-end
+  # @@messaging-begin
   rabbitmq:
     image: rabbitmq:4-management
     ports:
       - "127.0.0.1:5672:5672"
       - "127.0.0.1:15672:15672"
 
+  # @@messaging-end
   seq:
     image: datalust/seq:latest
     environment:
@@ -195,12 +226,14 @@ services:
       SEQ_FIRSTRUN_NOAUTHENTICATION: "true"
     ports:
       - "127.0.0.1:5341:80"
+# @@postgres-begin
 
 volumes:
   postgres-data:
+# @@postgres-end
 ```
 
-**For local development only**; all credentials are defaults, so every port is published on `127.0.0.1` only and never reachable from the network. Once started, the RabbitMQ management UI is at `http://localhost:15672` (user and password guest) and Seq is at `http://localhost:5341`.
+**For local development only**; all credentials are defaults, so every port is published on `127.0.0.1` only and never reachable from the network. The core Skeleton Solution needs only Seq, at `http://localhost:5341`. The PostgreSQL add-on adds the `postgres` service and the Messaging add-on adds `rabbitmq`, whose management UI is at `http://localhost:15672` (user and password guest).
 
 ## 12.6 BannedSymbols.txt \{#12-6-bannedsymbols-txt\}
 
@@ -212,7 +245,9 @@ P:System.DateTimeOffset.Now;Use TimeProvider.GetUtcNow() (see 8.20)
 
 Read by `Microsoft.CodeAnalysis.BannedApiAnalyzers`: using a listed API raises a warning, which fails the build under "warnings as errors". Add any other API that should be banned to this list.
 
-## 12.7 deploy/systemd service files \{#12-7-deploy-systemd-service-files\}
+<Optional when="golive">
+
+## 12.7 deploy/systemd service files (add-on: Go live) \{#12-7-deploy-systemd-service-files\}
 
 `deploy/systemd/productname-api.service`:
 
@@ -280,7 +315,7 @@ WantedBy=multi-user.target
 - The environment name and secrets live in the `EnvironmentFile`, so the service files are identical in every environment.
 - `Restart=always` restarts the service after an abnormal exit; `ProtectSystem` and similar settings limit where the service can write.
 
-## 12.8 deploy/nginx/productname-api.conf \{#12-8-deploy-nginx-productname-api-conf\}
+## 12.8 deploy/nginx/productname-api.conf (add-on: Go live) \{#12-8-deploy-nginx-productname-api-conf\}
 
 ```nginx
 server {
@@ -319,23 +354,25 @@ server {
 - `X-Forwarded-For` and `X-Forwarded-Proto` give the Api the real client IP and scheme (see the forwarded headers setup in [16.13](./16-api.mdx#16-13-program-cs)).
 - `client_max_body_size` is the upload size limit; adjust per project.
 
-## 12.9 deploy/env environment variable templates \{#12-9-deploy-env-environment-variable-templates\}
+## 12.9 deploy/env environment variable templates (add-on: Go live) \{#12-9-deploy-env-environment-variable-templates\}
 
 `deploy/env/api.env.example`:
 
 ```ini
 # Copy to /etc/productname/api.env and fill in this environment's values; owner root, mode 600
 ASPNETCORE_ENVIRONMENT=Production
-ConnectionStrings__Database=Host=<host>;Port=5432;Database=productname;Username=<app account>;Password=<password>
-ConnectionStrings__MessageBroker=amqps://<user>:<password>@<host>:5671
+ConnectionStrings__Database=Host=<host>;Port=5432;Database=productname;Username=<app account>;Password=<password>  # @@postgres
+ConnectionStrings__MessageBroker=amqps://<user>:<password>@<host>:5671  # @@messaging
 MediatR__LicenseKey=
-Authentication__Authority=
-Authentication__Audience=
+Authentication__Authority=  # @@auth
+Authentication__Audience=  # @@auth
 Cors__AllowedOrigins__0=
 Serilog__WriteTo__Seq__Args__serverUrl=
 Serilog__WriteTo__Seq__Args__apiKey=
+# @@messaging-begin
 # MassTransit v9 license text; MT_LICENSE_PATH=<file> works too
 MT_LICENSE=
+# @@messaging-end
 ```
 
 <Optional when="worker">
@@ -358,9 +395,9 @@ MT_LICENSE=
 
 - The templates list only settings that vary by environment and hold no real values, so they can be committed; filled in `.env` files are **never** committed.
 - On the SIT VM, set the environment name to `SIT` (case must match, see [8.8](../spec/08-design-rules/08-configuration-environments-and-secrets.mdx)).
-- Connection strings use the application account, never the database owner account (see [8.11](../spec/08-design-rules/11-database-migrations.mdx)).
+- Connection strings use the application account, never the database owner account (see [8.11](../spec/08-design-rules/11-database-migrations.mdx)). Each add-on brings its own lines: the connection strings come with PostgreSQL and Messaging, `MT_LICENSE` with Messaging, and `Authentication__*` with Authentication.
 
-## 12.10 .github/workflows/ci.yml \{#12-10-github-workflows-ci-yml\}
+## 12.10 .github/workflows/ci.yml (add-on: Go live) \{#12-10-github-workflows-ci-yml\}
 
 ```yaml
 name: ci
@@ -373,8 +410,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # @@messaging-begin
     env:
       MT_LICENSE: ${{ secrets.MT_LICENSE }}
+    # @@messaging-end
     steps:
       - uses: actions/checkout@v4
 
@@ -389,6 +428,7 @@ jobs:
       - run: dotnet publish src/ProductName.Api -c Release -r linux-x64 --self-contained -o artifacts/api
       - run: dotnet publish src/ProductName.Worker -c Release -r linux-x64 --self-contained -o artifacts/worker  # @@worker
 
+      # @@postgres-begin
       - run: dotnet tool restore
       - run: >
           dotnet ef migrations bundle
@@ -396,6 +436,7 @@ jobs:
           --startup-project src/ProductName.Api
           -r linux-x64 --self-contained
           -o artifacts/migrations/efbundle
+      # @@postgres-end
 
       - uses: actions/upload-artifact@v4
         with:
@@ -404,10 +445,9 @@ jobs:
 ```
 
 - GitHub Actions is the example; on another CI platform, rewrite the same steps.
-- Every push and pull request builds and runs all tests (including Testcontainers integration tests); deployment artifacts are produced only when tests pass.
-- Artifacts include the Api, the Worker and the migration bundle; see [8.21](../spec/08-design-rules/21-deployment.mdx) for deployment steps.
-- Projects without a Worker delete the step that publishes the Worker.
-- Set the `MT_LICENSE` secret before the first push: the integration tests start MassTransit, which refuses to run without a license (`gh secret set MT_LICENSE < license.txt`).
+- Every push and pull request builds and runs all tests (including Testcontainers integration tests when the PostgreSQL add-on is in); deployment artifacts are produced only when tests pass.
+- Artifacts include the Api, the Worker (Worker add-on) and the migration bundle (PostgreSQL add-on); see [8.21](../spec/08-design-rules/21-deployment.mdx) for deployment steps.
+- With the Messaging add-on, set the `MT_LICENSE` secret before the first push: the integration tests start MassTransit, which refuses to run without a license (`gh secret set MT_LICENSE < license.txt`).
 
 <Optional when="sonar,qodana">
 
@@ -421,8 +461,10 @@ From the English guide. When you want static analysis and coverage reports, add 
     name: SonarCloud
     runs-on: ubuntu-latest
     needs: build
+    # @@messaging-begin
     env:
       MT_LICENSE: ${{ secrets.MT_LICENSE }}
+    # @@messaging-end
     steps:
       - uses: actions/checkout@v4
         with:
@@ -502,9 +544,11 @@ Secrets and variables to set in GitHub:
 | --- | --- | --- |
 | Secret | `SONAR_TOKEN` | SonarCloud authentication token |
 | Secret | `QODANA_TOKEN` | Qodana Cloud authentication token |
-| Secret | `MT_LICENSE` | MassTransit v9 license text; the tests start the bus, so every job that runs tests needs it |
+| Secret | `MT_LICENSE` | Messaging add-on only. MassTransit v9 license text; the tests start the bus, so every job that runs tests needs it |
 | Variable | `SONAR_PROJECT_KEY` | SonarCloud project key |
 | Variable | `SONAR_ORGANIZATION_KEY` | SonarCloud organization key |
+
+</Optional>
 
 </Optional>
 

@@ -1,0 +1,14 @@
+{
+  "addons": [
+    {"id": "postgres", "letter": "A", "cli": "--postgres", "requires": [], "label": {"en": "PostgreSQL", "zh": "PostgreSQL"}},
+    {"id": "messaging", "letter": "B", "cli": "--messaging", "requires": ["postgres"], "label": {"en": "Messaging", "zh": "消息"}},
+    {"id": "worker", "letter": "C", "cli": "--worker", "requires": ["messaging"], "label": {"en": "Worker", "zh": "Worker"}},
+    {"id": "auditing", "letter": "D", "cli": "--auditing", "requires": ["postgres"], "label": {"en": "Auditing", "zh": "审计"}},
+    {"id": "auth", "letter": "E", "cli": "--auth", "requires": [], "label": {"en": "Authentication", "zh": "身份验证"}},
+    {"id": "golive", "letter": "F", "cli": "--go-live", "requires": [], "label": {"en": "Go live", "zh": "上线"}}
+  ],
+  "decisions": [
+    {"id": "sonar", "cli": "--sonar", "requires": ["golive"], "label": {"en": "SonarCloud", "zh": "SonarCloud"}},
+    {"id": "qodana", "cli": "--qodana", "requires": ["golive"], "label": {"en": "Qodana", "zh": "Qodana"}}
+  ]
+}

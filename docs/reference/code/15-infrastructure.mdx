@@ -6,10 +6,12 @@ import Prompt15Infrastructure from '../_partials/prompt-15-infrastructure.mdx';
 
 # 15. Infrastructure \{#15-infrastructure\}
 
-## 15.1 ApplicationDbContext.cs \{#15-1-applicationdbcontext-cs\}
+<Optional when="postgres">
+
+## 15.1 ApplicationDbContext.cs (add-on: PostgreSQL) \{#15-1-applicationdbcontext-cs\}
 
 ```csharp
-using MassTransit;
+using MassTransit; // @@messaging
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
@@ -39,10 +41,10 @@ public sealed class ApplicationDbContext(
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
 
-        modelBuilder.AddInboxStateEntity();
-        modelBuilder.AddOutboxMessageEntity();
-        modelBuilder.AddOutboxStateEntity();
-
+        modelBuilder.AddInboxStateEntity(); // @@messaging
+        modelBuilder.AddOutboxMessageEntity(); // @@messaging
+        modelBuilder.AddOutboxStateEntity(); // @@messaging
+ // @@messaging
         // Optimistic concurrency for every aggregate root; PostgreSQL uses the xmin system column as the version, adding no column (see 8.17)
         var aggregateTypes = modelBuilder.Model
             .GetEntityTypes()
@@ -88,19 +90,23 @@ public sealed class ApplicationDbContext(
 **Event flow**
 
 1. An aggregate method calls `Raise` for a domain event.
-2. Before writing to the database, `SaveChangesAsync` publishes every domain event through MediatR.
-3. A domain event handler that must notify the outside world or hand work to the Worker publishes an integration event through `IEventBus`.
+2. Before writing to the database, `SaveChangesAsync` publishes every domain event through MediatR, so the domain event handlers' changes commit in the same transaction.
+3. With the Messaging add-on, a domain event handler that must notify the outside world or hand work to the Worker publishes an integration event through `IEventBus`.
 4. With MassTransit's Bus Outbox on, the integration event is not sent immediately; it is written to the Outbox table and saved **in the same transaction** as the business data.
 5. The delivery service (in the Worker if there is one, otherwise in the Api) reads the Outbox table and sends to the broker, where a Consumer processes it.
 
 **Notes**
 
 - The `while` loop handles event handlers that raise further events.
-- The three `Add...Entity` methods create the Outbox and Inbox tables MassTransit needs, so no custom `OutboxMessage` class is required.
+- The three `Add...Entity` methods (Messaging add-on) create the Outbox and Inbox tables MassTransit needs, so no custom `OutboxMessage` class is required.
 - Concurrency uses a shadow property `Version` that Domain never sees; Npgsql maps a `uint` configured as row version to the `xmin` system column, so migrations add no column. Other databases need adjusting (see [8.17](../spec/08-design-rules/17-concurrency-control.mdx)).
 - The English guide publishes domain events **after** the write with a `SavedChangesAsync` interceptor. This template publishes before the write, so the event handlers' changes commit together with the Outbox messages and business data.
 
-## 15.2 StronglyTypedIdConverter.cs \{#15-2-stronglytypedidconverter-cs\}
+</Optional>
+
+<Optional when="postgres">
+
+## 15.2 StronglyTypedIdConverter.cs (add-on: PostgreSQL) \{#15-2-stronglytypedidconverter-cs\}
 
 ```csharp
 using System.Linq.Expressions;
@@ -130,7 +136,11 @@ internal sealed class StronglyTypedIdConverter<TId>()
 
 One generic converter serves every strongly typed ID. The constructor is compiled into a delegate on first use, so later conversions use no reflection.
 
-## 15.3 TimestampsInterceptor.cs \{#15-3-timestampsinterceptor-cs\}
+</Optional>
+
+<Optional when="postgres">
+
+## 15.3 TimestampsInterceptor.cs (add-on: PostgreSQL) \{#15-3-timestampsinterceptor-cs\}
 
 ```csharp
 using Microsoft.EntityFrameworkCore;
@@ -166,7 +176,11 @@ internal sealed class TimestampsInterceptor(TimeProvider timeProvider) : SaveCha
 
 Time comes from .NET's built in `TimeProvider`, replaceable with `FakeTimeProvider` in tests, so no custom `IDateTimeProvider` is needed.
 
-## 15.4 Repository.cs \{#15-4-repository-cs\}
+</Optional>
+
+<Optional when="postgres">
+
+## 15.4 Repository.cs (add-on: PostgreSQL) \{#15-4-repository-cs\}
 
 ```csharp
 namespace ProductName.Infrastructure.Database;
@@ -189,7 +203,11 @@ internal abstract class Repository<TAggregate, TId>(ApplicationDbContext db)
 
 Each aggregate's repository inherits this base class, so the common methods are not repeated.
 
-## 15.5 EventBus.cs \{#15-5-eventbus-cs\}
+</Optional>
+
+<Optional when="messaging">
+
+## 15.5 EventBus.cs (add-on: Messaging) \{#15-5-eventbus-cs\}
 
 ```csharp
 using MassTransit;
@@ -204,7 +222,11 @@ internal sealed class EventBus(IPublishEndpoint publishEndpoint) : IEventBus
 }
 ```
 
-## 15.6 CurrentUser.cs \{#15-6-currentuser-cs\}
+</Optional>
+
+<Optional when="auth">
+
+## 15.6 CurrentUser.cs (add-on: Authentication) \{#15-6-currentuser-cs\}
 
 ```csharp
 using System.Security.Claims;
@@ -226,7 +248,11 @@ internal sealed class CurrentUser(IHttpContextAccessor httpContextAccessor) : IC
 
 The Worker has no HttpContext, so `IsAuthenticated` is `false` there.
 
-## 15.7 ClaimsPermissionProvider.cs \{#15-7-claimspermissionprovider-cs\}
+</Optional>
+
+<Optional when="auth">
+
+## 15.7 ClaimsPermissionProvider.cs (add-on: Authentication) \{#15-7-claimspermissionprovider-cs\}
 
 ```csharp
 using System.Security.Claims;
@@ -252,11 +278,13 @@ internal sealed class ClaimsPermissionProvider(IConfiguration configuration) : I
 
 Reads permission claims from the token. Most OpenID Connect providers can put permissions in the token; if the claim name differs, change `Authentication:PermissionClaimType` instead of the code.
 
+</Optional>
+
 ## 15.8 DependencyInjection.cs \{#15-8-dependencyinjection-cs\}
 
 ```csharp
-using MassTransit;
-using Microsoft.EntityFrameworkCore;
+using MassTransit; // @@messaging
+using Microsoft.EntityFrameworkCore; // @@postgres
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http.Resilience;
@@ -267,13 +295,15 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
-        IConfiguration configuration,
-        Action<IBusRegistrationConfigurator>? configureConsumers = null)
+        IConfiguration configuration) // @@!messaging
+        IConfiguration configuration, // @@messaging
+        Action<IBusRegistrationConfigurator>? configureConsumers = null) // @@messaging
     {
         services.AddSingleton(TimeProvider.System);
         services.AddHttpContextAccessor();
-        services.AddScoped<ICurrentUser, CurrentUser>();
-        services.AddScoped<IPermissionProvider, ClaimsPermissionProvider>();
+        services.AddScoped<ICurrentUser, CurrentUser>(); // @@auth
+        services.AddScoped<IPermissionProvider, ClaimsPermissionProvider>(); // @@auth
+        // @@postgres-begin
 
         // Auditing (optional) // @@auditing
         services.AddScoped<IAuditContext, AuditContext>(); // @@auditing
@@ -292,18 +322,21 @@ public static class DependencyInjection
 
         services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<ApplicationDbContext>());
-        services.AddScoped<IEventBus, EventBus>();
+        // @@postgres-end
+        services.AddScoped<IEventBus, EventBus>(); // @@messaging
 
-        services.AddHealthChecks().AddDbContextCheck<ApplicationDbContext>();
+        services.AddHealthChecks(); // @@!postgres
+        services.AddHealthChecks().AddDbContextCheck<ApplicationDbContext>(); // @@postgres
 
         // Standard resilience for every HttpClient; unsafe methods are not retried (see 8.19)
         services.ConfigureHttpClientDefaults(http => http.AddStandardResilienceHandler(options =>
             options.Retry.DisableForUnsafeHttpMethods()));
 
-        AddMessaging(services, configuration, configureConsumers);
-
+        AddMessaging(services, configuration, configureConsumers); // @@messaging
+ // @@messaging
         return services;
     }
+    // @@messaging-begin
 
     private static void AddMessaging(
         IServiceCollection services,
@@ -340,22 +373,23 @@ public static class DependencyInjection
             });
         });
     }
+    // @@messaging-end
 }
 ```
 
 **Notes**
 
-- The `configureConsumers` parameter lets the Api and Worker share one registration method: the Api passes nothing, only writes to the Outbox and disables delivery; the Worker passes its Consumers, delivers and hosts every Consumer. Projects without a Worker remove the check that disables delivery, so the Api delivers.
-- Health checks: the database check is registered here; MassTransit registers the broker health check automatically.
+- In the core Skeleton Solution this method registers only what every project needs: `TimeProvider`, the HTTP context accessor, the health check endpoint's services and outbound HTTP resilience. `IConfiguration` is already a parameter, so `Program.cs` never changes when an add-on is added. Each add-on adds its own lines, shown highlighted on its Setup Flow page.
+- PostgreSQL add-on: EF Core with Npgsql, the timestamps interceptor, `IApplicationDbContext` and `IUnitOfWork`, and the database health check.
+- Messaging add-on: the `configureConsumers` parameter lets the Api and Worker share one registration method. The Api passes nothing and only writes to the Outbox; the Worker passes its Consumers, delivers and hosts every Consumer. Without the Worker add-on the check that disables delivery is left out, so the Api delivers. MassTransit registers the broker health check automatically.
 - `ConfigureHttpClientDefaults` gives every HttpClient registered later timeout, retry and circuit breaker (see [8.19](../spec/08-design-rules/19-outbound-http-calls.mdx)).
-- The permission source defaults to `ClaimsPermissionProvider`; projects storing permissions in the database replace it here (see [8.16](../spec/08-design-rules/16-authentication-and-authorization.mdx)).
-- Projects without auditing delete the three lines marked "Auditing (optional)" and the `AuditTrailInterceptor` in `AddInterceptors`.
-- `AuditTrailInterceptor` depends on per request audit information, so it is Scoped; the `AddDbContext` options run in each scope and resolve it correctly.
+- Authentication add-on: the permission source defaults to `ClaimsPermissionProvider`; projects storing permissions in the database replace it here (see [8.16](../spec/08-design-rules/16-authentication-and-authorization.mdx)).
+- Auditing add-on: the three lines marked "Auditing (optional)" and the `AuditTrailInterceptor` in `AddInterceptors`. `AuditTrailInterceptor` depends on per request audit information, so it is Scoped; the `AddDbContext` options run in each scope and resolve it correctly.
 - Repository implementations for new aggregates are registered here as well.
 
 <Optional when="auditing">
 
-## 15.9 AuditTrail.cs (optional: auditing) \{#15-9-audittrail-cs-optional-auditing\}
+## 15.9 AuditTrail.cs (add-on: Auditing) \{#15-9-audittrail-cs-optional-auditing\}
 
 ```csharp
 namespace ProductName.Infrastructure.Auditing;
@@ -382,7 +416,7 @@ The data change audit table. It is an Infrastructure persistence model, not a do
 
 <Optional when="auditing">
 
-## 15.10 OperationAudit.cs (optional: auditing) \{#15-10-operationaudit-cs-optional-auditing\}
+## 15.10 OperationAudit.cs (add-on: Auditing) \{#15-10-operationaudit-cs-optional-auditing\}
 
 ```csharp
 namespace ProductName.Infrastructure.Auditing;
@@ -406,7 +440,7 @@ public sealed class OperationAudit
 
 <Optional when="auditing">
 
-## 15.11 AuditConfigurations.cs (optional: auditing) \{#15-11-auditconfigurations-cs-optional-auditing\}
+## 15.11 AuditConfigurations.cs (add-on: Auditing) \{#15-11-auditconfigurations-cs-optional-auditing\}
 
 ```csharp
 using Microsoft.EntityFrameworkCore;
@@ -467,7 +501,7 @@ internal sealed class OperationAuditConfiguration : IEntityTypeConfiguration<Ope
 
 <Optional when="auditing">
 
-## 15.12 AuditContext.cs (optional: auditing) \{#15-12-auditcontext-cs-optional-auditing\}
+## 15.12 AuditContext.cs (add-on: Auditing) \{#15-12-auditcontext-cs-optional-auditing\}
 
 ```csharp
 using System.Diagnostics;
@@ -504,7 +538,7 @@ internal sealed class AuditContext(IHttpContextAccessor httpContextAccessor) : I
 
 <Optional when="auditing">
 
-## 15.13 AuditTrailInterceptor.cs (optional: auditing) \{#15-13-audittrailinterceptor-cs-optional-auditing\}
+## 15.13 AuditTrailInterceptor.cs (add-on: Auditing) \{#15-13-audittrailinterceptor-cs-optional-auditing\}
 
 ```csharp
 using System.Reflection;
@@ -631,7 +665,7 @@ internal sealed class AuditTrailInterceptor(IAuditContext auditContext, TimeProv
 
 <Optional when="auditing">
 
-## 15.14 OperationAuditWriter.cs (optional: auditing) \{#15-14-operationauditwriter-cs-optional-auditing\}
+## 15.14 OperationAuditWriter.cs (add-on: Auditing) \{#15-14-operationauditwriter-cs-optional-auditing\}
 
 ```csharp
 using MediatR;

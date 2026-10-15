@@ -218,30 +218,37 @@ public sealed class ResultTests
 ```csharp
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using ProductName.Infrastructure.Database;
-using Testcontainers.PostgreSql;
-using Testcontainers.RabbitMq;
+using Microsoft.EntityFrameworkCore; // @@postgres
+using Microsoft.Extensions.DependencyInjection; // @@postgres
+using ProductName.Infrastructure.Database; // @@postgres
+using Testcontainers.PostgreSql; // @@postgres
+using Testcontainers.RabbitMq; // @@messaging
 
 namespace ProductName.Api.IntegrationTests.Abstractions;
 
-public sealed class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsyncLifetime
+public sealed class IntegrationTestWebAppFactory : WebApplicationFactory<Program> // @@!postgres
+public sealed class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsyncLifetime // @@postgres
 {
+    // @@postgres-begin
     private readonly PostgreSqlContainer _database = new PostgreSqlBuilder("postgres:17").Build();
 
+    // @@postgres-end
+    // @@messaging-begin
     private readonly RabbitMqContainer _messageBroker = new RabbitMqBuilder("rabbitmq:4-management").Build();
 
+    // @@messaging-end
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
-        builder.UseSetting("ConnectionStrings:Database", _database.GetConnectionString());
-        builder.UseSetting("ConnectionStrings:MessageBroker", _messageBroker.GetConnectionString());
+        builder.UseSetting("ConnectionStrings:Database", _database.GetConnectionString()); // @@postgres
+        builder.UseSetting("ConnectionStrings:MessageBroker", _messageBroker.GetConnectionString()); // @@messaging
     }
+    // @@postgres-begin
 
     public async ValueTask InitializeAsync()
     {
-        await Task.WhenAll(_database.StartAsync(), _messageBroker.StartAsync());
+        await Task.WhenAll(_database.StartAsync(), _messageBroker.StartAsync()); // @@messaging
+        await _database.StartAsync(); // @@!messaging
 
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -251,17 +258,19 @@ public sealed class IntegrationTestWebAppFactory : WebApplicationFactory<Program
     public override async ValueTask DisposeAsync()
     {
         await _database.DisposeAsync();
-        await _messageBroker.DisposeAsync();
+        await _messageBroker.DisposeAsync(); // @@messaging
         await base.DisposeAsync();
     }
+    // @@postgres-end
 }
 ```
 
-- PostgreSQL and RabbitMQ containers start and migrations run when tests begin; containers are released when tests end.
+- In the core Skeleton Solution the factory only starts the Api in the `Testing` environment: no containers, so the tests need neither Docker nor a license.
+- The PostgreSQL add-on starts a PostgreSQL container and runs migrations when tests begin; the Messaging add-on adds a RabbitMQ container. Containers are released when tests end.
 - xUnit v3: `IAsyncLifetime` methods return `ValueTask` and it extends `IAsyncDisposable`, so containers are released by overriding `DisposeAsync`.
 - Testcontainers builders take the image name in the constructor; the old parameterless form is obsolete and fails the build under "warnings as errors".
 - The `Testing` environment loads only the base file, so OpenAPI and startup migrations are off; migrations run here instead.
-- For endpoints that require sign in, add a test authentication handler here that matches the project's scheme.
+- With the Authentication add-on, endpoints that require sign in need a test authentication handler here that matches the project's scheme.
 - Integration tests start their own containers, so CI needs no database service (the English guide starts PostgreSQL in CI `services`; this template does not need that).
 
 ## 18.4 BaseIntegrationTest.cs and HealthCheckTests.cs (Api.IntegrationTests) \{#18-4-baseintegrationtest-cs-api-integrationtests\}
@@ -269,7 +278,7 @@ public sealed class IntegrationTestWebAppFactory : WebApplicationFactory<Program
 ```csharp
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
-using ProductName.Infrastructure.Database;
+using ProductName.Infrastructure.Database; // @@postgres
 
 namespace ProductName.Api.IntegrationTests.Abstractions;
 
@@ -281,12 +290,12 @@ public abstract class BaseIntegrationTest : IClassFixture<IntegrationTestWebAppF
     {
         _scope = factory.Services.CreateScope();
         Sender = _scope.ServiceProvider.GetRequiredService<ISender>();
-        DbContext = _scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        DbContext = _scope.ServiceProvider.GetRequiredService<ApplicationDbContext>(); // @@postgres
         HttpClient = factory.CreateClient();
     }
 
     protected ISender Sender { get; }
-    protected ApplicationDbContext DbContext { get; }
+    protected ApplicationDbContext DbContext { get; } // @@postgres
     protected HttpClient HttpClient { get; }
 
     public void Dispose()
@@ -316,9 +325,9 @@ public sealed class HealthCheckTests(IntegrationTestWebAppFactory factory) : Bas
 }
 ```
 
-The smoke test proves the integration test base works: containers start, migrations run, the Api boots and `/health` answers without a token. It needs Docker and the MassTransit license (`MT_LICENSE` or `MT_LICENSE_PATH`, see [8.8](../spec/08-design-rules/08-configuration-environments-and-secrets.mdx)).
+The smoke test proves the integration test base works: the Api boots and `/health` answers. With the PostgreSQL add-on it also proves that the container starts and migrations run, and it then needs Docker; with the Messaging add-on it also needs the MassTransit license (`MT_LICENSE` or `MT_LICENSE_PATH`, see [8.8](../spec/08-design-rules/08-configuration-environments-and-secrets.mdx)). With the Authentication add-on, `/health` still answers without a token.
 
-Integration test classes inherit `BaseIntegrationTest` and can send Commands and Queries directly with `Sender`, or test the full flow from the HTTP endpoint with `HttpClient`, then check the database with `DbContext`.
+Integration test classes inherit `BaseIntegrationTest` and can send Commands and Queries directly with `Sender`, or test the full flow from the HTTP endpoint with `HttpClient`, then (PostgreSQL add-on) check the database with `DbContext`.
 
 ## 18.5 ValidationPipelineBehaviorTests.cs (Application.UnitTests) \{#18-5-validationpipelinebehaviortests-cs-application-unittests\}
 

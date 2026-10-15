@@ -1,10 +1,12 @@
 ---
-sidebar_label: "17. Worker (optional)"
+sidebar_label: "17. Worker (add-on)"
 ---
 
 import Prompt17Worker from '../_partials/prompt-17-worker.mdx';
 
-# 17. Worker (optional) \{#17-worker-optional\}
+# 17. Worker (add-on) \{#17-worker-optional\}
+
+The Worker add-on requires the Messaging add-on: it hosts the Consumers and delivers the Outbox ([7.1](../spec/07-optional-components.mdx#7-1-worker)).
 
 <Optional when="worker" page>
 
@@ -12,7 +14,7 @@ import Prompt17Worker from '../_partials/prompt-17-worker.mdx';
 
 The same four files as the Api, with the content of [16.12](./16-api.mdx#16-12-appsettings-files-4), minus the sections the Worker does not use:
 
-- Remove the `Cors`, `OpenApi`, `Migrations`, `Authentication` and `RateLimiting` sections (the Worker serves no HTTP endpoints and runs no migrations).
+- Remove the `Cors`, `OpenApi`, `Migrations`, `Authentication` (Authentication add-on) and `RateLimiting` sections (the Worker serves no HTTP endpoints and runs no migrations).
 - Keep `ConnectionStrings`, `MediatR` and `Serilog`.
 - Change `Serilog:Properties:Application` to `ProductName.Worker`.
 - Change the SIT and Production log path to `/var/log/<lowercase project name>/worker/log-.json`.
