@@ -1,0 +1,45 @@
+---
+sidebar_label: 2.1 Domain
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import Prompt13Domain from '../reference/_partials/prompt-13-domain.mdx';
+import LayerFiles from '@site/src/components/LayerFiles';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 2.1 Domain
+
+Domain is the centre of Clean Architecture and depends on nothing. It holds the building blocks for Domain-Driven Design:
+
+- **Entities** are equal by ID; **aggregate roots** are the entities that guard a consistency boundary and raise **domain events**.
+- **Strongly typed IDs** stop an order ID from being passed where a customer ID is expected.
+- **`Result` and `Error`** return expected business failures instead of throwing them.
+
+No business entity is created now; features add their own ([Reference 13.16](../reference/code/13-domain.mdx#13-16-domain-conventions-no-code)). The code is in [Reference 13](../reference/code/13-domain.mdx).
+
+<Tabs groupId="route" queryString>
+<TabItem value="manual" label="Manual" default>
+
+Create these files in `src/ProductName.Domain/`, then `GlobalUsings.cs` last:
+
+<LayerFiles project="Domain" />
+
+```bash
+dotnet build
+```
+
+</TabItem>
+<TabItem value="script" label="Script">
+
+Done by the scaffold script in [step 1.2](./empty-solution.mdx). Check the result against the Done Conditions below.
+
+</TabItem>
+<TabItem value="ai" label="AI Agent">
+
+<Prompt13Domain />
+
+</TabItem>
+</Tabs>
+
+<DoneConditions step="domain" />

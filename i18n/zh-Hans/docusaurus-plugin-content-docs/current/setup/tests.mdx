@@ -1,0 +1,45 @@
+---
+sidebar_label: 2.5 测试
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import Prompt18Tests from '../reference/_partials/prompt-18-tests.mdx';
+import LayerFiles from '@site/src/components/LayerFiles';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 2.5 测试
+
+四个测试项目将获得：
+
+- 使用 NetArchTest 的**架构测试**。只要代码违反 Clean Architecture 规则，测试就会失败：Domain 引用其他层、handler 没有 sealed，或一个功能使用另一个功能。
+- 针对 `Result` 和验证 pipeline 的**单元测试**。
+- 一个 **Api 测试**，在内存中启动整个 Api 并调用 `/health`。
+
+它们都不需要 Docker 或授权。代码见 [Reference 18](../reference/code/18-tests.mdx)。
+
+<Tabs groupId="route" queryString>
+<TabItem value="manual" label="手动" default>
+
+在 `tests/` 中创建这些文件，包括每个测试项目各一个 `GlobalUsings.cs`：
+
+<LayerFiles project="Tests" />
+
+```bash
+dotnet test
+```
+
+</TabItem>
+<TabItem value="script" label="脚本">
+
+已由[步骤 1.2](./empty-solution.mdx) 的 scaffold 脚本完成；在指令中加上 `--test` 会同时执行测试。请对照下方的完成条件检查结果。
+
+</TabItem>
+<TabItem value="ai" label="AI Agent">
+
+<Prompt18Tests />
+
+</TabItem>
+</Tabs>
+
+<DoneConditions step="tests" />

@@ -1,0 +1,16 @@
+```text
+执行文档第 16 节（Api）。前置条件：第 15 节已完成。
+
+1. 按第 11 节列出的路径建立 16.1 至 16.11 的核心文件，内容照文档；再加上标为“（附加组件：X）”且设定为“要”的附加组件的文件（16.4 PostgreSQL；16.7 至 16.10 身份验证）。
+2. 建立 16.12 的四个设定档（appsettings.json、appsettings.Development.json、appsettings.SIT.json、appsettings.Production.json），附加组件的行只保留设定为“要”的附加组件；SIT 与 Production 的日志文件路径改为 /var/log/<项目名称小写>/api/log-.json。
+3. 以 16.13 的内容完全取代 Program.cs，附加组件的行只保留设定为“要”的附加组件。
+4. 确认 Properties/launchSettings.json 的 ASPNETCORE_ENVIRONMENT 为 Development。
+5. 只在有 PostgreSQL 时：以本地工具安装 dotnet-ef（dotnet new tool-manifest，再 dotnet tool install dotnet-ef），并按 8.11 的指令建立第一个迁移，名称为 InitialCreate。有消息时它只包含 MassTransit 的 Outbox 与 Inbox 数据表，有审计时包含 AuditTrails 与 OperationAudits 数据表；两者都没有时它是空的。若出现其他数据表，停下来说明原因。
+6. 不要建立任何端点范例。有身份验证时，只使用 16.7 的通用 JWT Bearer 设定，不加入任何特定提供方的套件或设定。
+
+完成条件：
+(a) dotnet build 成功。
+(b) 执行 docker compose up -d 后，以 Development 启动 Api：/health 返回 Healthy，/scalar 可以开启（有 PostgreSQL 时，数据库迁移也会自动执行）。
+(c) 有 PostgreSQL 时：以 SIT 环境名称启动且未提供连接字符串时，Api 在启动时失败，而不是连到本地数据库。
+(d) 有身份验证时：不带令牌时，/health 返回 200，Development 下 /openapi/v1.json 与 /scalar 可以打开（设计上即为公开）；其他任何路径返回 401。
+```

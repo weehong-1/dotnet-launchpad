@@ -1,0 +1,45 @@
+---
+sidebar_label: 2.1 Domain
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import Prompt13Domain from '../reference/_partials/prompt-13-domain.mdx';
+import LayerFiles from '@site/src/components/LayerFiles';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 2.1 Domain
+
+Domain 是 Clean Architecture 的中心，不依赖任何东西。它包含领域驱动设计的基础构件：
+
+- **Entity** 以 ID 判断是否相等；**aggregate root** 是守护一致性边界并发出 **domain event** 的 entity。
+- **强类型 ID** 防止在需要客户 ID 的地方传入订单 ID。
+- **`Result` 和 `Error`** 以返回值表示预期的业务失败，而不是抛出异常。
+
+现在不创建任何业务 entity；功能会自行加入（[Reference 13.16](../reference/code/13-domain.mdx#13-16-domain-conventions-no-code)）。代码见 [Reference 13](../reference/code/13-domain.mdx)。
+
+<Tabs groupId="route" queryString>
+<TabItem value="manual" label="手动" default>
+
+在 `src/ProductName.Domain/` 中创建这些文件，最后再建立 `GlobalUsings.cs`：
+
+<LayerFiles project="Domain" />
+
+```bash
+dotnet build
+```
+
+</TabItem>
+<TabItem value="script" label="脚本">
+
+已由[步骤 1.2](./empty-solution.mdx) 的 scaffold 脚本完成。请对照下方的完成条件检查结果。
+
+</TabItem>
+<TabItem value="ai" label="AI Agent">
+
+<Prompt13Domain />
+
+</TabItem>
+</Tabs>
+
+<DoneConditions step="domain" />

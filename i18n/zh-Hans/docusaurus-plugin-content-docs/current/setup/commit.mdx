@@ -1,0 +1,37 @@
+---
+sidebar_label: 3.2 Commit 并 push
+---
+
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 3.2 Commit 并 push Skeleton Solution
+
+核心 Skeleton Solution 已完成。把它作为项目的第一个 commit 提交，从干净的 clone 检查一次，然后 push。
+
+先把所有文件加入暂存区，再确认没有任何机密会被提交：
+
+```bash
+git add -A
+git status --short                                                     # 没有已填写的 .env 文件，没有授权文件
+git grep --cached -n -i -E "licensekey|mt_license" -- ':!docs/TEMPLATE.md'
+# 每个结果都必须是代码，或值为空的设定，例如 "LicenseKey": ""
+```
+
+提交，然后从干净的 clone 执行测试，确保没有依赖未提交的文件：
+
+```bash
+git commit -m "Create the Skeleton Solution from Boilerplate v2.0"
+rm -rf /tmp/productname-clone && git clone -q "$PWD" /tmp/productname-clone
+(cd /tmp/productname-clone && dotnet test)
+```
+
+建立私有 GitHub repo 并 push：
+
+```bash
+gh repo create productname --private --source .
+git push -u origin main
+```
+
+CI 随上线附加组件一起加入，该附加组件也会设定 CI 需要的 secrets。
+
+<DoneConditions step="commit" />

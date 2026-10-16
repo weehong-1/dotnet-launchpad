@@ -1,0 +1,10 @@
+---
+sidebar_label: "8.1 CQRS 读写分离"
+---
+
+# 8.1 CQRS 读写分离 \{#8-1-cqrs-read-and-write-separation\}
+
+- **写端**：通过聚合加仓储执行，保证业务规则。
+- **读端**：Query 直接使用 DbContext 的 `AsNoTracking` 投影成 DTO，不经过聚合。
+
+**原因**：读取不需要执行业务规则，跳过聚合加载与变更追踪，只查询需要的字段，查询性能会好很多。

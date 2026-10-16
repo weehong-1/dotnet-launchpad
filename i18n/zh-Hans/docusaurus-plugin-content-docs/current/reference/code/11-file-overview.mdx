@@ -1,0 +1,326 @@
+---
+sidebar_label: "11. 文件总览"
+---
+
+import PromptCommonRules from '../_partials/prompt-common-rules.mdx';
+import PromptGenerateAll from '../_partials/prompt-generate-all.mdx';
+import SnippetCliScaffold from '../_partials/snippet-cli-scaffold.mdx';
+
+# 11. 文件总览 \{#11-file-overview\}
+
+标有“附加组件”的文件属于某个附加组件，只存在于包含该附加组件的项目中（见第 [7](../spec/07-optional-components.mdx) 节）；其他文件都属于核心 Skeleton Solution。[11.4](#11-4-core-and-add-on-files) 列出每个附加组件带来哪些文件。
+
+**解决方案层级：14 个**
+
+1. `ProductName.slnx`
+2. `Directory.Build.props`
+3. `Directory.Packages.props`
+4. `global.json`
+5. `.editorconfig`
+6. `.gitignore`（以 `dotnet new gitignore` 产生，不另列内容）
+7. `docker-compose.yml`
+8. `BannedSymbols.txt`
+9. `deploy/systemd/productname-api.service`（附加组件：上线）
+10. `deploy/systemd/productname-worker.service`（附加组件：上线、Worker）
+11. `deploy/nginx/productname-api.conf`（附加组件：上线）
+12. `deploy/env/api.env.example`（附加组件：上线）
+13. `deploy/env/worker.env.example`（附加组件：上线、Worker）
+14. `.github/workflows/ci.yml`（附加组件：上线）
+
+有 PostgreSQL 附加组件时，另有根目录的 `dotnet-tools.json`，由 `dotnet new tool-manifest` 产生，不属于手写文件。启用 Qodana 时加入 `qodana.yaml`（见 [12.10](./12-solution-level.mdx#12-10-github-workflows-ci-yml)）；使用 GitHub Copilot 时加入 `.github/copilot-instructions.md`（见 [11.1](#11-1-generating-with-an-ai-coding-agent)）。
+
+**Domain：16 个**
+
+1. `Abstractions/Entity.cs`
+2. `Abstractions/IAggregateRoot.cs`
+3. `Abstractions/AggregateRoot.cs`
+4. `Abstractions/IDomainEvent.cs`
+5. `Abstractions/DomainEvent.cs`
+6. `Abstractions/IRepository.cs`
+7. `Abstractions/IHasTimestamps.cs`
+8. `Abstractions/ErrorType.cs`
+9. `Abstractions/Error.cs`
+10. `Abstractions/ValidationError.cs`
+11. `Abstractions/Result.cs`（含 `Result<T>`）
+12. `Abstractions/IResultFactory.cs`
+13. `Abstractions/DomainException.cs`
+14. `Abstractions/IStronglyTypedId.cs`
+15. `Abstractions/IAuditable.cs`（附加组件：审计）
+16. `Abstractions/AuditIgnoreAttribute.cs`（附加组件：审计）
+
+**Application：19 个**
+
+1. `Abstractions/Messaging/IBaseCommand.cs`
+2. `Abstractions/Messaging/ICommand.cs`（含泛型版本）
+3. `Abstractions/Messaging/IQuery.cs`
+4. `Abstractions/Messaging/ICommandHandler.cs`（含泛型版本）
+5. `Abstractions/Messaging/IQueryHandler.cs`
+6. `Abstractions/Messaging/IDomainEventHandler.cs`
+7. `Abstractions/Messaging/IEventBus.cs`（附加组件：消息）
+8. `Abstractions/Behaviors/LoggingPipelineBehavior.cs`
+9. `Abstractions/Behaviors/ValidationPipelineBehavior.cs`
+10. `Abstractions/Data/IApplicationDbContext.cs`（附加组件：PostgreSQL）
+11. `Abstractions/Data/IUnitOfWork.cs`（附加组件：PostgreSQL）
+12. `Abstractions/Authentication/ICurrentUser.cs`（附加组件：身份验证）
+13. `Abstractions/Authentication/IPermissionProvider.cs`（附加组件：身份验证）
+14. `Abstractions/PagedList.cs`
+15. `DependencyInjection.cs`
+16. `Abstractions/Auditing/IAuditContext.cs`（附加组件：审计）
+17. `Abstractions/Auditing/IAuditableRequest.cs`（附加组件：审计）
+18. `Abstractions/Auditing/IOperationAuditWriter.cs`（附加组件：审计）
+19. `Abstractions/Behaviors/OperationAuditPipelineBehavior.cs`（附加组件：审计）
+
+**Infrastructure：14 个**
+
+1. `Database/ApplicationDbContext.cs`（附加组件：PostgreSQL）
+2. `Database/StronglyTypedIdConverter.cs`（附加组件：PostgreSQL）
+3. `Database/TimestampsInterceptor.cs`（附加组件：PostgreSQL）
+4. `Database/Repository.cs`（附加组件：PostgreSQL）
+5. `Messaging/EventBus.cs`（附加组件：消息）
+6. `Authentication/CurrentUser.cs`（附加组件：身份验证）
+7. `Authentication/ClaimsPermissionProvider.cs`（附加组件：身份验证）
+8. `DependencyInjection.cs`
+9. `Auditing/AuditTrail.cs`（附加组件：审计）
+10. `Auditing/OperationAudit.cs`（附加组件：审计）
+11. `Auditing/AuditConfigurations.cs`（附加组件：审计）
+12. `Auditing/AuditContext.cs`（附加组件：审计）
+13. `Auditing/AuditTrailInterceptor.cs`（附加组件：审计）
+14. `Auditing/OperationAuditWriter.cs`（附加组件：审计）
+
+有 PostgreSQL 附加组件时，另有 `Database/Migrations/` 文件夹，由 EF Core 工具产生，不属于手写文件。
+
+**Api：16 个**
+
+1. `Endpoints/IEndpoint.cs`
+2. `Endpoints/EndpointExtensions.cs`
+3. `Extensions/ResultExtensions.cs`
+4. `Extensions/MigrationExtensions.cs`（附加组件：PostgreSQL）
+5. `Infrastructure/CustomResults.cs`
+6. `Infrastructure/GlobalExceptionHandler.cs`
+7. `Extensions/AuthExtensions.cs`（附加组件：身份验证）
+8. `Authorization/PermissionRequirement.cs`（附加组件：身份验证）
+9. `Authorization/PermissionAuthorizationHandler.cs`（附加组件：身份验证）
+10. `Authorization/PermissionEndpointExtensions.cs`（附加组件：身份验证）
+11. `Extensions/RateLimitingExtensions.cs`
+12. `appsettings.json`
+13. `appsettings.Development.json`
+14. `appsettings.SIT.json`
+15. `appsettings.Production.json`
+16. `Program.cs`
+
+**Worker：5 个**（附加组件：Worker）
+
+1. `appsettings.json`
+2. `appsettings.Development.json`
+3. `appsettings.SIT.json`
+4. `appsettings.Production.json`
+5. `Program.cs`
+
+**Tests：7 个**
+
+1. `ProductName.Architecture.Tests/LayerTests.cs`
+2. `ProductName.Domain.UnitTests/Abstractions/BaseTest.cs`
+3. `ProductName.Api.IntegrationTests/Abstractions/IntegrationTestWebAppFactory.cs`
+4. `ProductName.Api.IntegrationTests/Abstractions/BaseIntegrationTest.cs`
+5. `ProductName.Application.UnitTests/Abstractions/Behaviors/ValidationPipelineBehaviorTests.cs`
+6. `ProductName.Domain.UnitTests/Abstractions/ResultTests.cs`
+7. `ProductName.Api.IntegrationTests/HealthCheckTests.cs`
+
+**合计：项目内文件 77 个，另加每个项目一个 `GlobalUsings.cs`（11.3）；解决方案层级文件 14 个。**
+
+## 11.1 使用 AI Coding Agent 生成 \{#11-1-generating-with-an-ai-coding-agent\}
+
+每一节末尾都附有提示词，可交给 AI Coding Agent（例如 Claude Code、Cursor、GitHub Copilot）生成该节的文件。
+
+**使用步骤**
+
+1. 下载 `TEMPLATE.md`（整个 Reference 合成的单一文件，见 [Setup Flow 步骤 1.1](../../setup/repository.mdx)），放进新项目的存储库，路径为 `docs/TEMPLATE.md`，让 AI 可以读取。
+2. 把下方的**共通规则**填好项目设定后，放进 AI 的项目指示档（例如 `CLAUDE.md`、`AGENTS.md`，或 GitHub Copilot 自动读取的 `.github/copilot-instructions.md`）；工具不支持项目指示档时，就在每次对话开头贴上。
+3. 按第 [12](./12-solution-level.mdx) 至 [18](./18-tests.mdx) 节的顺序，每次贴一节的提示词，确认完成条件都通过后，再进行下一节。
+4. 想一次完成时，改用下方的**一次生成全部**提示词。建议第一次使用模板时逐节执行，比较容易发现问题。
+
+项目指示档除了共通规则，建议另写明：建置与执行指令（见 [8.10](../spec/08-design-rules/10-local-development.mdx)、[8.11](../spec/08-design-rules/11-database-migrations.mdx)）、分层规则（见第 [3](../spec/03-layers-and-dependency-direction.mdx) 节）、主要约定（CQRS、Result、功能切片）、测试约定、技术栈与版本。
+
+**共通规则**
+
+<PromptCommonRules />
+
+**一次生成全部**
+
+<PromptGenerateAll />
+
+## 11.2 以 CLI 建立解决方案骨架 \{#11-2-scaffolding-the-solution-with-the-cli\}
+
+不交给 AI 时，可用以下指令手动建立第 [5](../spec/05-solution-structure.mdx) 节的结构与 [12.2](./12-solution-level.mdx#12-2-directory-packages-props) 的项目引用，效果等同 [12.11](./12-solution-level.mdx#12-11-ai-coding-agent-prompt) 提示词的第 1、2、6 步。改写自英文 guide 的第 2、3 节，已换成本模板的项目名称与 xUnit v3。先安装 .NET 10 SDK 与 Docker。
+
+<SnippetCliScaffold />
+
+- 不需要 Worker 时，略过所有标有 Worker 的指令。
+- 指令建立空项目与引用，把所有测试项目改为 net10.0，删除模板加入的包引用与范例，并把 Worker 模板的 `Program.cs` 换成不再注册已删除 `Worker` 类别的最小版本。之后按 [12.1](./12-solution-level.mdx#12-1-directory-build-props) 至 [12.10](./12-solution-level.mdx#12-10-github-workflows-ci-yml) 加入根目录文件，按 [12.2](./12-solution-level.mdx#12-2-directory-packages-props) 表格以不带版本的 `<PackageReference Include="..." />` 加入 NuGet 包。
+- Windows PowerShell 改用 `$env:PROJECT = "ProductName"` 设定变量，其余指令相同（循环改用 `Get-ChildItem src/*/*.csproj | ForEach-Object { ... }`）。
+
+## 11.3 各项目的 GlobalUsings.cs \{#11-3-globalusings-cs-per-project\}
+
+Boilerplate 文件省略了解决方案内部命名空间的 `using`，改由每个项目根目录的一个 `GlobalUsings.cs` 统一提供，因此每个文件照抄即可编译。请在该项目的其他文件都建立**之后**再建立它：全局引用一个还不存在的命名空间会让编译失败。标示某个附加组件的行，在项目未包含该附加组件时省略，并在加入该附加组件时与其文件一起加入。
+
+`src/ProductName.Domain/GlobalUsings.cs`：
+
+```csharp
+global using ProductName.Domain.Abstractions;
+```
+
+`src/ProductName.Application/GlobalUsings.cs`：
+
+```csharp
+global using ProductName.Application;
+global using ProductName.Application.Abstractions;
+global using ProductName.Application.Abstractions.Auditing;  // @@auditing
+global using ProductName.Application.Abstractions.Authentication;  // @@auth
+global using ProductName.Application.Abstractions.Behaviors;
+global using ProductName.Application.Abstractions.Data;  // @@postgres
+global using ProductName.Application.Abstractions.Messaging;
+global using ProductName.Domain.Abstractions;
+```
+
+`src/ProductName.Infrastructure/GlobalUsings.cs`：
+
+```csharp
+global using ProductName.Application;
+global using ProductName.Application.Abstractions;
+global using ProductName.Application.Abstractions.Auditing;  // @@auditing
+global using ProductName.Application.Abstractions.Authentication;  // @@auth
+global using ProductName.Application.Abstractions.Behaviors;
+global using ProductName.Application.Abstractions.Data;  // @@postgres
+global using ProductName.Application.Abstractions.Messaging;
+global using ProductName.Domain.Abstractions;
+global using ProductName.Infrastructure;
+global using ProductName.Infrastructure.Auditing;  // @@auditing
+global using ProductName.Infrastructure.Authentication;  // @@auth
+global using ProductName.Infrastructure.Database;  // @@postgres
+global using ProductName.Infrastructure.Messaging;  // @@messaging
+```
+
+`src/ProductName.Api/GlobalUsings.cs`：
+
+```csharp
+global using ProductName.Api.Authorization;  // @@auth
+global using ProductName.Api.Endpoints;
+global using ProductName.Api.Extensions;
+global using ProductName.Api.Infrastructure;
+global using ProductName.Application;
+global using ProductName.Application.Abstractions;
+global using ProductName.Application.Abstractions.Auditing;  // @@auditing
+global using ProductName.Application.Abstractions.Authentication;  // @@auth
+global using ProductName.Application.Abstractions.Behaviors;
+global using ProductName.Application.Abstractions.Data;  // @@postgres
+global using ProductName.Application.Abstractions.Messaging;
+global using ProductName.Domain.Abstractions;
+global using ProductName.Infrastructure;
+global using ProductName.Infrastructure.Auditing;  // @@auditing
+global using ProductName.Infrastructure.Authentication;  // @@auth
+global using ProductName.Infrastructure.Database;  // @@postgres
+global using ProductName.Infrastructure.Messaging;  // @@messaging
+```
+
+<Optional when="worker">
+
+`src/ProductName.Worker/GlobalUsings.cs`（附加组件：Worker）：
+
+```csharp
+global using ProductName.Application;
+global using ProductName.Application.Abstractions;
+global using ProductName.Application.Abstractions.Auditing;  // @@auditing
+global using ProductName.Application.Abstractions.Authentication;  // @@auth
+global using ProductName.Application.Abstractions.Behaviors;
+global using ProductName.Application.Abstractions.Data;  // @@postgres
+global using ProductName.Application.Abstractions.Messaging;
+global using ProductName.Domain.Abstractions;
+global using ProductName.Infrastructure;
+global using ProductName.Infrastructure.Auditing;  // @@auditing
+global using ProductName.Infrastructure.Authentication;  // @@auth
+global using ProductName.Infrastructure.Database;  // @@postgres
+global using ProductName.Infrastructure.Messaging;  // @@messaging
+```
+
+</Optional>
+
+`tests/ProductName.Domain.UnitTests/GlobalUsings.cs`：
+
+```csharp
+global using ProductName.Domain.Abstractions;
+global using ProductName.Domain.UnitTests.Abstractions;
+```
+
+`tests/ProductName.Application.UnitTests/GlobalUsings.cs`：
+
+```csharp
+global using ProductName.Application;
+global using ProductName.Application.Abstractions;
+global using ProductName.Application.Abstractions.Auditing;  // @@auditing
+global using ProductName.Application.Abstractions.Authentication;  // @@auth
+global using ProductName.Application.Abstractions.Behaviors;
+global using ProductName.Application.Abstractions.Data;  // @@postgres
+global using ProductName.Application.Abstractions.Messaging;
+global using ProductName.Application.UnitTests.Abstractions.Behaviors;
+global using ProductName.Domain.Abstractions;
+```
+
+`tests/ProductName.Architecture.Tests/GlobalUsings.cs`：
+
+```csharp
+global using ProductName.Api.Authorization;  // @@auth
+global using ProductName.Api.Endpoints;
+global using ProductName.Api.Extensions;
+global using ProductName.Api.Infrastructure;
+global using ProductName.Application;
+global using ProductName.Application.Abstractions;
+global using ProductName.Application.Abstractions.Auditing;  // @@auditing
+global using ProductName.Application.Abstractions.Authentication;  // @@auth
+global using ProductName.Application.Abstractions.Behaviors;
+global using ProductName.Application.Abstractions.Data;  // @@postgres
+global using ProductName.Application.Abstractions.Messaging;
+global using ProductName.Architecture.Tests;
+global using ProductName.Domain.Abstractions;
+global using ProductName.Infrastructure;
+global using ProductName.Infrastructure.Auditing;  // @@auditing
+global using ProductName.Infrastructure.Authentication;  // @@auth
+global using ProductName.Infrastructure.Database;  // @@postgres
+global using ProductName.Infrastructure.Messaging;  // @@messaging
+```
+
+`tests/ProductName.Api.IntegrationTests/GlobalUsings.cs`：
+
+```csharp
+global using ProductName.Api.Authorization;  // @@auth
+global using ProductName.Api.Endpoints;
+global using ProductName.Api.Extensions;
+global using ProductName.Api.Infrastructure;
+global using ProductName.Api.IntegrationTests;
+global using ProductName.Api.IntegrationTests.Abstractions;
+global using ProductName.Application;
+global using ProductName.Application.Abstractions;
+global using ProductName.Application.Abstractions.Auditing;  // @@auditing
+global using ProductName.Application.Abstractions.Authentication;  // @@auth
+global using ProductName.Application.Abstractions.Behaviors;
+global using ProductName.Application.Abstractions.Data;  // @@postgres
+global using ProductName.Application.Abstractions.Messaging;
+global using ProductName.Domain.Abstractions;
+global using ProductName.Infrastructure;
+global using ProductName.Infrastructure.Auditing;  // @@auditing
+global using ProductName.Infrastructure.Authentication;  // @@auth
+global using ProductName.Infrastructure.Database;  // @@postgres
+global using ProductName.Infrastructure.Messaging;  // @@messaging
+```
+
+## 11.4 核心与附加组件的文件 \{#11-4-core-and-add-on-files\}
+
+核心 Skeleton Solution 就是上方所有没有“附加组件”标记的文件。每个附加组件带来自己的文件，并修改少数核心文件；它在 Setup Flow 的页面会同时列出两者，并标亮修改的行。
+
+| 附加组件 | 需要先有 | 新文件 | 修改的核心文件 |
+| --- | --- | --- | --- |
+| PostgreSQL | 无 | Application 的 `Abstractions/Data/*`；Infrastructure 的 `Database/*`；Api 的 `Extensions/MigrationExtensions.cs`；第一个迁移 | `Directory.Packages.props`、`docker-compose.yml`、Infrastructure 的 `DependencyInjection.cs`、Api 的 `GlobalExceptionHandler.cs`、`Program.cs` 与 appsettings、整合测试基础类、`GlobalUsings.cs` |
+| 消息 | PostgreSQL | Application 的 `IEventBus.cs`；Infrastructure 的 `Messaging/EventBus.cs`；Outbox 与 Inbox 的迁移 | `Directory.Packages.props`、`docker-compose.yml`、`ApplicationDbContext.cs`、Infrastructure 的 `DependencyInjection.cs`、appsettings、整合测试 factory、`GlobalUsings.cs` |
+| Worker | 消息 | Worker 项目（第 [17](./17-worker-optional.mdx) 节） | Infrastructure 的 `DependencyInjection.cs`、`LayerTests.cs`、解决方案 |
+| 审计 | PostgreSQL | Domain、Application 与 Infrastructure 的 `Auditing` 相关文件；审计数据表的迁移 | Application 与 Infrastructure 的 `DependencyInjection.cs`、`GlobalUsings.cs` |
+| 身份验证 | 无 | Application 的 `Abstractions/Authentication/*`；Infrastructure 的 `Authentication/*`；Api 的 `Extensions/AuthExtensions.cs` 与 `Authorization/*` | `Directory.Packages.props`、Infrastructure 的 `DependencyInjection.cs`、`Program.cs` 与 appsettings、`GlobalUsings.cs` |
+| 上线 | 无 | `deploy/*`、`.github/workflows/ci.yml`、`qodana.yaml`（仅 Qodana） | 无 |

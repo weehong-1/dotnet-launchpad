@@ -1,0 +1,10 @@
+```text
+为本项目加入消息附加组件（RabbitMQ 与 MassTransit），依据文档第 7.5 与 8.4 节，以及第二部分标为“（附加组件：消息）”的代码。前置条件：PostgreSQL 附加组件已加入，且测试全部通过。先在项目设定中设为“附加组件 消息：要”。
+
+1. 套件：加入 12.2 附加组件表格中消息的各列，版本写在 Directory.Packages.props。
+2. 建立新文件：Application 的 14.7 IEventBus.cs 与 Infrastructure 的 15.5 EventBus.cs。
+3. 在现有文件中加入标为消息的行：ApplicationDbContext.cs（15.1）、Infrastructure 的 DependencyInjection.cs（15.8，包括 AddMessaging 方法与 configureConsumers 参数）、各 appsettings 文件（16.12）、docker-compose.yml（12.5）、集成测试 factory（18.3），以及每个 GlobalUsings.cs（11.3）。没有 Worker 附加组件时由 Api 投递 Outbox，因此不要加入标为 Worker 的行。
+4. 按 8.11 的指令建立迁移，名称为 AddMessaging。它只应包含 MassTransit 的 Outbox 与 Inbox 数据表；出现其他变更时停下来说明原因。
+
+完成条件：dotnet build 零警告零错误；执行 docker compose up -d 后，Api 启动时日志中没有 MassTransit 错误；在 Docker 运行中且已设定 MT_LICENSE 或 MT_LICENSE_PATH 时，dotnet test 全部通过。
+```

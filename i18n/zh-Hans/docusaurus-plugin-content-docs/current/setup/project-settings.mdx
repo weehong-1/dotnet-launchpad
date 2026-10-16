@@ -1,0 +1,19 @@
+---
+sidebar_label: 0.1 为项目命名
+---
+
+import ProjectSettingsForm from '@site/src/components/ProjectSettingsForm';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 0.1 为项目命名
+
+每个新后端都从这里开始。你保存的内容会成为**当前项目**：整个站点的代码块会换成你的名称。
+
+- **项目名称**替换 `%%ProductName%%`：solution、项目、namespace 和文件夹。
+- **简短名称**替换 `%%productname%%`：数据库名称、Linux 服务帐号、`/opt`、`/etc` 和 `/var/log` 下的路径，以及 systemd 服务。默认取项目名称的最后一段并转为小写。
+
+<ProjectSettingsForm />
+
+之后可以随时回来修改；站点上的所有内容都会跟随保存的值。PostgreSQL 或 Worker 等附加组件稍后在[附加组件](./addons.mdx)页面选择，等核心 Skeleton Solution 运行起来之后再说。
+
+<DoneConditions step="project-settings" />

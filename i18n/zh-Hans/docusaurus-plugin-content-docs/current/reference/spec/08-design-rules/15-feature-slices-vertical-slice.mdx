@@ -1,0 +1,73 @@
+---
+sidebar_label: "8.15 功能切片（Vertical Slice）"
+---
+
+import PromptFeatureSlice from '../../_partials/prompt-feature-slice.mdx';
+
+# 8.15 功能切片（Vertical Slice） \{#8-15-feature-slices-vertical-slice\}
+
+**为什么同时使用**
+
+Clean Architecture 负责依赖方向，保护领域不受技术细节影响；Vertical Slice 负责组织方式，让一个用例的所有代码集中在一处。只用分层时，一个功能散落在 Commands、Handlers、Validators、DTOs 等按类型分的资料夹中，修改一个功能要跳好几个地方；加入功能切片后，修改一个用例通常只动一个资料夹，外加对应的端点。
+
+**资料夹结构**
+
+大括号为占位名称。`{功能}` 是一组相关的业务能力（通常为复数名词）；`{用例}` 是一个具体动作，以动词开头（例如 Create、Cancel、GetById、List 加上名词）。
+
+```
+src/
+    ProductName.Domain/
+        Abstractions/
+        {聚合复数}/                          按聚合组织：聚合、ID、Errors、领域事件、仓储接口
+    ProductName.Application/
+        Abstractions/                        技术共用：Messaging、Behaviors、Data、Authentication、Auditing
+        IntegrationEvents/                   对外消息契约，不属于任何切片
+        Features/
+            {功能}/
+                {写入用例}/
+                    {用例}Command.cs
+                    {用例}CommandValidator.cs
+                    {用例}CommandHandler.cs
+                    {用例}Response.cs          有返回资料时才建立
+                {查询用例}/
+                    {用例}Query.cs
+                    {用例}QueryHandler.cs
+                    {用例}Response.cs
+                EventHandlers/               此功能对领域事件的反应
+    ProductName.Infrastructure/
+        Database/
+            Configurations/{聚合}Configuration.cs
+            Repositories/{聚合}Repository.cs
+    ProductName.Api/
+        Endpoints/
+            {功能}/
+                {用例}.cs                    与 Application 的用例一一对应
+    ProductName.Worker/  # @@worker
+        Consumers/  # @@worker
+            {功能}/  # @@worker
+                {事件名称}Consumer.cs  # @@worker
+tests/
+    ProductName.Domain.UnitTests/{聚合复数}/
+    ProductName.Application.UnitTests/Features/{功能}/{用例}/
+    ProductName.Api.IntegrationTests/Features/{功能}/{用例}Tests.cs
+```
+
+命名空间一律与资料夹路径相同。
+
+**规则**
+
+1. **一个用例一个资料夹**：该用例的 Command 或 Query、Validator、Handler、Response 都放在里面，一个类型一个文件。
+2. **切片之间不得互相引用**：不引用其他切片的 Command、Handler 或 Response，由架构测试检查（见 [18.1](../../code/18-tests.mdx#18-1-layertests-cs)）。
+3. **共用代码的去处**：业务规则放 Domain；技术能力放 `Application/Abstractions`；对外消息放 `Application/IntegrationEvents`。**不建立** Common、Shared、Helpers 之类的杂物资料夹。
+4. **不共用 DTO**：每个用例有自己的 Response，即使栏位暂时相同，以免一个用例的修改影响另一个。
+5. **Handler 不呼叫 Handler**：不在 Handler 中发送另一个 Command 或 Query；跨用例的流程以领域事件（同一事务）或整合事件（异步）串接。
+6. **各切片自行决定写法**：写入用例通过聚合与仓储；查询用例直接投影（见 [8.1](./01-cqrs-read-and-write-separation.mdx)）。简单的切片保持简单，不为了一致而加入不需要的抽象。
+7. **Domain 不按切片组织**：聚合是业务规则的边界，可以被多个功能使用，因此 Domain 按聚合分资料夹。
+8. **Infrastructure 不按切片组织**：实体设定与仓储按聚合命名，放在技术资料夹中。
+9. **结构互相对应**：Api 的端点、Worker 的 Consumer、测试的资料夹，都与 Application 的 `Features/{功能}/{用例}` 对应，看到一个用例就能推知它在各层的位置。
+
+**AI Coding Agent 提示词：新增功能切片**
+
+模板建立完成后，日常开发每新增一个用例，使用以下提示词（填好角括号内容）：
+
+<PromptFeatureSlice />

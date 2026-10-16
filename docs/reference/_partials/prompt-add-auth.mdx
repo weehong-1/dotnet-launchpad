@@ -1,0 +1,10 @@
+```text
+Add the Authentication add-on to this project, following section 8.16 and the code in Part 2 marked "(add-on: Authentication)". Prerequisite: the core Skeleton Solution is built and its tests pass. Set "Add-on Authentication: yes" in the project settings first.
+
+1. Packages: add the Authentication row of the 12.2 add-on table, with its version in Directory.Packages.props.
+2. Create the new files: 14.12 and 14.13 in Application; 15.6 and 15.7 in Infrastructure; 16.7 to 16.10 in Api.
+3. Add the lines marked Authentication to the existing files: Infrastructure DependencyInjection.cs (15.8), Program.cs (16.13), appsettings.json (16.12) and every GlobalUsings.cs (11.3).
+4. Use only the generic JWT Bearer setup of 16.7, with no provider specific packages or settings.
+
+Done when: dotnet build has zero warnings and zero errors; dotnet test passes; in Development, without a token /health returns 200 and /openapi/v1.json and /scalar open, and any other path returns 401.
+```

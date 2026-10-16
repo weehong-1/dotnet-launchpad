@@ -1,0 +1,11 @@
+---
+sidebar_label: "8.20 时间处理"
+---
+
+# 8.20 时间处理 \{#8-20-time-handling\}
+
+- **数据库一律存 UTC**：时间点使用 `DateTimeOffset`，对应 PostgreSQL 的 `timestamptz`。Npgsql 只接受偏移为零的值，写入非 UTC 时间会直接报错。
+- **取得当前时间一律使用 `TimeProvider`**（`GetUtcNow()`），测试时可替换为 `FakeTimeProvider`。`DateTime.Now`、`DateTime.Today`、`DateTimeOffset.Now` 已由 `BannedSymbols.txt` 禁用（见 [12.6](../../code/12-solution-level.mdx#12-6-bannedsymbols-txt)），使用会导致建置失败。
+- 只有日期、没有时间的资料（例如到期日）使用 `DateOnly`；只有时间使用 `TimeOnly`。
+- API 以含偏移的 ISO 8601 格式返回 UTC 时间，由前端依使用者所在时区显示。需要依特定时区计算时（例如“某地的今天”），明确传入时区，不依赖服务器时区。
+- 所有服务器的系统时区设为 UTC。

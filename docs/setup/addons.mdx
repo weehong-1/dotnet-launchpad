@@ -1,0 +1,53 @@
+---
+sidebar_label: Overview
+sidebar_position: 0
+---
+
+import AddOnSwitch from '@site/src/components/AddOnSwitch';
+import StepList from '@site/src/components/StepList';
+
+# Add-ons
+
+The [Setup Flow](./index.mdx) builds the core Skeleton Solution: Clean Architecture, DDD and CQRS with no database, broker or sign in. Add-ons add the rest, one at a time, after the core runs. Each one is optional: add only what the project needs, in the order below.
+
+Switch an add-on on for the active project, then follow its steps. Every code block on the site then includes it, and its steps start counting in your progress. Each add-on page shows the new files in full and the existing files it changes, with the changed lines highlighted.
+
+## A. PostgreSQL
+
+EF Core with PostgreSQL. Adds the `DbContext`, which is also the unit of work, plus the repository base class and the first migration. Domain events are published when changes are saved, in the same transaction. Needed by most backends; Messaging and Auditing build on it. [Reference 7.4](../reference/spec/07-optional-components.mdx#7-4-postgresql).
+
+<AddOnSwitch addon="postgres" href="/docs/setup/postgres" />
+
+## B. Messaging (RabbitMQ and MassTransit)
+
+Integration events through RabbitMQ with MassTransit. Events are written to an Outbox table in the same transaction as the business data, and every Consumer gets an Inbox, so no message is lost or processed twice. MassTransit v9 needs a commercial license. [Reference 7.5](../reference/spec/07-optional-components.mdx#7-5-messaging) and [8.4](../reference/spec/08-design-rules/04-masstransit-async-messaging.mdx).
+
+<AddOnSwitch addon="messaging" href="/docs/setup/licenses" />
+
+## C. Worker
+
+A second host for background work: it runs the Consumers and delivers the Outbox, so the Api only answers requests. Scheduled jobs go here too. [Reference 7.1](../reference/spec/07-optional-components.mdx#7-1-worker).
+
+<AddOnSwitch addon="worker" href="/docs/setup/worker" />
+
+## D. Auditing
+
+Data change and operation audit records from day one. History that was never recorded cannot be recovered later, so add it before the first feature if the system will need it. [Reference 7.3](../reference/spec/07-optional-components.mdx#7-3-audit-records).
+
+<AddOnSwitch addon="auditing" href="/docs/setup/auditing" />
+
+## E. Authentication
+
+JWT Bearer sign in against any OpenID Connect provider, with permission checks on endpoints. Every endpoint then requires sign in by default. [Reference 8.16](../reference/spec/08-design-rules/16-authentication-and-authorization.mdx).
+
+<AddOnSwitch addon="auth" href="/docs/setup/identity-provider" />
+
+## F. Go live
+
+CI on GitHub Actions, then SIT and Production on Ubuntu VMs behind Nginx. Do it last: the steps adapt to the other add-ons the project has. [Reference 7.7](../reference/spec/07-optional-components.mdx#7-7-go-live) and [8.21](../reference/spec/08-design-rules/21-deployment.mdx).
+
+<AddOnSwitch addon="golive" href="/docs/setup/ci" />
+
+## All add-on steps
+
+<StepList track="addon" />

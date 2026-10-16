@@ -1,0 +1,13 @@
+---
+sidebar_label: "8.6 Solution infrastructure"
+---
+
+# 8.6 Solution infrastructure \{#8-6-solution-infrastructure\}
+
+- **`.slnx`**: the default solution format in .NET 10; XML based, simpler and more readable than the old `.sln`, with fewer merge conflicts.
+- **`Directory.Build.props`**: inherited by every project automatically; unifies target framework, Nullable, implicit usings, warnings as errors and similar settings so no `.csproj` repeats them.
+- **`Directory.Packages.props`**: Central Package Management; every NuGet version is defined here once, and projects reference packages without versions.
+- **`global.json`**: pins the .NET SDK version so every machine and every build uses the same SDK.
+- **`.editorconfig`**: unifies code style and analyzer rules, applied both in the IDE and at build time.
+- **`.gitignore`**: generated with `dotnet new gitignore`; excludes build output and local settings.
+- **`docker-compose.yml`**: starts the external services needed for local development in one command (see [8.10](./10-local-development.mdx)).

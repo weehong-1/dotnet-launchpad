@@ -1,0 +1,10 @@
+```text
+为本项目加入身份验证附加组件，依据文档第 8.16 节，以及第二部分标为“（附加组件：身份验证）”的代码。前置条件：核心骨架解决方案已建立，且测试全部通过。先在项目设定中设为“附加组件 身份验证：要”。
+
+1. 套件：加入 12.2 附加组件表格中身份验证的那一列，版本写在 Directory.Packages.props。
+2. 建立新文件：Application 的 14.12 与 14.13；Infrastructure 的 15.6 与 15.7；Api 的 16.7 至 16.10。
+3. 在现有文件中加入标为身份验证的行：Infrastructure 的 DependencyInjection.cs（15.8）、Program.cs（16.13）、appsettings.json（16.12），以及每个 GlobalUsings.cs（11.3）。
+4. 只使用 16.7 的通用 JWT Bearer 设定，不加入任何特定提供方的套件或设定。
+
+完成条件：dotnet build 零警告零错误；dotnet test 全部通过；在 Development 下不带令牌时，/health 返回 200，/openapi/v1.json 与 /scalar 可以打开，其他任何路径返回 401。
+```

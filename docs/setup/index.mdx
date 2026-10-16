@@ -1,0 +1,42 @@
+---
+sidebar_label: Overview
+sidebar_position: 0
+---
+
+import StepList from '@site/src/components/StepList';
+
+# The Setup Flow
+
+The Setup Flow takes a new backend from an empty folder to a running **Skeleton Solution**: a .NET 10 solution laid out with Clean Architecture, with the building blocks for Domain-Driven Design (DDD) and Command Query Responsibility Segregation (CQRS) in place, and no business features yet. It needs no database, message broker or identity provider. Everything else comes afterwards as [Add-ons](./addons.mdx).
+
+## What you will build
+
+| Project | Layer | What goes in it |
+| --- | --- | --- |
+| `Domain` | Core of the onion; depends on nothing | DDD building blocks: entities, aggregate roots, domain events, strongly typed IDs, `Result` and errors |
+| `Application` | Depends on Domain | CQRS: Commands, Queries and their handlers through MediatR, with logging and validation pipelines |
+| `Infrastructure` | Implements Application's abstractions | Technical services; empty in the core apart from time, health checks and HTTP resilience |
+| `Api` | Entry point; wires everything together | Minimal API endpoints, error handling, OpenAPI, logging with Serilog and Seq |
+| Four test projects | | Architecture tests that enforce the layer rules, plus unit and Api tests |
+
+[Reference 3](../reference/spec/03-layers-and-dependency-direction.mdx) explains the layers and the direction of dependencies.
+
+## How it works
+
+1. **Name the project in [step 0.1](./project-settings.mdx).** Its Project Name and Short Name replace `%%ProductName%%` and `%%productname%%` in every command and file on the site.
+2. **Follow the steps in order.** Each code step has three tabs:
+   - **Manual** (the default) lists the commands to run and every file to create, with its code and a link to where the Reference explains it.
+   - **Script** runs one command in step 1.2 that creates the whole Skeleton Solution.
+   - **AI Agent** gives a prompt for Claude Code, Cursor or Copilot.
+
+   All three end with the same Done Conditions.
+3. **Tick the Done Conditions.** Progress is saved in this browser for the active project. [Projects](/projects) shows every project, its next step, and exports a backup.
+4. **Then add what the project needs** from the [Add-ons](./addons.mdx): PostgreSQL, messaging with RabbitMQ and MassTransit, a Worker, auditing, authentication, and going live on SIT and Production.
+
+:::info[What has been verified]
+Boilerplate v2.0 was checked by running the step 1.2 scaffold script on .NET SDK 10.0.402 for the core alone and for every add-on combination. Every combination builds with zero warnings and creates the expected migration. The core tests pass with no Docker or license, and the Authentication tests pass too. The PostgreSQL and Messaging tests need Docker and were last run on v1.0. Running on a VM (Go live) is not yet verified. If a step fails for you, fix the Reference first, so the next project starts from working code.
+:::
+
+## Steps
+
+<StepList />

@@ -1,0 +1,5 @@
+# The site is the source of truth, not the original Markdown documents
+
+The content started as two parallel Markdown documents (English and 中文, v1.1, 27 Sep 2026). We converted them once into Docusaurus pages and retired the originals, instead of keeping them as masters and generating the site with a splitting script. The Setup Flow reorders and rewrites the content into Steps, which a mechanical split cannot produce, so a generator would be brittle and would still need hand-written pages on top. Consequence: any further edits happen in the site's English and zh-Hans pages; the original documents are not kept in sync.
+
+The originals were themselves a merge of a Chinese template (v1.0) and an English step-by-step guide; their merge notes were dropped from the site because the rejected alternatives already live in the decision record and the open decisions became Project Decisions or ADRs. The English guide's gist files (`scaffold.sh`, `scaffold.ps1`, `scaffold_project.sh`, validator rules) were never merged and follow an older structure.

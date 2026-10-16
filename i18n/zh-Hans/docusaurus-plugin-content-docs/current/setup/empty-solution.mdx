@@ -1,0 +1,66 @@
+---
+sidebar_label: 1.2 项目与引用
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import Prompt12Solution from '../reference/_partials/prompt-12-solution.mdx';
+import SnippetCliScaffold from '../reference/_partials/snippet-cli-scaffold.mdx';
+import ScaffoldCommand from '@site/src/components/ScaffoldCommand';
+import FlagScope from '@site/src/components/FlagScope';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 1.2 创建项目与引用
+
+Clean Architecture 由项目引用来强制执行：每一层都是独立的项目，一个项目只能使用它所引用的项目。本步骤创建 `.slnx` solution，其中有四个源代码项目和四个测试项目，引用只指向内层：
+
+```text
+Api ──► Application ──► Domain
+ │           ▲
+ └─► Infrastructure
+```
+
+Domain 不引用任何项目，Application 只引用 Domain，Infrastructure 实现 Application 所定义的内容。Api 两者都引用，因为它在启动时把所有部分串在一起。[Reference 5](../reference/spec/05-solution-structure.mdx) 展示文件夹结构，[Reference 12.2 表格](../reference/code/12-solution-level.mdx#12-2-directory-packages-props)列出各项引用。
+
+<Tabs groupId="route" queryString>
+<TabItem value="manual" label="手动" default>
+
+在 repo 文件夹内运行：
+
+<FlagScope core>
+<SnippetCliScaffold />
+</FlagScope>
+
+然后检查每个测试 `.csproj` 都有 `<OutputType>Exe</OutputType>`（xUnit v3 需要它），并检查 Api 的 `.csproj` 现在有 `<UserSecretsId>`。
+
+</TabItem>
+<TabItem value="script" label="脚本">
+
+<ScaffoldCommand />
+
+在步骤 1.1 建立的 repo 文件夹内执行。这一条指令完成**步骤 1.2 至 2.5**：
+
+- 建立所有项目与引用
+- 以最新稳定版填好 `Directory.Packages.props`
+- 写入所有 solution 级别文件和 Boilerplate 文件
+- 编译 solution
+
+加上 `--test` 会再执行 `dotnet test`。如果你已经知道项目需要哪些附加组件，先在[附加组件](./addons.mdx)中启用它们：上面的指令就会同时加入它们的 flag 和代码。
+
+脚本在每次网站发布时由 Reference 自动产生，因此内容永远与这里显示的代码一致。执行前请先[阅读脚本](pathname:///scaffold.sh)。
+
+执行完后，逐一核对步骤 1.2 至 2.5 的完成条件。
+
+</TabItem>
+<TabItem value="ai" label="AI Agent">
+
+粘贴这段提示词。它涵盖**本步骤和步骤 1.3**：项目、引用、package 以及所有 solution 级别文件。
+
+<Prompt12Solution />
+
+agent 完成后，先勾选本步骤的完成条件，再勾选步骤 1.3 的完成条件。
+
+</TabItem>
+</Tabs>
+
+<DoneConditions step="empty-solution" />

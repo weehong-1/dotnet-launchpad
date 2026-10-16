@@ -1,0 +1,85 @@
+---
+sidebar_label: C.1 加入 Worker
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import PromptAddWorker from '../reference/_partials/prompt-add-worker.mdx';
+import AddOnSwitch from '@site/src/components/AddOnSwitch';
+import AddOnFiles from '@site/src/components/AddOnFiles';
+import PackageCommands from '@site/src/components/PackageCommands';
+import FlagScope from '@site/src/components/FlagScope';
+import StepApplies from '@site/src/components/StepApplies';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# C.1 加入 Worker
+
+<AddOnSwitch addon="worker" />
+<StepApplies step="worker" />
+
+Worker 是用于后台工作的第二个 host（[Reference 7.1](../reference/spec/07-optional-components.mdx#7-1-worker)、[17](../reference/code/17-worker-optional.mdx)）。它需要消息附加组件。
+
+- 它承载所有 Consumer 并投递 Outbox，让 Api 只负责响应请求。
+- Consumer 不包含业务逻辑：它把消息转成一个 Command，并通过 MediatR 发送。
+- 项目需要定时任务时，以 `BackgroundService` 类的形式放在这里。
+
+<Tabs groupId="route" queryString>
+<TabItem value="manual" label="手动" default>
+
+**1. 创建项目**，把它加入 solution 和架构测试，并引用它的 package：
+
+<FlagScope addon="worker">
+
+```bash
+dotnet new worker -n ProductName.Worker -o src/ProductName.Worker
+rm -f src/ProductName.Worker/Worker.cs
+# 目标框架来自 Directory.Build.props，版本来自 Directory.Packages.props
+sed -i.bak -e '/<TargetFramework>/d' -e '/<PackageReference /d' src/ProductName.Worker/ProductName.Worker.csproj && rm -f src/ProductName.Worker/*.bak
+dotnet sln ProductName.slnx add src/ProductName.Worker/ProductName.Worker.csproj --solution-folder src
+dotnet add src/ProductName.Worker reference src/ProductName.Application src/ProductName.Infrastructure
+dotnet add tests/ProductName.Architecture.Tests reference src/ProductName.Worker
+dotnet user-secrets init --project src/ProductName.Worker
+dotnet user-secrets set "MediatR:LicenseKey" "<key>" --project src/ProductName.Worker
+```
+
+<PackageCommands projects={['Worker']} />
+
+</FlagScope>
+
+**2. 创建新文件，并把高亮的行加入**现有文件。检查 `Properties/launchSettings.json` 是否将 `DOTNET_ENVIRONMENT` 设为 `Development`。
+
+<AddOnFiles addon="worker" />
+
+```bash
+dotnet build
+dotnet test
+```
+
+**3. 运行**，与 Api 并行，在单独的终端中启动：
+
+<FlagScope addon="worker">
+
+```bash
+dotnet run --project src/ProductName.Worker
+```
+
+</FlagScope>
+
+Seq 中的 Worker 日志显示 bus 启动且没有错误。
+
+</TabItem>
+<TabItem value="script" label="脚本">
+
+scaffold 脚本只能把附加组件加入全新的空 repo。如果还没有任何功能，可以重新开始：在上方开启这个附加组件，然后在新文件夹中执行步骤 1.2 的指令。否则请走手动或 AI Agent 路径。
+
+</TabItem>
+<TabItem value="ai" label="AI Agent">
+
+在上方开启这个附加组件，把通用规则（[步骤 1.1](./repository.mdx)）中更新后的附加组件相关行复制到 agent 指令文件中，然后粘贴：
+
+<PromptAddWorker />
+
+</TabItem>
+</Tabs>
+
+<DoneConditions step="worker" />

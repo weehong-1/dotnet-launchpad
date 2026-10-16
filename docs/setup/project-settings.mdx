@@ -1,0 +1,19 @@
+---
+sidebar_label: 0.1 Name your project
+---
+
+import ProjectSettingsForm from '@site/src/components/ProjectSettingsForm';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 0.1 Name your project
+
+Every new backend starts here. What you save becomes the **active project**: code blocks across the site switch to your names.
+
+- **Project Name** replaces `%%ProductName%%`: solution, projects, namespaces and folders.
+- **Short Name** replaces `%%productname%%`: the database name, Linux service account, paths under `/opt`, `/etc` and `/var/log`, and systemd services. It defaults to the last segment of the Project Name, lowercased.
+
+<ProjectSettingsForm />
+
+You can come back and change these later; everything on the site follows the saved values. Add-ons such as PostgreSQL or a Worker are chosen later, on the [Add-ons](./addons.mdx) page, once the core Skeleton Solution runs.
+
+<DoneConditions step="project-settings" />

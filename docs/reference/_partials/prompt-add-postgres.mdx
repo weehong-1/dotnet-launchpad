@@ -1,0 +1,11 @@
+```text
+Add the PostgreSQL add-on to this project, following section 7.4 and the code in Part 2 marked "(add-on: PostgreSQL)". Prerequisite: the core Skeleton Solution is built and its tests pass. Set "Add-on PostgreSQL: yes" in the project settings first.
+
+1. Packages: add the PostgreSQL rows of the 12.2 add-on table, with their versions in Directory.Packages.props.
+2. Create the new files: 14.10 and 14.11 in Application; 15.1 to 15.4 in Infrastructure; 16.4 in Api.
+3. Add the lines marked PostgreSQL to the existing files: Infrastructure DependencyInjection.cs (15.8), Api GlobalExceptionHandler.cs (16.6), Program.cs (16.13), the four appsettings files (16.12), docker-compose.yml (12.5), the integration test base (18.3, 18.4) and every GlobalUsings.cs (11.3).
+4. Install dotnet-ef as a local tool (dotnet new tool-manifest, then dotnet tool install dotnet-ef) and create the first migration named InitialCreate with the 8.11 command. It must be empty: there are no tables yet. If any table appears, stop and explain why.
+5. Do not create any business entity, configuration or repository.
+
+Done when: dotnet build has zero warnings and zero errors; after docker compose up -d, the Api starts in Development and applies migrations; dotnet test passes with Docker running.
+```

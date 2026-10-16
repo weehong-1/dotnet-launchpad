@@ -1,0 +1,47 @@
+---
+sidebar_label: 2.4 Api
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import Prompt16Api from '../reference/_partials/prompt-16-api.mdx';
+import LayerFiles from '@site/src/components/LayerFiles';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 2.4 Api
+
+The Api is the entry point. `Program.cs` wires the layers together (`AddApplication`, `AddInfrastructure`) and sets up what every HTTP API needs:
+
+- **Endpoints** are Minimal API classes, one per use case, found automatically. Each one sends a Command or Query and turns the `Result` into a response.
+- **Error handling** turns failures into ProblemDetails responses.
+- **OpenAPI** with the Scalar UI, **rate limiting**, a `/health` endpoint, and request logging with Serilog to Seq.
+
+The code is in [Reference 16](../reference/code/16-api.mdx).
+
+<Tabs groupId="route" queryString>
+<TabItem value="manual" label="Manual" default>
+
+Create these files in `src/ProductName.Api/`, replacing the template's `Program.cs` and `appsettings` files. Check that `Properties/launchSettings.json` sets `ASPNETCORE_ENVIRONMENT` to `Development`.
+
+<LayerFiles project="Api" />
+
+```bash
+dotnet build
+```
+
+</TabItem>
+<TabItem value="script" label="Script">
+
+Done by the scaffold script in [step 1.2](./empty-solution.mdx). Check the result against the Done Conditions below.
+
+</TabItem>
+<TabItem value="ai" label="AI Agent">
+
+<Prompt16Api />
+
+The prompt's runtime check (b) needs Seq and secrets, so it is checked in step 3.1. Here, check that it builds.
+
+</TabItem>
+</Tabs>
+
+<DoneConditions step="api" />

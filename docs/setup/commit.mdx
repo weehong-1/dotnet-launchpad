@@ -1,0 +1,37 @@
+---
+sidebar_label: 3.2 Commit and push
+---
+
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 3.2 Commit and push the Skeleton Solution
+
+The core Skeleton Solution is complete. Commit it as the project's first commit, check it from a clean clone, and push.
+
+Stage everything, then check that nothing secret is about to be committed:
+
+```bash
+git add -A
+git status --short                                                     # no filled-in .env files, no license files
+git grep --cached -n -i -E "licensekey|mt_license" -- ':!docs/TEMPLATE.md'
+# Every hit must be code or configuration with an empty value, such as "LicenseKey": ""
+```
+
+Commit, then run the tests from a clean clone so nothing depends on files that were never committed:
+
+```bash
+git commit -m "Create the Skeleton Solution from Boilerplate v2.0"
+rm -rf /tmp/productname-clone && git clone -q "$PWD" /tmp/productname-clone
+(cd /tmp/productname-clone && dotnet test)
+```
+
+Create the private GitHub repository and push:
+
+```bash
+gh repo create productname --private --source .
+git push -u origin main
+```
+
+CI comes with the Go live add-on, which also sets the secrets it needs.
+
+<DoneConditions step="commit" />

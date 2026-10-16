@@ -1,0 +1,9 @@
+```text
+执行文档第 18 节（Tests）。前置条件：第 16 节已完成（有 Worker 附加组件时，第 17 节也须完成）。
+
+1. 按第 11 节列出的路径建立 18.1 至 18.5 的文件，内容照文档，附加组件的行只保留设定为“要”的附加组件。测试项目使用 xUnit v3。
+2. 按 11.3 建立四个测试项目的 GlobalUsings.cs。
+3. 除了 18.1 至 18.5 的测试，不要建立其他测试。
+
+完成条件：dotnet test 全部通过。核心测试不需要 Docker；有 PostgreSQL 时，Docker 必须在运行，供 Testcontainers 使用；有消息时，须设定 MT_LICENSE 或 MT_LICENSE_PATH，供 MassTransit 使用。
+```

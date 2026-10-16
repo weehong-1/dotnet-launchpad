@@ -1,0 +1,9 @@
+```bash
+for id in $(grep -oE 'Include="[^"]+" Version=""' Directory.Packages.props | sed -E 's/Include="([^"]+)".*/\1/'); do
+  case "$id" in Microsoft.EntityFrameworkCore*|Microsoft.AspNetCore.*|Microsoft.Extensions.*|Npgsql.EntityFrameworkCore.PostgreSQL) pat='^10\.' ;; *) pat='.' ;; esac
+  v=$(curl -fsSL "https://api.nuget.org/v3-flatcontainer/$(echo "$id" | tr '[:upper:]' '[:lower:]')/index.json" \
+    | tr -d '[]{}" \n' | sed 's/^versions://' | tr ',' '\n' | grep -v -- '-' | grep -- "$pat" | sort -V | tail -1)
+  sed -i.bak "s|Include=\"$id\" Version=\"\"|Include=\"$id\" Version=\"$v\"|" Directory.Packages.props && rm -f Directory.Packages.props.bak
+  echo "$id $v"
+done
+```

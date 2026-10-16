@@ -1,0 +1,48 @@
+---
+sidebar_label: 2.3 Infrastructure
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import Prompt15Infrastructure from '../reference/_partials/prompt-15-infrastructure.mdx';
+import LayerFiles from '@site/src/components/LayerFiles';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 2.3 Infrastructure
+
+Infrastructure 实现 Application 定义的抽象：数据库、message broker、当前用户和其他技术服务。在核心中它几乎是空的：`AddInfrastructure` 注册 `TimeProvider`、健康检查以及对外 HTTP 调用的弹性处理。[附加组件](./addons.mdx)会把它填满：PostgreSQL 加入 EF Core，消息加入 MassTransit，身份验证加入当前用户。代码见 [Reference 15](../reference/code/15-infrastructure.mdx)。
+
+<Tabs groupId="route" queryString>
+<TabItem value="manual" label="手动" default>
+
+Infrastructure 需要 ASP.NET Core 共享框架来使用 HTTP context accessor。把它加入项目文件：
+
+```xml
+<!-- src/ProductName.Infrastructure/ProductName.Infrastructure.csproj -->
+<ItemGroup>
+  <FrameworkReference Include="Microsoft.AspNetCore.App" />
+</ItemGroup>
+```
+
+然后在 `src/ProductName.Infrastructure/` 中创建这些文件：
+
+<LayerFiles project="Infrastructure" />
+
+```bash
+dotnet build
+```
+
+</TabItem>
+<TabItem value="script" label="脚本">
+
+已由[步骤 1.2](./empty-solution.mdx) 的 scaffold 脚本完成。请对照下方的完成条件检查结果。
+
+</TabItem>
+<TabItem value="ai" label="AI Agent">
+
+<Prompt15Infrastructure />
+
+</TabItem>
+</Tabs>
+
+<DoneConditions step="infrastructure" />

@@ -1,0 +1,9 @@
+---
+sidebar_label: "8.13 Strongly typed IDs"
+---
+
+# 8.13 Strongly typed IDs \{#8-13-strongly-typed-ids\}
+
+- Each aggregate defines its own ID implementing `IStronglyTypedId`; see [13.13](../../code/13-domain.mdx#13-13-istronglytypedid-cs).
+- The DbContext adds database value conversion for every strongly typed ID by convention, so a new ID needs **no** individual setup.
+- The domain generates the ID when creating the aggregate (`Guid.CreateVersion7()`), and the entity configuration must set the key to `ValueGeneratedNever()`.

@@ -1,0 +1,38 @@
+---
+sidebar_label: 0.3 Prepare this machine
+---
+
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 0.3 Prepare this machine
+
+## The shell
+
+Commands on this site are written for bash and carry `# comments`. Run them in bash, or in zsh after turning on interactive comments; otherwise zsh treats a comment as more arguments:
+
+```bash
+setopt interactive_comments 2>/dev/null; grep -q interactive_comments ~/.zshrc 2>/dev/null || [ "${SHELL##*/}" != zsh ] || echo 'setopt interactive_comments' >> ~/.zshrc
+```
+
+## The tools
+
+```bash
+dotnet --list-sdks          # a 10.0.x SDK must be listed; note the exact version for global.json
+docker compose version      # Docker must be running: the local Seq log server runs in it
+git --version
+gh auth status              # GitHub CLI, used to create the repository in step 3.2
+```
+
+- Install the .NET 10 SDK from the official .NET download page if it is missing. The exact version goes into `global.json` in step 1.3 ([Reference 12.3](../reference/code/12-solution-level.mdx#12-3-global-json)).
+- On the AI route, have your coding agent (Claude Code, Cursor or GitHub Copilot) ready in a terminal or IDE.
+
+## The licenses
+
+The core uses two products with commercial terms. Confirm them **before** writing code, for the organisation that will actually own and use the system ([Reference 8.5](../reference/spec/08-design-rules/05-third-party-licensing.mdx)):
+
+- **MediatR** (from version 13): free Community license for organisations under USD 5 million annual revenue and no more than USD 10 million outside funding. Get the license key. It goes into User Secrets in step 3.1, never into the repository.
+- **Seq**: free for a single user, paid for more. Check the current terms ([Reference 8.9](../reference/spec/08-design-rules/09-logging-rules.mdx)).
+
+The Messaging add-on adds MassTransit, which has its own license; its page covers it.
+
+<DoneConditions step="local-environment" />

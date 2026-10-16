@@ -1,0 +1,85 @@
+---
+sidebar_label: C.1 Add the Worker
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import PromptAddWorker from '../reference/_partials/prompt-add-worker.mdx';
+import AddOnSwitch from '@site/src/components/AddOnSwitch';
+import AddOnFiles from '@site/src/components/AddOnFiles';
+import PackageCommands from '@site/src/components/PackageCommands';
+import FlagScope from '@site/src/components/FlagScope';
+import StepApplies from '@site/src/components/StepApplies';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# C.1 Add the Worker
+
+<AddOnSwitch addon="worker" />
+<StepApplies step="worker" />
+
+The Worker is a second host for background work ([Reference 7.1](../reference/spec/07-optional-components.mdx#7-1-worker), [17](../reference/code/17-worker-optional.mdx)). It needs Messaging.
+
+- It hosts every Consumer and delivers the Outbox, so the Api only answers requests.
+- A Consumer holds no business logic: it turns the message into a Command and sends it through MediatR.
+- Scheduled jobs go here as `BackgroundService` classes when the project needs them.
+
+<Tabs groupId="route" queryString>
+<TabItem value="manual" label="Manual" default>
+
+**1. Create the project**, add it to the solution and the architecture tests, and reference its packages:
+
+<FlagScope addon="worker">
+
+```bash
+dotnet new worker -n ProductName.Worker -o src/ProductName.Worker
+rm -f src/ProductName.Worker/Worker.cs
+# Target framework from Directory.Build.props, versions from Directory.Packages.props
+sed -i.bak -e '/<TargetFramework>/d' -e '/<PackageReference /d' src/ProductName.Worker/ProductName.Worker.csproj && rm -f src/ProductName.Worker/*.bak
+dotnet sln ProductName.slnx add src/ProductName.Worker/ProductName.Worker.csproj --solution-folder src
+dotnet add src/ProductName.Worker reference src/ProductName.Application src/ProductName.Infrastructure
+dotnet add tests/ProductName.Architecture.Tests reference src/ProductName.Worker
+dotnet user-secrets init --project src/ProductName.Worker
+dotnet user-secrets set "MediatR:LicenseKey" "<key>" --project src/ProductName.Worker
+```
+
+<PackageCommands projects={['Worker']} />
+
+</FlagScope>
+
+**2. Create the new files and add the highlighted lines** to the existing ones. Check that `Properties/launchSettings.json` sets `DOTNET_ENVIRONMENT` to `Development`.
+
+<AddOnFiles addon="worker" />
+
+```bash
+dotnet build
+dotnet test
+```
+
+**3. Run it** next to the Api, in its own terminal:
+
+<FlagScope addon="worker">
+
+```bash
+dotnet run --project src/ProductName.Worker
+```
+
+</FlagScope>
+
+The Worker log in Seq shows the bus starting with no errors.
+
+</TabItem>
+<TabItem value="script" label="Script">
+
+The scaffold script adds add-ons only to a new, empty repository. If no feature exists yet, you can start over: switch this add-on on above, then run the step 1.2 command in a fresh folder. Otherwise use the Manual or AI Agent route.
+
+</TabItem>
+<TabItem value="ai" label="AI Agent">
+
+Switch this add-on on above and copy the updated add-on lines of the common rules ([step 1.1](./repository.mdx)) into the agent instruction file, then paste:
+
+<PromptAddWorker />
+
+</TabItem>
+</Tabs>
+
+<DoneConditions step="worker" />

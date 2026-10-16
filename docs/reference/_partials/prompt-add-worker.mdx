@@ -1,0 +1,10 @@
+```text
+Add the Worker add-on to this project, following section 7.1 and section 17. Prerequisite: the Messaging add-on is in and its tests pass. Set "Add-on Worker: yes" in the project settings first.
+
+1. Create the Worker project as 11.2 does: dotnet new worker, add it to the solution under src, reference Application and Infrastructure, delete the template's Worker.cs, add the Worker packages of the 12.2 table, and run dotnet user-secrets init.
+2. Create the Worker's files per section 17 (prompt 17.3) and its GlobalUsings.cs per 11.3.
+3. Add the lines marked Worker to the existing files: Infrastructure DependencyInjection.cs (15.8: the Api stops delivering the Outbox) and LayerTests.cs (18.1). With the Go live add-on, also add the Worker's systemd service, env template and CI publish step (12.7, 12.9, 12.10).
+4. Do not create any sample Consumer or BackgroundService.
+
+Done when: dotnet build has zero warnings and zero errors; dotnet test passes; after docker compose up -d, the Worker started in Development connects to RabbitMQ with no errors in the log.
+```

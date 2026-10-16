@@ -1,0 +1,49 @@
+---
+sidebar_label: 3.1 运行 Api
+---
+
+import DoneConditions from '@site/src/components/DoneConditions';
+import FlagScope from '@site/src/components/FlagScope';
+
+# 3.1 运行 Api
+
+启动本地日志服务器 Seq，并检查它已经运行：
+
+```bash
+docker compose up -d
+docker compose ps
+```
+
+Seq 位于 [http://localhost:5341](http://localhost:5341)。`docker-compose.yml` 和 `appsettings.Development.json` 中的本地设定是默认值，不是密钥（[Reference 8.8](../reference/spec/08-design-rules/08-configuration-environments-and-secrets.mdx)）。
+
+把步骤 0.3 的 MediatR license key 放进 User Secrets，绝不放进 repo：
+
+<FlagScope core>
+
+```bash
+dotnet user-secrets set "MediatR:LicenseKey" "<key>" --project src/ProductName.Api
+```
+
+</FlagScope>
+
+启动 Api：
+
+<FlagScope core>
+
+```bash
+dotnet run --project src/ProductName.Api
+```
+
+</FlagScope>
+
+从 `Properties/launchSettings.json` 中取得 Api 的 URL，然后在另一个终端中检查：
+
+```bash
+API=http://localhost:5000   # 使用 launchSettings.json 中的 URL
+curl -i $API/health         # 200 且 Healthy
+curl -i $API/openapi/v1.json
+```
+
+在浏览器中打开 `$API/scalar` 查看 API 文档，并打开 [http://localhost:5341](http://localhost:5341) 上的 Seq，查看请求日志条目到达。
+
+<DoneConditions step="run-locally" />

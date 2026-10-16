@@ -1,0 +1,49 @@
+---
+sidebar_label: 3.1 Run the Api
+---
+
+import DoneConditions from '@site/src/components/DoneConditions';
+import FlagScope from '@site/src/components/FlagScope';
+
+# 3.1 Run the Api
+
+Start Seq, the local log server, and check that it is up:
+
+```bash
+docker compose up -d
+docker compose ps
+```
+
+Seq is at [http://localhost:5341](http://localhost:5341). The local settings in `docker-compose.yml` and `appsettings.Development.json` are defaults, not secrets ([Reference 8.8](../reference/spec/08-design-rules/08-configuration-environments-and-secrets.mdx)).
+
+Put the MediatR license key from step 0.3 into User Secrets, never into the repository:
+
+<FlagScope core>
+
+```bash
+dotnet user-secrets set "MediatR:LicenseKey" "<key>" --project src/ProductName.Api
+```
+
+</FlagScope>
+
+Start the Api:
+
+<FlagScope core>
+
+```bash
+dotnet run --project src/ProductName.Api
+```
+
+</FlagScope>
+
+Take the Api's URL from `Properties/launchSettings.json`, then check it in another terminal:
+
+```bash
+API=http://localhost:5000   # use the URL from launchSettings.json
+curl -i $API/health         # 200 and Healthy
+curl -i $API/openapi/v1.json
+```
+
+Open `$API/scalar` in a browser for the API documentation, and Seq at [http://localhost:5341](http://localhost:5341) to see the request log entries arrive.
+
+<DoneConditions step="run-locally" />

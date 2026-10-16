@@ -1,0 +1,79 @@
+---
+sidebar_label: "8.9 日志规范"
+---
+
+# 8.9 日志规范 \{#8-9-logging-rules\}
+
+日志是正式环境排查问题的唯一依据，所有项目必须遵守本节。
+
+**部署前提**
+
+SIT 与 Production 部署在 Ubuntu VM（DigitalOcean、Azure、AWS 皆同），Api 与 Worker 以 systemd 服务执行，前面由 Nginx 做反向代理。不使用容器，也不使用 IIS。
+
+**各环境的输出方式**
+
+| 输出 | Development | SIT | Production | 作用 |
+| --- | --- | --- | --- | --- |
+| 控制台 | 全部，文字格式 | Warning 以上，文字格式 | Warning 以上，文字格式 | 由 systemd 的 journald 收集，用 `journalctl` 快速查看服务状态与启动错误 |
+| 本机文件 | 不写 | JSON，按日轮替，保留 14 天 | JSON，按日轮替，保留 30 天 | 本机的完整纪录；集中日志系统故障时仍有资料可查 |
+| Seq | 本地 Docker | SIT 的 Seq | 正式环境的 Seq | 集中搜索、筛选、告警，日常排查以这里为主 |
+
+**为什么这样设计**
+
+- 在 VM 上，业界做法是**本机文件加上集中日志系统**，两者并用。只写本机文件的话，出问题时要登入每台 VM 翻档案，服务器一多就查不了；只送集中系统的话，集中系统故障期间的日志会遗失。
+- 文件一律使用 **JSON 格式**，方便工具读取与日后转送到其他日志系统；人要阅读时用 Seq。
+- 文件写入包在**非同步**输出中，磁盘缓慢时不会拖慢请求。
+- 控制台只输出 Warning 以上，避免 journald 与文件重复储存大量资料，但服务启动失败等严重问题仍可用 `journalctl -u <服务名称>` 立即看到。
+
+**文件轮替与磁盘保护**
+
+- 路径：`/var/log/<项目名称小写>/api/` 与 `/var/log/<项目名称小写>/worker/`，目录拥有者为执行服务的系统帐号。
+- 每天产生一个新文件；单一文件超过 100 MB 时提前轮替。
+- 同时限制保留天数与文件数量，两者先到者为准，确保日志占用的磁盘有上限（Production 最多约 10 GB，SIT 最多约 5 GB）。
+- journald 另外在 `/etc/systemd/journald.conf` 设定 `SystemMaxUse`（建议 1 GB），避免控制台日志占满磁盘。
+
+**集中日志系统：Seq**
+
+- Seq 与 Serilog 原生整合，是 .NET 项目最常见的自架集中日志系统。**安装在独立的 VM**，不与应用放在同一台，应用服务器故障时仍可查看日志。
+- 以 HTTPS 连线，每个环境、每个服务使用各自的 API key；SIT 与 Production 至少使用不同的 API key，建议 Production 使用独立的 Seq。
+- Seq 的连线网址与 API key 以环境变量提供，不写在设定档（见 [8.8](./08-configuration-environments-and-secrets.mdx)）。
+- 在 Seq 设定告警：Error 数量异常增加、特定错误代码出现时，自动通知负责人。
+- 授权：Seq 单人使用有免费授权，多人使用需付费，启用前确认最新授权条款。若不使用 Seq，删除设定档中的 `Seq` 输出，改用其他集中系统（例如 Grafana Loki），并由 VM 上的收集代理读取本机 JSON 文件送出。
+
+**每条日志自动带有的资讯**
+
+| 资讯 | 来源 |
+| --- | --- |
+| 时间、等级、讯息、异常 | Serilog |
+| `TraceId`、`SpanId` | .NET 为每个请求建立的追踪资讯，Serilog 自动带入；MassTransit 会把追踪资讯随消息传递，因此同一个请求在 Api 与 Worker 的日志可用同一个 `TraceId` 串起来 |
+| `Application` | 设定档，区分 Api 与 Worker |
+| `EnvironmentName`、`MachineName` | 环境变量与主机名称，区分环境与机器 |
+| `RequestName`、耗时 | MediatR 日志管线（[14.8](../../code/14-application.mdx#14-8-loggingpipelinebehavior-cs)） |
+| 请求路径、状态码、耗时、`UserId`、`ClientIp` | Api 的请求日志（[16.13](../../code/16-api.mdx#16-13-program-cs)） |
+
+**等级规范**
+
+| 等级 | 用途 | 例子 |
+| --- | --- | --- |
+| Debug | 开发时的细节，SIT 与 Production 不输出 | 中间计算结果 |
+| Information | 正常流程的重要节点 | 请求完成、消息处理完成 |
+| Warning | 可预期、可恢复的问题 | 验证失败、业务规则拒绝、重试后成功 |
+| Error | 操作失败，需要有人处理 | 未处理的异常、外部服务呼叫最终失败 |
+| Fatal | 服务无法继续运行 | 启动失败 |
+
+**撰写规则**
+
+- 一律使用结构化参数：`logger.LogInformation("Processed {RequestName}", name)`，不要用字符串拼接或 `$""` 插值，否则无法按属性搜索。
+- 属性名称使用 PascalCase，同一概念在全系统用同一个名称（例如一律用 `UserId`，不混用 `UserID`、`uid`）。
+- 记录异常时把异常物件作为第一个参数传入，不要只记 `ex.Message`，否则会遗失堆叠追踪。
+- 同一个错误只记录一次：在处理它的地方记录，往上抛出时不要每一层都记。
+- **不得记录**：密码、令牌、API key、完整信用卡或身份证号码，以及不必要的个人资料。不要把整个请求或回应主体写进日志。
+- 正式环境不得开启 EF Core 的 `EnableSensitiveDataLogging`。
+
+**应用日志与审计纪录的分别**
+
+应用日志给开发与运维排查问题，会按保留期限删除，格式也可能调整。“谁在什么时候修改了什么资料”属于审计纪录，是业务资料，由审计机制写入数据库（见 [7.3](../07-optional-components.mdx#7-3-audit-records)），不可依赖应用日志。两者可用 `TraceId` 互相对照。
+
+**日后扩充**
+
+如需分布式追踪与效能指标，再加入 OpenTelemetry，与 Serilog 并存。

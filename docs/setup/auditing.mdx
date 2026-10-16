@@ -1,0 +1,66 @@
+---
+sidebar_label: D.1 Add auditing
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import PromptAddAuditing from '../reference/_partials/prompt-add-auditing.mdx';
+import SnippetAddMigration from '../reference/_partials/snippet-add-migration.mdx';
+import AddOnSwitch from '@site/src/components/AddOnSwitch';
+import AddOnFiles from '@site/src/components/AddOnFiles';
+import StepApplies from '@site/src/components/StepApplies';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# D.1 Add auditing
+
+<AddOnSwitch addon="auditing" />
+<StepApplies step="auditing" />
+
+Auditing records what changed and who did what, from day one ([Reference 7.3](../reference/spec/07-optional-components.mdx#7-3-audit-records)). History that was never recorded cannot be recovered later. It needs PostgreSQL.
+
+- **Data change audit**: an EF Core interceptor writes an `AuditTrails` row for every change to an entity marked `IAuditable`, with old and new values.
+- **Operation audit**: a pipeline behavior writes an `OperationAudits` row for every run of a Command or Query marked `IAuditableRequest`, including failures.
+
+The application account cannot change or delete audit rows on SIT and Production (Go live).
+
+<Tabs groupId="route" queryString>
+<TabItem value="manual" label="Manual" default>
+
+**1. Create the new files and add the highlighted lines** to the existing ones:
+
+<AddOnFiles addon="auditing" />
+
+```bash
+dotnet build
+```
+
+**2. Create the migration** for the audit tables:
+
+<SnippetAddMigration />
+
+Use `AddAuditTables` as the migration name. Open it: it must contain only the `AuditTrails` and `OperationAudits` tables.
+
+**3. Test:**
+
+```bash
+dotnet test
+```
+
+**4. Write down the audit rule** before features arrive: which kinds of entities implement `IAuditable`, which properties carry `[AuditIgnore]`, and which kinds of Commands or Queries implement `IAuditableRequest`. Put it in the agent instruction file so every feature slice follows it.
+
+</TabItem>
+<TabItem value="script" label="Script">
+
+The scaffold script adds add-ons only to a new, empty repository. If no feature exists yet, you can start over: switch this add-on on above, then run the step 1.2 command in a fresh folder. Otherwise use the Manual or AI Agent route.
+
+</TabItem>
+<TabItem value="ai" label="AI Agent">
+
+Switch this add-on on above and copy the updated add-on lines of the common rules ([step 1.1](./repository.mdx)) into the agent instruction file, then paste:
+
+<PromptAddAuditing />
+
+</TabItem>
+</Tabs>
+
+<DoneConditions step="auditing" />

@@ -1,0 +1,12 @@
+```text
+Run section 12 of the document (solution level).
+
+1. Use the dotnet CLI to create the .slnx solution and every project in section 5: Domain, Application and Infrastructure with classlib; Api with web (empty ASP.NET Core); Worker with worker only with the Worker add-on; the four test projects with xUnit v3 (first run dotnet new install xunit.v3.templates, then create them with dotnet new xunit3), and confirm each .csproj sets <OutputType>Exe</OutputType>. The xunit3 template targets an older framework: set every test project's TargetFramework to net10.0. Remove every PackageReference the templates add (versions live only in Directory.Packages.props). The commands in 11.2 do all of this and can be used as a reference.
+2. Set each project's project references and NuGet package references per the core 12.2 table, plus the rows of the 12.2 add-on table for the add-ons that are "yes".
+3. Create Directory.Build.props, Directory.Packages.props, global.json, .editorconfig, docker-compose.yml and BannedSymbols.txt with the content of 12.1 to 12.6, keeping only the add-on lines for add-ons that are "yes". Set the global.json version to the locally installed .NET 10 SDK.
+4. Generate .gitignore with dotnet new gitignore. Only with the Go live add-on, create the files of 12.7 to 12.10, replacing %%productname%% in file names and content with the short name and %%ProductName%% with the project name, and add SonarCloud and Qodana per the project settings.
+5. Delete the sample files the project templates generate (such as Class1.cs, UnitTest1.cs, Worker.cs, WeatherForecast code); keep a minimal compilable Program.cs in the Api (and the Worker) for now, to be replaced in sections 16 and 17.
+6. Run dotnet user-secrets init in the Api (and the Worker).
+
+Done when: dotnet build succeeds; docker compose config validates.
+```

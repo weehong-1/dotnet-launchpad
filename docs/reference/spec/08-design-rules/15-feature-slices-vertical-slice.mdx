@@ -1,0 +1,73 @@
+---
+sidebar_label: "8.15 Feature slices (Vertical Slice)"
+---
+
+import PromptFeatureSlice from '../../_partials/prompt-feature-slice.mdx';
+
+# 8.15 Feature slices (Vertical Slice) \{#8-15-feature-slices-vertical-slice\}
+
+**Why use both**
+
+Clean Architecture governs dependency direction and shields the domain from technical detail; Vertical Slice governs organisation and keeps all the code for one use case in one place. With layers alone, a feature is scattered across type based folders such as Commands, Handlers, Validators and DTOs, and changing one feature means jumping between several places; with feature slices, changing a use case usually touches one folder plus its endpoint.
+
+**Folder structure**
+
+Braces mark placeholders. `{Feature}` is a group of related business capabilities (usually a plural noun); `{UseCase}` is one concrete action starting with a verb (for example Create, Cancel, GetById or List plus a noun).
+
+```
+src/
+    ProductName.Domain/
+        Abstractions/
+        {AggregatePlural}/                   By aggregate: aggregate, ID, Errors, domain events, repository interface
+    ProductName.Application/
+        Abstractions/                        Technical shared code: Messaging, Behaviors, Data, Authentication, Auditing
+        IntegrationEvents/                   Outbound message contracts, not part of any slice
+        Features/
+            {Feature}/
+                {WriteUseCase}/
+                    {UseCase}Command.cs
+                    {UseCase}CommandValidator.cs
+                    {UseCase}CommandHandler.cs
+                    {UseCase}Response.cs       Only when data is returned
+                {QueryUseCase}/
+                    {UseCase}Query.cs
+                    {UseCase}QueryHandler.cs
+                    {UseCase}Response.cs
+                EventHandlers/               This feature's reactions to domain events
+    ProductName.Infrastructure/
+        Database/
+            Configurations/{Aggregate}Configuration.cs
+            Repositories/{Aggregate}Repository.cs
+    ProductName.Api/
+        Endpoints/
+            {Feature}/
+                {UseCase}.cs                 One to one with the Application use case
+    ProductName.Worker/  # @@worker
+        Consumers/  # @@worker
+            {Feature}/  # @@worker
+                {EventName}Consumer.cs  # @@worker
+tests/
+    ProductName.Domain.UnitTests/{AggregatePlural}/
+    ProductName.Application.UnitTests/Features/{Feature}/{UseCase}/
+    ProductName.Api.IntegrationTests/Features/{Feature}/{UseCase}Tests.cs
+```
+
+Namespaces always match folder paths.
+
+**Rules**
+
+1. **One folder per use case**: the use case's Command or Query, Validator, Handler and Response all live there, one type per file.
+2. **Slices never reference each other**: no Command, Handler or Response from another slice; the architecture tests enforce this (see [18.1](../../code/18-tests.mdx#18-1-layertests-cs)).
+3. **Where shared code goes**: business rules go in Domain; technical capabilities in `Application/Abstractions`; outbound messages in `Application/IntegrationEvents`. **No** catch all folders such as Common, Shared or Helpers.
+4. **No shared DTOs**: each use case has its own Response even if the fields match for now, so one use case's change never affects another.
+5. **Handlers never call handlers**: a handler never sends another Command or Query; cross use case flows are chained through domain events (same transaction) or integration events (async).
+6. **Each slice picks its approach**: write use cases go through aggregates and repositories; query use cases project directly (see [8.1](./01-cqrs-read-and-write-separation.mdx)). Simple slices stay simple, with no abstraction added just for consistency.
+7. **Domain is not sliced**: aggregates are business rule boundaries used by several features, so Domain is organised by aggregate.
+8. **Infrastructure is not sliced**: entity configuration and repositories are named by aggregate and live in technical folders.
+9. **Structures mirror each other**: Api endpoints, Worker consumers and test folders all match Application's `Features/{Feature}/{UseCase}`, so seeing one use case tells you where it lives in every layer.
+
+**AI coding agent prompt: add a feature slice**
+
+Once the template is built, use this prompt for every new use case in daily development (fill in the angle brackets):
+
+<PromptFeatureSlice />

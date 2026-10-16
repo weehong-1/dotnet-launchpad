@@ -1,0 +1,13 @@
+---
+sidebar_label: "8.6 解决方案基础设施"
+---
+
+# 8.6 解决方案基础设施 \{#8-6-solution-infrastructure\}
+
+- **`.slnx`**：.NET 10 默认的解决方案格式，基于 XML，比旧的 `.sln` 简洁易读，合并冲突也更少。
+- **`Directory.Build.props`**：所有项目自动继承，统一目标框架、Nullable、隐式 using、警告视为错误等设置，不必在每个 `.csproj` 重复。
+- **`Directory.Packages.props`**：中央包管理，所有 NuGet 包版本只在这里定义一次，各项目引用时不写版本号。
+- **`global.json`**：锁定 .NET SDK 版本，确保每台机器、每次建置使用同一版 SDK。
+- **`.editorconfig`**：统一代码风格与分析规则，IDE 与建置时都会套用。
+- **`.gitignore`**：以 `dotnet new gitignore` 产生，排除建置产物与本机设定。
+- **`docker-compose.yml`**：一键启动本地开发所需的外部服务（见 [8.10](./10-local-development.mdx)）。

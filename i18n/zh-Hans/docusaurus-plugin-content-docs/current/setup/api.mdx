@@ -1,0 +1,47 @@
+---
+sidebar_label: 2.4 Api
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import Prompt16Api from '../reference/_partials/prompt-16-api.mdx';
+import LayerFiles from '@site/src/components/LayerFiles';
+import DoneConditions from '@site/src/components/DoneConditions';
+
+# 2.4 Api
+
+Api 是入口。`Program.cs` 把各层串在一起（`AddApplication`、`AddInfrastructure`），并设定每个 HTTP API 都需要的东西：
+
+- **Endpoint** 是 Minimal API 类，每个用例一个，会被自动找到。每个 endpoint 发送一个 Command 或 Query，并把 `Result` 转成响应。
+- **错误处理**把失败转成 ProblemDetails 响应。
+- 带 Scalar UI 的 **OpenAPI**、**限流**、`/health` endpoint，以及使用 Serilog 写入 Seq 的请求日志。
+
+代码见 [Reference 16](../reference/code/16-api.mdx)。
+
+<Tabs groupId="route" queryString>
+<TabItem value="manual" label="手动" default>
+
+在 `src/ProductName.Api/` 中创建这些文件，取代模板的 `Program.cs` 和 `appsettings` 文件。检查 `Properties/launchSettings.json` 是否将 `ASPNETCORE_ENVIRONMENT` 设为 `Development`。
+
+<LayerFiles project="Api" />
+
+```bash
+dotnet build
+```
+
+</TabItem>
+<TabItem value="script" label="脚本">
+
+已由[步骤 1.2](./empty-solution.mdx) 的 scaffold 脚本完成。请对照下方的完成条件检查结果。
+
+</TabItem>
+<TabItem value="ai" label="AI Agent">
+
+<Prompt16Api />
+
+提示词中的运行时检查 (b) 需要 Seq 和密钥，因此在步骤 3.1 中检查。在这里，只需检查能否构建。
+
+</TabItem>
+</Tabs>
+
+<DoneConditions step="api" />

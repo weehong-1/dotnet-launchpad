@@ -1,0 +1,10 @@
+---
+sidebar_label: "8.1 CQRS read and write separation"
+---
+
+# 8.1 CQRS read and write separation \{#8-1-cqrs-read-and-write-separation\}
+
+- **Write side**: goes through aggregates and repositories, so business rules are enforced.
+- **Read side**: Queries use the DbContext with `AsNoTracking` and project straight to DTOs, without aggregates.
+
+**Why**: reads need no business rules; skipping aggregate loading and change tracking and selecting only the needed columns makes queries much faster.

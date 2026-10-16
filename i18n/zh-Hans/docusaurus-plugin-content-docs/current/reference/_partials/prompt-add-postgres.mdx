@@ -1,0 +1,11 @@
+```text
+为本项目加入 PostgreSQL 附加组件，依据文档第 7.4 节，以及第二部分标为“（附加组件：PostgreSQL）”的代码。前置条件：核心骨架解决方案已建立，且测试全部通过。先在项目设定中设为“附加组件 PostgreSQL：要”。
+
+1. 套件：加入 12.2 附加组件表格中 PostgreSQL 的各列，版本写在 Directory.Packages.props。
+2. 建立新文件：Application 的 14.10 与 14.11；Infrastructure 的 15.1 至 15.4；Api 的 16.4。
+3. 在现有文件中加入标为 PostgreSQL 的行：Infrastructure 的 DependencyInjection.cs（15.8）、Api 的 GlobalExceptionHandler.cs（16.6）、Program.cs（16.13）、四个 appsettings 文件（16.12）、docker-compose.yml（12.5）、集成测试基础类（18.3、18.4），以及每个 GlobalUsings.cs（11.3）。
+4. 以本地工具安装 dotnet-ef（dotnet new tool-manifest，再 dotnet tool install dotnet-ef），并按 8.11 的指令建立第一个迁移，名称为 InitialCreate。它必须是空的：目前还没有任何数据表。若出现任何数据表，停下来说明原因。
+5. 不要建立任何业务实体、配置或 Repository。
+
+完成条件：dotnet build 零警告零错误；执行 docker compose up -d 后，Api 以 Development 启动并执行数据库迁移；在 Docker 运行中时，dotnet test 全部通过。
+```

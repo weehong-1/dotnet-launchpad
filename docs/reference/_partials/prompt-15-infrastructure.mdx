@@ -1,0 +1,10 @@
+```text
+Run section 15 of the document (Infrastructure). Prerequisite: section 14 is done.
+
+1. Create 15.8 DependencyInjection.cs, keeping only the add-on lines for add-ons that are "yes", plus the files marked "(add-on: X)" for those add-ons (15.1 to 15.4 PostgreSQL; 15.5 Messaging; 15.6 and 15.7 Authentication; 15.9 to 15.14 Auditing). In the core, AddInfrastructure registers only TimeProvider, the HTTP context accessor, health checks and HTTP resilience.
+2. Add the Microsoft.AspNetCore.App framework reference to ProductName.Infrastructure.csproj.
+3. With PostgreSQL or Messaging: if the database or broker is not PostgreSQL or RabbitMQ, stop and confirm the packages to use first, then change UseNpgsql, UsePostgres and UsingRabbitMq.
+4. Do not create any business entity configuration, repository implementation or migration (the first migration is created in section 16 with PostgreSQL); the audit configurations of 15.11 are part of the template and are created with Auditing.
+
+Done when: dotnet build succeeds.
+```
