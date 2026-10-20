@@ -36,10 +36,10 @@ dotnet run --project src/ProductName.Api
 
 </FlagScope>
 
-从 `Properties/launchSettings.json` 中取得 Api 的 URL，然后在另一个终端中检查：
+模板会为每个项目随机选一个端口，因此请从 Api 启动时打印的 `Now listening on` 一行取得 URL（它也是 `Properties/launchSettings.json` 中 `http` profile 的 `applicationUrl`），然后在另一个终端中检查：
 
 ```bash
-API=http://localhost:5000   # 使用 launchSettings.json 中的 URL
+API=http://localhost:<port> # "Now listening on" 中的 URL
 curl -i $API/health         # 200 且 Healthy
 curl -i $API/openapi/v1.json
 ```
