@@ -54,7 +54,7 @@ dotnet user-secrets set "Authentication:Audience" "<audience>" --project src/Pro
 **4. 检查。** 启动 Api，然后：
 
 ```bash
-API=http://localhost:<port> # "Now listening on" 中的 URL
+API=$(awk -F'"' '/"http": *\{/{p=1} p&&/"applicationUrl"/{print $4; exit}' src/ProductName.Api/Properties/launchSettings.json)
 curl -i $API/health         # 200，无需 token
 curl -i $API/openapi/v1.json
 curl -i $API/anything       # 401：默认所有 endpoint 都要求登录
