@@ -54,7 +54,7 @@ dotnet user-secrets set "Authentication:Audience" "<audience>" --project src/Pro
 **4. 检查。** 启动 Api，然后：
 
 ```bash
-API=http://localhost:5000   # 使用 launchSettings.json 中的 URL
+API=http://localhost:<port> # "Now listening on" 中的 URL
 curl -i $API/health         # 200，无需 token
 curl -i $API/openapi/v1.json
 curl -i $API/anything       # 401：默认所有 endpoint 都要求登录

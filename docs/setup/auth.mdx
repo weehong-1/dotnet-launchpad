@@ -54,7 +54,7 @@ dotnet user-secrets set "Authentication:Audience" "<audience>" --project src/Pro
 **4. Check it.** Start the Api, then:
 
 ```bash
-API=http://localhost:5000   # use the URL from launchSettings.json
+API=http://localhost:<port> # the URL from "Now listening on"
 curl -i $API/health         # 200, no token needed
 curl -i $API/openapi/v1.json
 curl -i $API/anything       # 401: every endpoint requires sign in by default
