@@ -17,10 +17,10 @@ git grep --cached -n -i -E "licensekey|mt_license" -- ':!docs/TEMPLATE.md'
 # 每个结果都必须是代码，或值为空的设定，例如 "LicenseKey": ""
 ```
 
-提交，然后从干净的 clone 执行测试，确保没有依赖未提交的文件：
+提交，然后从干净的 clone 执行测试，确保没有依赖未提交的文件。提交信息遵循 [Conventional Commits](https://www.conventionalcommits.org/zh-hans/v1.0.0/)：`<type>: <description>`，例如 `feat`、`fix`、`docs`、`ci` 或 `chore`。
 
 ```bash
-git commit -m "Create the Skeleton Solution from Boilerplate v2.0"
+git commit -m "feat: create the Skeleton Solution from Boilerplate v2.0"
 rm -rf /tmp/productname-clone && git clone -q "$PWD" /tmp/productname-clone
 (cd /tmp/productname-clone && dotnet test)
 ```

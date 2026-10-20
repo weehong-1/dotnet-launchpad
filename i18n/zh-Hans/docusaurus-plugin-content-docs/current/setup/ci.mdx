@@ -57,7 +57,7 @@ gh secret set QODANA_TOKEN   # @@qodana
 **3. Commit、push，并跟踪运行：**
 
 ```bash
-git add -A && git commit -m "Add deployment files and CI" && git push
+git add -A && git commit -m "ci: add deployment files and CI workflow" && git push
 gh run watch                        # 跟踪最新一次运行
 gh run view <run-id>                # artifact productname-<sha> 列在底部
 ```
