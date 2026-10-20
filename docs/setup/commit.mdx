@@ -17,10 +17,10 @@ git grep --cached -n -i -E "licensekey|mt_license" -- ':!docs/TEMPLATE.md'
 # Every hit must be code or configuration with an empty value, such as "LicenseKey": ""
 ```
 
-Commit, then run the tests from a clean clone so nothing depends on files that were never committed:
+Commit, then run the tests from a clean clone so nothing depends on files that were never committed. Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/): `<type>: <description>`, such as `feat`, `fix`, `docs`, `ci` or `chore`.
 
 ```bash
-git commit -m "Create the Skeleton Solution from Boilerplate v2.0"
+git commit -m "feat: create the Skeleton Solution from Boilerplate v2.0"
 rm -rf /tmp/productname-clone && git clone -q "$PWD" /tmp/productname-clone
 (cd /tmp/productname-clone && dotnet test)
 ```
