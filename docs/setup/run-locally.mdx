@@ -36,10 +36,11 @@ dotnet run --project src/ProductName.Api
 
 </FlagScope>
 
-The template picks a random port for each project, so take the Api's URL from the `Now listening on` line it prints on start (it is also the `http` profile's `applicationUrl` in `Properties/launchSettings.json`). Check it in another terminal:
+The template picks a random port for each project. In another terminal, read the Api's URL from the `http` profile in `Properties/launchSettings.json` and check it:
 
 ```bash
-API=http://localhost:<port> # the URL from "Now listening on"
+API=$(awk -F'"' '/"http": *\{/{p=1} p&&/"applicationUrl"/{print $4; exit}' src/ProductName.Api/Properties/launchSettings.json)
+echo $API                   # the same URL as "Now listening on"
 curl -i $API/health         # 200 and Healthy
 curl -i $API/openapi/v1.json
 ```
